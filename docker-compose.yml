@@ -1,0 +1,71 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cont-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cont
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kongpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: cont-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go Admin API
+  admin-api:
+    build:
+      context: ./admin-api
+      dockerfile: Dockerfile
+    container_name: cont-admin-api
+    restart: unless-stopped
+    environment:
+      ADMIN_PORT: "8001"
+      POSTGRES_URL: "postgres://kong:kongpass@postgres:5432/cont?sslmode=disable"
+      REDIS_URL: "redis:6379"
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # OpenResty proxy engine
+  proxy:
+    image: openresty/openresty:alpine
+    container_name: cont-proxy
+    restart: unless-stopped
+    volumes:
+      - ./proxy/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./proxy/lua:/usr/local/openresty/lualib/cont/:ro
+      - proxy_logs:/usr/local/openresty/nginx/logs
+    ports:
+      - "8000:8000"
+    environment:
+      - LUA_PACKAGE_PATH=/usr/local/openresty/lualib/?.lua;/usr/local/openresty/lualib/?/init.lua;./?.lua;./?/init.lua
+    depends_on:
+      - admin-api
+
+volumes:
+  postgres_data:
+  proxy_logs:
