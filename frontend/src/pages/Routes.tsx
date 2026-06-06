@@ -55,7 +55,6 @@ export default function RoutesPage() {
       const values = await form.validateFields()
       setSubmitting(true)
       const payload: Partial<KongRoute> = {
-        name: values.name,
         service: values.service_id ? { id: values.service_id } : undefined,
         protocols: values.protocols,
         hosts: values.hosts ? values.hosts.split(',').map((h: string) => h.trim()) : undefined,
@@ -64,6 +63,7 @@ export default function RoutesPage() {
         strip_path: values.strip_path,
         preserve_host: values.preserve_host,
       }
+      if (values.name) payload.name = values.name
       if (editing) {
         await api.updateRoute(editing.id!, payload)
         message.success('更新成功')
