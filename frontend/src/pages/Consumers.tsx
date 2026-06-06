@@ -184,7 +184,7 @@ export default function ConsumersPage() {
         </Button>
       </Space>
     )},
-    { title: '建立時間', dataIndex: 'created_at', render: v => v ? new Date(v * 1000).toLocaleString('zh-TW') : '-' },
+    { title: '建立時間', dataIndex: 'created_at', render: v => v ? new Date(v).toLocaleString('zh-TW') : '-' },
     {
       title: '操作', width: 100,
       render: (_, r) => (
@@ -218,7 +218,7 @@ export default function ConsumersPage() {
         </Space>
       )
     },
-    { title: '建立時間', dataIndex: 'created_at', render: v => v ? new Date(v * 1000).toLocaleString('zh-TW') : '-' },
+    { title: '建立時間', dataIndex: 'created_at', render: v => v ? new Date(v).toLocaleString('zh-TW') : '-' },
     {
       title: '操作', width: 100,
       render: (_, r) => (
@@ -244,7 +244,7 @@ export default function ConsumersPage() {
           { title: 'Username', dataIndex: 'username', key: 'username', render: v => <b style={{color:'var(--highlight)'}}>{v}</b> },
           { title: 'Custom ID', dataIndex: 'custom_id', key: 'custom_id', render: v => v || <span style={{color:'var(--muted)'}}>—</span> },
           { title: 'ID', dataIndex: 'id', key: 'id', ellipsis: true, render: v => <code style={{fontSize:11,color:'var(--muted)'}}>{v}</code> },
-          { title: '建立時間', dataIndex: 'created_at', render: v => v ? new Date(v * 1000).toLocaleString('zh-TW') : '-' },
+          { title: '建立時間', dataIndex: 'created_at', render: v => v ? new Date(v).toLocaleString('zh-TW') : '-' },
           {
             title: '操作', width: 250,
             render: (_, r) => (
