@@ -623,9 +623,15 @@ func (s *Store) ListPlugins(limit, offset int) ([]Plugin, error) {
 			return nil, err
 		}
 		p.Name = name.String
-		p.RouteID = routeID.String
-		p.ServiceID = serviceID.String
-		p.ConsumerID = consumerID.String
+		if routeID.Valid {
+			p.Route =&PluginScope{ID: routeID.String}
+		}
+		if serviceID.Valid {
+			p.Service = &PluginScope{ID: serviceID.String}
+		}
+		if consumerID.Valid {
+			p.Consumer = &PluginScope{ID: consumerID.String}
+		}
 		if len(config) > 0 {
 			p.Config = json.RawMessage(config)
 		}
@@ -645,11 +651,20 @@ func (s *Store) ListPlugins(limit, offset int) ([]Plugin, error) {
 
 func (s *Store) CreatePlugin(p *Plugin) (*Plugin, error) {
 	configJSON, _ := json.Marshal(p.Config)
+	var routeID, serviceID, consumerID *string
+	if p.Route != nil {
+		routeID = &p.Route.ID
+	}
+	if p.Service != nil {
+		serviceID = &p.Service.ID
+	}
+	if p.Consumer != nil {
+		consumerID = &p.Consumer.ID
+	}
 	err := s.db.QueryRow(`
 		INSERT INTO plugins (name, route_id, service_id, consumer_id, config, enabled)
 		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at, updated_at`,
-		p.Name, nullString(p.RouteID), nullString(p.ServiceID),
-		nullString(p.ConsumerID), configJSON, orBool(p.Enabled, true),
+		p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true),
 	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -673,9 +688,15 @@ func (s *Store) GetPlugin(id string) (*Plugin, error) {
 		return nil, err
 	}
 	p.Name = name.String
-	p.RouteID = routeID.String
-	p.ServiceID = serviceID.String
-	p.ConsumerID = consumerID.String
+	if routeID.Valid {
+		p.Route =&PluginScope{ID: routeID.String}
+	}
+	if serviceID.Valid {
+		p.Service = &PluginScope{ID: serviceID.String}
+	}
+	if consumerID.Valid {
+		p.Consumer = &PluginScope{ID: consumerID.String}
+	}
 	if len(config) > 0 {
 		p.Config = json.RawMessage(config)
 	}
@@ -693,12 +714,21 @@ func (s *Store) GetPlugin(id string) (*Plugin, error) {
 
 func (s *Store) UpdatePlugin(id string, p *Plugin) (*Plugin, error) {
 	configJSON, _ := json.Marshal(p.Config)
+	var routeID, serviceID, consumerID *string
+	if p.Route != nil {
+		routeID = &p.Route.ID
+	}
+	if p.Service != nil {
+		serviceID = &p.Service.ID
+	}
+	if p.Consumer != nil {
+		consumerID = &p.Consumer.ID
+	}
 	err := s.db.QueryRow(`
 		UPDATE plugins SET name=$2, route_id=$3, service_id=$4, consumer_id=$5,
 			config=$6, enabled=$7, updated_at=NOW()
 		WHERE id=$1 RETURNING updated_at`,
-		id, p.Name, nullString(p.RouteID), nullString(p.ServiceID),
-		nullString(p.ConsumerID), configJSON, orBool(p.Enabled, true),
+		id, p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true),
 	).Scan(&p.UpdatedAt)
 	if err != nil {
 		return nil, err

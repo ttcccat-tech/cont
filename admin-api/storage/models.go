@@ -110,12 +110,17 @@ type Consumer struct {
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
+// PluginScope holds the id of the entity this plugin is attached to
+type PluginScope struct {
+	ID string `json:"id"`
+}
+
 type Plugin struct {
 	ID         string          `json:"id"`
 	Name       string          `json:"name"`
-	RouteID    string          `json:"route,omitempty"`
-	ServiceID  string          `json:"service,omitempty"`
-	ConsumerID string          `json:"consumer,omitempty"`
+	Route      *PluginScope    `json:"route,omitempty"`
+	Service    *PluginScope    `json:"service,omitempty"`
+	Consumer   *PluginScope    `json:"consumer,omitempty"`
 	Config     json.RawMessage `json:"config,omitempty"`
 	Enabled    bool            `json:"enabled"`
 	CreatedAt  string          `json:"created_at,omitempty"`
