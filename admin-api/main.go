@@ -37,6 +37,13 @@ func main() {
 	r.GET("/status", routes.Status(store))
 	r.GET("/metrics", routes.Metrics(store))
 
+	// Auth
+	auth := r.Group("/auth")
+	{
+		auth.POST("/login", routes.Login(store))
+		auth.POST("/sso/mock", routes.SSOMock(store))
+	}
+
 	// Admin API — Kong-compatible
 	admin := r.Group("/")
 	{

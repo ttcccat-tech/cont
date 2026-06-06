@@ -24,22 +24,61 @@ type Service struct {
 	UpdatedAt       string `json:"updated_at,omitempty"`
 }
 
+// Route wraps ServiceID so JSON serializes as {"service":{"id":"..."}}
 type Route struct {
-	ID                     string   `json:"id"`
-	Name                   string   `json:"name,omitempty"`
-	ServiceID              string   `json:"service,omitempty"`
-	Protocols              []string `json:"protocols,omitempty"`
-	Hosts                  []string `json:"hosts,omitempty"`
-	Paths                  []string `json:"paths,omitempty"`
-	Methods                []string `json:"methods,omitempty"`
-	StripPath              bool     `json:"strip_path"`
-	PreserveHost           bool     `json:"preserve_host"`
-	RegexPriority          int      `json:"regex_priority,omitempty"`
-	HTTPSRedirectStatusCode int     `json:"https_redirect_status_code,omitempty"`
-	ConnectionTimeout      int      `json:"connection_timeout,omitempty"`
-	Enabled                bool     `json:"enabled"`
-	CreatedAt              string   `json:"created_at,omitempty"`
-	UpdatedAt              string   `json:"updated_at,omitempty"`
+	ID                       string   `json:"id"`
+	Name                     string   `json:"name,omitempty"`
+	Service                  *ServiceRef `json:"service,omitempty"`
+	Protocols                []string `json:"protocols,omitempty"`
+	Hosts                    []string `json:"hosts,omitempty"`
+	Paths                    []string `json:"paths,omitempty"`
+	Methods                  []string `json:"methods,omitempty"`
+	StripPath                bool     `json:"strip_path"`
+	PreserveHost             bool     `json:"preserve_host"`
+	RegexPriority            int      `json:"regex_priority,omitempty"`
+	HTTPSRedirectStatusCode int      `json:"https_redirect_status_code,omitempty"`
+	ConnectionTimeout        int      `json:"connection_timeout,omitempty"`
+	Enabled                  bool     `json:"enabled"`
+	CreatedAt                string   `json:"created_at,omitempty"`
+	UpdatedAt                string   `json:"updated_at,omitempty"`
+}
+
+// ServiceRef is used for JSON serialize/deserialize of {"service":{"id":"..."}}
+type ServiceRef struct {
+	ID string `json:"id"`
+}
+
+// GetServiceID returns the service ID for SQL writes
+func (r *Route) GetServiceID() string {
+	if r.Service == nil {
+		return ""
+	}
+	return r.Service.ID
+}
+
+// UnmarshalJSON converts {"service":"uuid"} or {"service":{"id":"uuid"}} to ServiceRef
+func (r *Route) UnmarshalJSON(data []byte) error {
+	type routeAlias Route
+	aux := struct {
+		Service interface{} `json:"service"`
+		*routeAlias
+	}{
+		routeAlias: (*routeAlias)(r),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	switch v := aux.Service.(type) {
+	case string:
+		r.Service = &ServiceRef{ID: v}
+	case map[string]interface{}:
+		if id, ok := v["id"].(string); ok {
+			r.Service = &ServiceRef{ID: id}
+		}
+	case nil:
+		r.Service = nil
+	}
+	return nil
 }
 
 type Upstream struct {

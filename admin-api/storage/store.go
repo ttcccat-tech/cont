@@ -4,12 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"strings"
-)
 
-type Store struct {
-	db  *sql.DB
-	rdb *Redis
-}
+	_ "github.com/lib/pq"
+)
 
 func NewStore(db *sql.DB, rdb *Redis) *Store {
 	return &Store{db: db, rdb: rdb}
@@ -193,12 +190,16 @@ func (s *Store) ListRoutes(limit, offset int) ([]Route, error) {
 			&httpsStatus, &connTimeout, &enabled, &created, &updated); err != nil {
 			return nil, err
 		}
-		r.Name = name.String
-		r.ServiceID = serviceID.String
 		jsonScanSlice(&r.Protocols, protocols)
 		jsonScanSlice(&r.Hosts, hosts)
 		jsonScanSlice(&r.Paths, paths)
 		jsonScanSlice(&r.Methods, methods)
+		if name.Valid {
+			r.Name = name.String
+		}
+		if serviceID.Valid {
+			r.Service = &ServiceRef{ID: serviceID.String}
+		}
 		if stripPath.Valid {
 			r.StripPath = stripPath.Bool
 		}
@@ -229,10 +230,10 @@ func (s *Store) ListRoutes(limit, offset int) ([]Route, error) {
 }
 
 func (s *Store) CreateRoute(r *Route) (*Route, error) {
-	protocolsJSON, _ := json.Marshal(orSlice(r.Protocols, []string{"http", "https"}))
-	hostsJSON, _ := json.Marshal(orSlice(r.Hosts, []string{}))
-	pathsJSON, _ := json.Marshal(orSlice(r.Paths, []string{}))
-	methodsJSON, _ := json.Marshal(orSlice(r.Methods, []string{}))
+	protocols := orSlice(r.Protocols, []string{"http", "https"})
+	hosts := orSlice(r.Hosts, []string{})
+	paths := orSlice(r.Paths, []string{})
+	methods := orSlice(r.Methods, []string{})
 
 	err := s.db.QueryRow(`
 		INSERT INTO routes (name, service_id, protocols, hosts, paths, methods,
@@ -240,7 +241,7 @@ func (s *Store) CreateRoute(r *Route) (*Route, error) {
 			connection_timeout, enabled)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		RETURNING id, created_at, updated_at`,
-		r.Name, r.ServiceID, protocolsJSON, hostsJSON, pathsJSON, methodsJSON,
+		r.Name, r.GetServiceID(), "{"+strings.Join(protocols,",")+"}", "{"+strings.Join(hosts,",")+"}", "{"+strings.Join(paths,",")+"}", "{"+strings.Join(methods,",")+"}",
 		orBool(r.StripPath, true), orBool(r.PreserveHost, false),
 		orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426),
 		orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true),
@@ -271,13 +272,15 @@ func (s *Store) GetRoute(id string) (*Route, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.Name = name.String
-	r.ServiceID = serviceID.String
-	jsonScanSlice(&r.Protocols, protocols)
-	jsonScanSlice(&r.Hosts, hosts)
-	jsonScanSlice(&r.Paths, paths)
-	jsonScanSlice(&r.Methods, methods)
-	if stripPath.Valid {
+r.Name = name.String
+		if serviceID.Valid {
+			r.Service = &ServiceRef{ID: serviceID.String}
+		}
+		jsonScanSlice(&r.Protocols, protocols)
+		jsonScanSlice(&r.Hosts, hosts)
+		jsonScanSlice(&r.Paths, paths)
+		jsonScanSlice(&r.Methods, methods)
+		if stripPath.Valid {
 		r.StripPath = stripPath.Bool
 	}
 	if preserveHost.Valid {
@@ -305,22 +308,21 @@ func (s *Store) GetRoute(id string) (*Route, error) {
 }
 
 func (s *Store) UpdateRoute(id string, r *Route) (*Route, error) {
-	protocolsJSON, _ := json.Marshal(orSlice(r.Protocols, []string{"http", "https"}))
-	hostsJSON, _ := json.Marshal(orSlice(r.Hosts, []string{}))
-	pathsJSON, _ := json.Marshal(orSlice(r.Paths, []string{}))
-	methodsJSON, _ := json.Marshal(orSlice(r.Methods, []string{}))
+	protocols := orSlice(r.Protocols, []string{"http", "https"})
+	hosts := orSlice(r.Hosts, []string{})
+	paths := orSlice(r.Paths, []string{})
+	methods := orSlice(r.Methods, []string{})
 
-	err := s.db.QueryRow(`
-		UPDATE routes SET name=$2, service_id=$3, protocols=$4, hosts=$5,
-			paths=$6, methods=$7, strip_path=$8, preserve_host=$9,
-			regex_priority=$10, https_redirect_status_code=$11,
-			connection_timeout=$12, enabled=$13, updated_at=NOW()
-		WHERE id=$1 RETURNING updated_at`,
-		id, r.Name, r.ServiceID, protocolsJSON, hostsJSON, pathsJSON,
-		methodsJSON, orBool(r.StripPath, true), orBool(r.PreserveHost, false),
-		orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426),
-		orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true),
-	).Scan(&r.UpdatedAt)
+	// Build UPDATE with only provided fields — avoid empty string for UUID
+	setClauses := []string{"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6", "strip_path=$7", "preserve_host=$8", "regex_priority=$9", "https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12"}
+	args := []interface{}{id, r.Name, "{" + strings.Join(protocols, ",") + "}", "{" + strings.Join(hosts, ",") + "}", "{" + strings.Join(paths, ",") + "}", "{" + strings.Join(methods, ",") + "}", orBool(r.StripPath, true), orBool(r.PreserveHost, false), orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426), orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true)}
+	if svcID := r.GetServiceID(); svcID != "" {
+		setClauses = append([]string{"service_id=$13"}, setClauses...)
+		args = append([]interface{}{svcID}, args...)
+	}
+	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 RETURNING updated_at"
+
+	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -768,7 +770,17 @@ func jsonScanSlice(out *[]string, data []byte) {
 		*out = []string{}
 		return
 	}
-	json.Unmarshal(data, out)
+	if err := json.Unmarshal(data, out); err != nil {
+		// Fallback: PostgreSQL TEXT[] format like {http,https}
+		s := string(data)
+		s = strings.TrimPrefix(s, "{")
+		s = strings.TrimSuffix(s, "}")
+		if s == "" {
+			*out = []string{}
+			return
+		}
+		*out = strings.Split(s, ",")
+	}
 }
 
 func nullString(s string) interface{} {

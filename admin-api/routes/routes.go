@@ -77,7 +77,9 @@ func Status(store *storage.Store) gin.HandlerFunc {
 		c.JSON(http.StatusOK, storage.StatusResponse{
 			Version: "cont 0.1.0",
 			Uptime:  int64(storage.StartTime.Second()),
-			Database: struct{ Reachable bool }{Reachable: true},
+			Database: struct {
+				Reachable bool `json:"reachable"`
+			}{Reachable: true},
 		})
 	}
 }
@@ -177,7 +179,7 @@ func DeleteService(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
-		c.NoContent(204)
+		c.Status(http.StatusNoContent)
 	}
 }
 
@@ -252,7 +254,7 @@ func DeleteRoute(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
-		c.NoContent(204)
+		c.Status(http.StatusNoContent)
 	}
 }
 
@@ -327,7 +329,7 @@ func DeleteUpstream(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
-		c.NoContent(204)
+		c.Status(http.StatusNoContent)
 	}
 }
 
@@ -383,7 +385,7 @@ func DeleteTarget(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
-		c.NoContent(204)
+		c.Status(http.StatusNoContent)
 	}
 }
 
@@ -458,7 +460,7 @@ func DeleteConsumer(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
-		c.NoContent(204)
+		c.Status(http.StatusNoContent)
 	}
 }
 
@@ -533,7 +535,7 @@ func DeletePlugin(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
-		c.NoContent(204)
+		c.Status(http.StatusNoContent)
 	}
 }
 
@@ -581,7 +583,111 @@ func GetWorkspace(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type LoginResponse struct {
+	Token       string         `json:"token"`
+	User        UserInfo       `json:"user"`
+	Permissions map[string]any `json:"permissions"`
+}
+
+type UserInfo struct {
+	ID          string           `json:"id"`
+	Username    string           `json:"username"`
+	DisplayName string           `json:"display_name"`
+	Email       string           `json:"email"`
+	Groups      []map[string]any `json:"groups"`
+	CreatedAt   string           `json:"created_at"`
+}
+
+// Demo users: admin/admin123 (full), user/user123 (limited)
+var demoUsers = map[string]struct {
+	Password    string
+	DisplayName string
+	Email       string
+	Groups      []map[string]any
+	Level       int
+}{
+	"admin": {
+		Password:    "admin123",
+		DisplayName: "Administrator",
+		Email:       "admin@cont.local",
+		Groups:      []map[string]any{{"name": "admin", "label": "Administrators"}},
+		Level:       3,
+	},
+	"user": {
+		Password:    "user123",
+		DisplayName: "Regular User",
+		Email:       "user@cont.local",
+		Groups:      []map[string]any{{"name": "users", "label": "Users"}},
+		Level:       1,
+	},
+}
+
+func Login(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req LoginRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request"})
+			return
+		}
+		user, ok := demoUsers[req.Username]
+		if !ok || user.Password != req.Password {
+			c.JSON(401, gin.H{"error": "invalid credentials"})
+			return
+		}
+		c.JSON(200, LoginResponse{
+			Token: "cont-token-" + req.Username + "-demo",
+			User: UserInfo{
+				ID:          req.Username + "-001",
+				Username:    req.Username,
+				DisplayName: user.DisplayName,
+				Email:       user.Email,
+				Groups:      user.Groups,
+				CreatedAt:   "2026-01-01T00:00:00Z",
+			},
+			Permissions: map[string]any{
+				"services":  map[string]any{"mode": "rw", "level": user.Level},
+				"routes":    map[string]any{"mode": "rw", "level": user.Level},
+				"plugins":   map[string]any{"mode": "rw", "level": user.Level},
+				"consumers": map[string]any{"mode": "rw", "level": user.Level},
+				"upstreams": map[string]any{"mode": "rw", "level": user.Level},
+				"workspace": map[string]any{"mode": "rw", "level": user.Level},
+			},
+		})
+	}
+}
+
+func SSOMock(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(200, LoginResponse{
+			Token: "cont-sso-mock-token-admin",
+			User: UserInfo{
+				ID:          "sso-admin-001",
+				Username:    "sso_admin",
+				DisplayName: "SSO Admin",
+				Email:       "sso@cont.local",
+				Groups:      []map[string]any{{"name": "admin", "label": "Administrators"}},
+				CreatedAt:   "2026-01-01T00:00:00Z",
+			},
+			Permissions: map[string]any{
+				"services":  map[string]any{"mode": "rw", "level": 3},
+				"routes":    map[string]any{"mode": "rw", "level": 3},
+				"plugins":   map[string]any{"mode": "rw", "level": 3},
+				"consumers": map[string]any{"mode": "rw", "level": 3},
+				"upstreams": map[string]any{"mode": "rw", "level": 3},
+				"workspace": map[string]any{"mode": "rw", "level": 3},
+			},
+		})
+	}
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 func isUniqueViolation(err error) bool {
 	return err != nil && (contains(err.Error(), "unique") || contains(err.Error(), "23505"))

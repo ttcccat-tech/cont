@@ -1,6 +1,7 @@
 version: '3.9'
 
 services:
+  # ── Databases ────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: cont-postgres
@@ -31,7 +32,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Go Admin API
+  # ── cont Admin API (Go Gin) ───────────────────────────────────
   admin-api:
     build:
       context: ./admin-api
@@ -40,17 +41,19 @@ services:
     restart: unless-stopped
     environment:
       ADMIN_PORT: "8001"
+      API_PORT: "8001"
+      PROXY_PORT: "8000"
       POSTGRES_URL: "postgres://kong:kongpass@postgres:5432/cont?sslmode=disable"
       REDIS_URL: "redis:6379"
     ports:
-      - "8001:8001"
+      - "18081:8001"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  # OpenResty proxy engine
+  # ── cont Proxy Engine (OpenResty) ────────────────────────────
   proxy:
     image: openresty/openresty:alpine
     container_name: cont-proxy
@@ -60,11 +63,32 @@ services:
       - ./proxy/lua:/usr/local/openresty/lualib/cont/:ro
       - proxy_logs:/usr/local/openresty/nginx/logs
     ports:
-      - "8000:8000"
+      - "18000:8000"
     environment:
       - LUA_PACKAGE_PATH=/usr/local/openresty/lualib/?.lua;/usr/local/openresty/lualib/?/init.lua;./?.lua;./?/init.lua
     depends_on:
       - admin-api
+
+  # ── cont Frontend (React + Nginx) ─────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_KONG_BASE: /api
+        VITE_API_BASE: /api
+    container_name: cont-frontend
+    restart: unless-stopped
+    networks:
+      - cont_default
+    ports:
+      - "127.0.0.1:3003:80"
+    depends_on:
+      - admin-api
+
+networks:
+  cont_default:
+    external: true
 
 volumes:
   postgres_data:
