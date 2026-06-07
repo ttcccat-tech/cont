@@ -14,4 +14,18 @@
 
 ---
 
-> 每 commit 完成一項，隨即從上方移除並記錄到下方 ✅已完成
+## ✅ 已完成
+
+（每次開發輪次完成後，隨即將已完成項目移至此處並標注 commit hash）
+
+---
+
+## 完整開發流程（開發守護遵循）
+
+1. **開發執行** → 逐項處理，每修完一個問題即時 commit
+2. **QA 測試** → curl / browser 驗證 Create/Read/Update/Delete 基本流程
+3. **寫入 event.md** → 發現的 Bug 加入 🔴 未完成，完成的移至 ✅
+4. **commit** → 每個變更单独 commit
+5. **push** → 確認所有改動入庫
+
+> 一輪：開發 → QA → Bug 寫入 event.md → commit → push = 完整回合
