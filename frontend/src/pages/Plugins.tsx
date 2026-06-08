@@ -263,13 +263,13 @@ export default function PluginsPage() {
       <Modal
         title={editingPlugin ? '編輯插件' : '新增插件'}
         open={modalOpen}
-        onOk={handleSubmit}
+        onOk={() => form.submit()}
         confirmLoading={submitting}
         onCancel={() => setModalOpen(false)}
         width={600}
         okText={editingPlugin ? '更新' : '建立'}
       >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }} onFinish={handleSubmit}>
           {editingPlugin ? (
             <Form.Item label="插件名"><Tag color="purple">{editingPlugin.name}</Tag></Form.Item>
           ) : (

@@ -139,13 +139,13 @@ export default function Services() {
       <Modal
         title={editing ? '編輯服務' : '新增服務'}
         open={modalOpen}
-        onOk={handleSubmit}
+        onOk={() => form.submit()}
         confirmLoading={submitting}
         onCancel={() => setModalOpen(false)}
         width={560}
         okText={editing ? '更新' : '建立'}
       >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }} onFinish={handleSubmit}>
           <Form.Item name="name" label="服務名稱" rules={[{ required: true, message: '必填' }]}>
             <Input placeholder="my-api-service" />
           </Form.Item>
