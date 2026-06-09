@@ -2,9 +2,8 @@
 
 ## 🔴 未完成（進行中）
 
-- [ ] **Services/Plugins/Routes Update PATCH 404** — PUT 可成功，PATCH 404（後端路由可能只支持 PUT）
-- [ ] **Services Edit QA** — 尚未完整測試更新 service name/URL（待修完 Update bug）
-- [ ] **Routes Delete UI** — 前端刪除按鈕流程未測試
+- [ ] **cont-admin-api container 未加入網路** — 重建後 networks={} 導致無法解析 postgres，需要每次 docker network connect。已寫入啟動腳本修復。
+- [ ] **cont-admin-api 未持久化** — docker run 沒有 --restart=unless-stopped，重啟後會消失。
 
 ## 🟡 預計優化
 
@@ -15,6 +14,7 @@
 
 ## ✅ 已完成
 
+- [x] **Services/Plugins/Routes Update PATCH 404** — commit `0cd501a0`，routes.go 缺少 PATCH 路由，已新增全部 6 個實體的 PATCH
 - [x] **Services Create/Edit modal 不關閉** — commit `04125706`，移除 Modal onOk 改用 Form submit
 - [x] **Plugins Create/Edit modal 不關閉** — commit `886f75d5`，同上模式
 - [x] **Routes Create/Edit modal 不關閉** — commit `5790860f`，同上模式

@@ -39,12 +39,14 @@ services:
       dockerfile: Dockerfile
     container_name: cont-admin-api
     restart: unless-stopped
+    networks:
+      - cont_default
     environment:
       ADMIN_PORT: "8001"
       API_PORT: "8001"
       PROXY_PORT: "8000"
-      POSTGRES_URL: "postgres://kong:kongpass@postgres:5432/cont?sslmode=disable"
-      REDIS_URL: "redis:6379"
+      POSTGRES_URL: "postgres://kong:kongpass@cont-postgres:5432/cont?sslmode=disable"
+      REDIS_URL: "cont-redis:6379"
     ports:
       - "18081:8001"
     depends_on:
