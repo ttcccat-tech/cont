@@ -207,9 +207,15 @@ func CreateRoute(store *storage.Store) gin.HandlerFunc {
 		// Resolve service.name → service.id if service_id is empty
 		if r.Service != nil && r.Service.ID == "" && r.GetServiceName() != "" {
 			svc, err := store.GetServiceByName(r.GetServiceName())
-			if err == nil && svc != nil {
-				r.Service.ID = svc.ID
+			if err != nil {
+				c.JSON(400, gin.H{"message": "service not found: " + r.GetServiceName()})
+				return
 			}
+			if svc == nil {
+				c.JSON(400, gin.H{"message": "service not found: " + r.GetServiceName()})
+				return
+			}
+			r.Service.ID = svc.ID
 		}
 		result, err := store.CreateRoute(&r)
 		if err != nil {
