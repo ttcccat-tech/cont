@@ -111,8 +111,8 @@ export default function RoutesPage() {
       </div>
       <Table columns={columns} dataSource={routes as any} rowKey="id" loading={loading} pagination={{ pageSize: 10 }} locale={{ emptyText: '暫無路由' }} />
 
-      <Modal title={editing ? '編輯路由' : '新增路由'} open={modalOpen} onOk={handleSubmit} confirmLoading={submitting} onCancel={() => setModalOpen(false)} width={580} okText={editing ? '更新' : '建立'}>
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+      <Modal title={editing ? '編輯路由' : '新增路由'} open={modalOpen} onCancel={() => setModalOpen(false)} width={580} footer={null}>
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }} onFinish={handleSubmit}>
           <Form.Item name="name" label="路由名稱（可選）"><Input placeholder="my-route" /></Form.Item>
           <Form.Item name="service_id" label="所屬服務" rules={[{ required: true, message: '必選' }]}>
             <Select placeholder="選擇服務">{services.map(s => <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>)}</Select>
@@ -125,6 +125,14 @@ export default function RoutesPage() {
           <Form.Item name="methods" label="HTTP 方法（可選）" tooltip="多個用逗號分隔"><Input placeholder="GET, POST" /></Form.Item>
           <Form.Item name="strip_path" label="Strip Path" valuePropName="checked" initialValue><Switch checkedChildren="開" unCheckedChildren="關" /></Form.Item>
           <Form.Item name="preserve_host" label="Preserve Host" valuePropName="checked" initialValue={false}><Switch checkedChildren="開" unCheckedChildren="關" /></Form.Item>
+          <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={() => setModalOpen(false)}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={submitting}>
+                {editing ? '更新' : '建立'}
+              </Button>
+            </Space>
+          </Form.Item>
         </Form>
       </Modal>
     </div>
