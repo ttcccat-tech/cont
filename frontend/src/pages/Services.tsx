@@ -57,7 +57,7 @@ export default function Services() {
     try {
       const values = await form.validateFields()
       setSubmitting(true)
-      const payload = {
+      const payload: any = {
         name: values.name,
         url: `${values.protocol}://${values.host}:${values.port}${values.path || ''}`,
         retries: values.retries ?? 5,
@@ -65,6 +65,8 @@ export default function Services() {
         read_timeout: values.read_timeout ?? 60000,
         write_timeout: values.write_timeout ?? 60000,
       }
+      if (values.health_url) payload.health_url = values.health_url
+      if (values.doc_url) payload.doc_url = values.doc_url
       if (editing?.id) {
         await api.updateService(editing.id, payload)
         message.success('更新成功')
@@ -139,11 +141,9 @@ export default function Services() {
       <Modal
         title={editing ? '編輯服務' : '新增服務'}
         open={modalOpen}
-        onOk={() => form.submit()}
-        confirmLoading={submitting}
         onCancel={() => setModalOpen(false)}
         width={560}
-        okText={editing ? '更新' : '建立'}
+        footer={null}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }} onFinish={handleSubmit}>
           <Form.Item name="name" label="服務名稱" rules={[{ required: true, message: '必填' }]}>
@@ -178,6 +178,14 @@ export default function Services() {
           </Form.Item>
           <Form.Item name="doc_url" label="API 文件 URL">
             <Input placeholder="https://api.example.com/docs" />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={() => setModalOpen(false)}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={submitting}>
+                {editing ? '更新' : '建立'}
+              </Button>
+            </Space>
           </Form.Item>
         </Form>
       </Modal>
