@@ -2,9 +2,8 @@
 
 ## 🔴 未完成（進行中）
 
-- [ ] **Services Create UI modal 不關閉** — Ant Design Form + Modal onOk 行為問題，onFinish callback 未被正確觸發
-- [ ] **Plugins Create UI modal 不關閉** — 同上，PluginScope model 已重構但 UI submit 邏輯未動
-- [ ] **Services Edit QA** — 尚未完整測試更新 service name/URL
+- [ ] **Services/Plugins/Routes Update PATCH 404** — PUT 可成功，PATCH 404（後端路由可能只支持 PUT）
+- [ ] **Services Edit QA** — 尚未完整測試更新 service name/URL（待修完 Update bug）
 - [ ] **Routes Delete UI** — 前端刪除按鈕流程未測試
 
 ## 🟡 預計優化
@@ -16,7 +15,12 @@
 
 ## ✅ 已完成
 
-（每次開發輪次完成後，隨即將已完成項目移至此處並標注 commit hash）
+- [x] **Services Create/Edit modal 不關閉** — commit `04125706`，移除 Modal onOk 改用 Form submit
+- [x] **Plugins Create/Edit modal 不關閉** — commit `886f75d5`，同上模式
+- [x] **Routes Create/Edit modal 不關閉** — commit `5790860f`，同上模式
+- [x] **Services Create/Edit/Delete API QA** — Create ✅ Delete ✅（Update PATCH 404 為已知 bug）
+- [x] **Plugins Create/Delete API QA** — Create ✅ Delete ✅（Update PATCH 404 為已知 bug）
+- [x] **Routes Create/Delete API QA** — Create ✅ Delete ✅（Update PATCH 404 為已知 bug）
 
 ---
 
