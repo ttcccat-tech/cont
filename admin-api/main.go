@@ -53,6 +53,7 @@ func main() {
 			svcs.POST("", routes.CreateService(store))
 			svcs.GET("/:id", routes.GetService(store))
 			svcs.PUT("/:id", routes.UpdateService(store))
+			svcs.PATCH("/:id", routes.UpdateService(store))
 			svcs.DELETE("/:id", routes.DeleteService(store))
 		}
 
@@ -62,6 +63,7 @@ func main() {
 			rt.POST("", routes.CreateRoute(store))
 			rt.GET("/:id", routes.GetRoute(store))
 			rt.PUT("/:id", routes.UpdateRoute(store))
+			rt.PATCH("/:id", routes.UpdateRoute(store))
 			rt.DELETE("/:id", routes.DeleteRoute(store))
 		}
 
@@ -71,10 +73,12 @@ func main() {
 			up.POST("", routes.CreateUpstream(store))
 			up.GET("/:id", routes.GetUpstream(store))
 			up.PUT("/:id", routes.UpdateUpstream(store))
+			up.PATCH("/:id", routes.UpdateUpstream(store))
 			up.DELETE("/:id", routes.DeleteUpstream(store))
 			up.GET("/:id/targets", routes.ListTargets(store))
 			up.POST("/:id/targets", routes.CreateTarget(store))
 			up.PUT("/:id/targets/:target_id", routes.UpdateTarget(store))
+			up.PATCH("/:id/targets/:target_id", routes.UpdateTarget(store))
 			up.DELETE("/:id/targets/:target_id", routes.DeleteTarget(store))
 		}
 
@@ -84,6 +88,7 @@ func main() {
 			cons.POST("", routes.CreateConsumer(store))
 			cons.GET("/:id", routes.GetConsumer(store))
 			cons.PUT("/:id", routes.UpdateConsumer(store))
+			cons.PATCH("/:id", routes.UpdateConsumer(store))
 			cons.DELETE("/:id", routes.DeleteConsumer(store))
 		}
 
@@ -93,6 +98,7 @@ func main() {
 			plugs.POST("", routes.CreatePlugin(store))
 			plugs.GET("/:id", routes.GetPlugin(store))
 			plugs.PUT("/:id", routes.UpdatePlugin(store))
+			plugs.PATCH("/:id", routes.UpdatePlugin(store))
 			plugs.DELETE("/:id", routes.DeletePlugin(store))
 		}
 
