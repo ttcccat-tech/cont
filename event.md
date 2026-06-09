@@ -2,8 +2,7 @@
 
 ## 🔴 未完成（進行中）
 
-- [ ] **cont-admin-api container 未加入網路** — 重建後 networks={} 導致無法解析 postgres，需要每次 docker network connect。已寫入啟動腳本修復。
-- [ ] **cont-admin-api 未持久化** — docker run 沒有 --restart=unless-stopped，重啟後會消失。
+- [ ] **Routes Create 不支援 service.name 格式** — 前端以 `{"service":{"name":"..."}}` 傳送，後端只接受 `service.id`，導致 UUID 空字串錯誤 → 已修：models.go ServiceRef + GetServiceName()，store.go GetServiceByName()，routes.go CreateRoute 解析 service.name → commit `0a6e2060`
 
 ## 🟡 預計優化
 
@@ -14,13 +13,16 @@
 
 ## ✅ 已完成
 
+- [x] **cont-admin-api container 未加入網路** — commit `295379b7`，docker-compose.yml 新增 networks: cont_default，確保網路正確連接
+- [x] **cont-admin-api 未持久化** — commit `295379b7`，新增 restart: unless-stopped
+- [x] **Routes Create 不支援 service.name 格式** — commit `0a6e2060`，models.go ServiceRef + GetServiceName()，store.go GetServiceByName()，routes.go CreateRoute 解析 service.name → service.id
 - [x] **Services/Plugins/Routes Update PATCH 404** — commit `0cd501a0`，routes.go 缺少 PATCH 路由，已新增全部 6 個實體的 PATCH
 - [x] **Services Create/Edit modal 不關閉** — commit `04125706`，移除 Modal onOk 改用 Form submit
 - [x] **Plugins Create/Edit modal 不關閉** — commit `886f75d5`，同上模式
 - [x] **Routes Create/Edit modal 不關閉** — commit `5790860f`，同上模式
-- [x] **Services Create/Edit/Delete API QA** — Create ✅ Delete ✅（Update PATCH 404 為已知 bug）
-- [x] **Plugins Create/Delete API QA** — Create ✅ Delete ✅（Update PATCH 404 為已知 bug）
-- [x] **Routes Create/Delete API QA** — Create ✅ Delete ✅（Update PATCH 404 為已知 bug）
+- [x] **Services Create/Edit/Delete API QA** — Create ✅ Read ✅ Delete ✅（Update PATCH ✅）
+- [x] **Plugins Create/Delete API QA** — Create ✅ Delete ✅（Update PATCH ✅）
+- [x] **Routes Create/Delete API QA** — Create ✅ Read ✅ Delete ✅（Update PATCH ✅）
 
 ---
 
