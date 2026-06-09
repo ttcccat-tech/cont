@@ -263,11 +263,9 @@ export default function PluginsPage() {
       <Modal
         title={editingPlugin ? '編輯插件' : '新增插件'}
         open={modalOpen}
-        onOk={() => form.submit()}
-        confirmLoading={submitting}
         onCancel={() => setModalOpen(false)}
         width={600}
-        okText={editingPlugin ? '更新' : '建立'}
+        footer={null}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }} onFinish={handleSubmit}>
           {editingPlugin ? (
@@ -330,6 +328,14 @@ export default function PluginsPage() {
               {!field.type || field.type === 'text' && <Input placeholder={field.placeholder} />}
             </Form.Item>
           ))}
+          <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={() => setModalOpen(false)}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={submitting}>
+                {editingPlugin ? '更新' : '建立'}
+              </Button>
+            </Space>
+          </Form.Item>
         </Form>
       </Modal>
 
