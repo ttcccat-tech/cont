@@ -43,9 +43,10 @@ type Route struct {
 	UpdatedAt                string   `json:"updated_at,omitempty"`
 }
 
-// ServiceRef is used for JSON serialize/deserialize of {"service":{"id":"..."}}
+// ServiceRef is used for JSON serialize/deserialize of {"service":{"id":"..."}} or {"service":{"name":"..."}}
 type ServiceRef struct {
-	ID string `json:"id"`
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
 }
 
 // GetServiceID returns the service ID for SQL writes
@@ -54,6 +55,14 @@ func (r *Route) GetServiceID() string {
 		return ""
 	}
 	return r.Service.ID
+}
+
+// GetServiceName returns the service name for lookup
+func (r *Route) GetServiceName() string {
+	if r.Service == nil {
+		return ""
+	}
+	return r.Service.Name
 }
 
 // UnmarshalJSON converts {"service":"uuid"} or {"service":{"id":"uuid"}} to ServiceRef
@@ -72,8 +81,11 @@ func (r *Route) UnmarshalJSON(data []byte) error {
 	case string:
 		r.Service = &ServiceRef{ID: v}
 	case map[string]interface{}:
-		if id, ok := v["id"].(string); ok {
+		if id, ok := v["id"].(string); ok && id != "" {
 			r.Service = &ServiceRef{ID: id}
+		} else if name, ok := v["name"].(string); ok && name != "" {
+			// Store service.name for later resolution in CreateRoute handler
+			r.Service = &ServiceRef{Name: name}
 		}
 	case nil:
 		r.Service = nil

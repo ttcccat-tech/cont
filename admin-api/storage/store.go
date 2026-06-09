@@ -162,6 +162,16 @@ func (s *Store) getOneService(row *sql.Row) (*Service, error) {
 	return &r, nil
 }
 
+// ── Services (helper) ──────────────────────────────────────────────────────
+
+func (s *Store) GetServiceByName(name string) (*Service, error) {
+	row := s.db.QueryRow(`
+		SELECT id, name, protocol, host, port, path, url, retries,
+		       connect_timeout, read_timeout, write_timeout, enabled,
+		       created_at, updated_at FROM services WHERE name=$1`, name)
+	return s.getOneService(row)
+}
+
 // ── Routes ─────────────────────────────────────────────────────────────────
 
 func (s *Store) ListRoutes(limit, offset int) ([]Route, error) {
