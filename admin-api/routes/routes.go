@@ -737,14 +737,7 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 				Groups:      []map[string]any{{"name": user.Role, "label": strings.Title(user.Role)}},
 				CreatedAt:   user.CreatedAt,
 			},
-			Permissions: map[string]any{
-				"services":  map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
-				"routes":    map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
-				"plugins":   map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
-				"consumers": map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
-				"upstreams": map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
-				"workspace": map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
-			},
+			Permissions: buildPermissions(user.Role),
 		})
 	}
 }
@@ -755,18 +748,12 @@ func GetMe(jwtSecret string) gin.HandlerFunc {
 		userID, _ := c.Get("user_id")
 		username, _ := c.Get("username")
 		role, _ := c.Get("role")
+		roleStr := role.(string)
 		c.JSON(200, gin.H{
 			"id":           userID,
 			"username":     username,
 			"role":         role,
-			"permissions": map[string]any{
-				"services":  map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
-				"routes":    map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
-				"plugins":   map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
-				"consumers": map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
-				"upstreams": map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
-				"workspace": map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
-			},
+			"permissions":  buildPermissions(roleStr),
 		})
 	}
 }
@@ -780,6 +767,42 @@ func levelFromRole(role string) int {
 	default:
 		return 1
 	}
+}
+
+// buildPermissions returns a permissions map that accurately reflects what the
+// user can actually do with each entity, based on the real RBAC rules (CanWrite/CanRead).
+// This is what we return to the frontend so it can show/hide buttons correctly.
+func buildPermissions(role string) map[string]any {
+	entities := []string{"services", "routes", "plugins", "consumers", "upstreams", "targets", "workspaces", "users"}
+	perms := make(map[string]any)
+	for _, e := range entities {
+		canR := storage.CanRead(role, e)
+		canW := storage.CanWrite(role, e)
+		canD := storage.CanDelete(role, e)
+
+		lvl := 0
+		if canR {
+			lvl = 1
+		}
+		if canW {
+			lvl = 2
+		}
+		if canD && e != "targets" { // targets share upstream's delete; skip extra
+			lvl = 3
+		}
+
+		mode := "r"
+		if canW && canD {
+			mode = "rwd"
+		} else if canW {
+			mode = "rw"
+		} else if canR {
+			mode = "r"
+		}
+
+		perms[e] = map[string]any{"mode": mode, "level": lvl}
+	}
+	return perms
 }
 
 func SSOMock(store *storage.Store) gin.HandlerFunc {
