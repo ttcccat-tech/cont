@@ -6,19 +6,20 @@
 
 ## 🟡 預計優化
 
-- [ ] **單元測試覆蓋率提升（Go：admin-api ✅ / Lua：proxy ⏳）** — 為 admin-api (Go) 和 proxy (Lua) 核心模組建立單元測試，提升程式碼品質與回歸防護
-  - Go ✅ — admin-api/storage/models_test.go（14 tests）、admin-api/routes/routes_test.go（8 tests）、admin-api/routes/auth_test.go（7 tests）→ 共 29 tests，commit `c4b52414` + `d06594e3`
-  - Lua ⏳ — proxy/lua/cont/*.lua 單元測試框架尚未建立
+- [ ] **CI/CD Pipeline 建置** — 為 Cont 建立 GitHub Actions / GitLab CI 自動化流程：Go lint (golangci-lint) + test、Lua busted tests、Frontend build + test、Docker image build + push、docker-compose 整合測試
+  - 目標：每個 PR 自動執行全堆疊測試，生產部署前通過全部 quality gates
 
-- [ ] **使用者管理（RBAC 權限）** — 為 Cont 新增 Role-Based Access Control：定義 admin/editor/viewer 角色、對應權限矩陣、角色指派 API，防止一般使用者誤刪系統設定
-  - ✅ — commit `7f58a251`，storage/rbac.go（PermissionMatrix：admin/editor/viewer 權限矩陣）、storage/postgres.go（role column migration）、routes/routes.go（RequirePermission middleware、GET /roles、GET /roles/:role/permissions）、main.go（所有寫操作 RBAC middleware）
-
----
+- [ ] **proxy/lua 深度重構（access.lua / header_filter.lua）** — proxy Lua 核心模組缺少單元測試，且多個 handler 實作粗糙（healthcheck 僅框架、TODO 遍地在）。建立完整測試覆蓋並重構關鍵模組
+  - access_test.lua / header_filter_test.lua 建立
+  - healthcheck.lua 實作 active probing（Redis 健康狀態寫回）
+  - init.lua / worker.lua 穩定性強化
 
 ## ✅ 已完成
 
+- [x] **單元測試覆蓋率提升（Go：admin-api ✅ / Lua：proxy ✅）** — 為 admin-api (Go) 和 proxy (Lua) 核心模組建立單元測試，提升程式碼品質與回歸防護
+  - Go ✅ — admin-api/storage/models_test.go（14 tests）、admin-api/routes/routes_test.go（8 tests）、admin-api/routes/auth_test.go（7 tests）→ 共 29 tests，commit `c4b52414` + `d06594e3`
+  - Lua ✅ — proxy/lua/cont/metrics_test.lua（6 tests）、status_test.lua（9 tests）、healthcheck_test.lua（8 tests）→ 共 23 tests，commit `05c27cef`。busted 測試框架、lua-cjson 安裝完成
 - [x] **Swagger/OpenAPI 文件生成** — commit `c8fa5b71`，admin-api/docs/swagger.yaml（Swagger 2.0，覆蓋 /services, /routes, /upstreams, /consumers, /plugins, /workspaces 全端點，JWT Bearer 認證，Kong-compatible schemas），main.go 新增 /docs 和 /docs.json 端點（無需認證），Dockerfile 複製 docs/ 目錄。QA: /docs ✅ 200, /docs.json ✅ 200, Auth flow ✅
-
 - [x] **生產部署評估** — commit `ce5582e4`，移除 hardcoded IP、Docker DNS resolver、admin-api healthcheck、proxy health-based startup、JWT_SECRET 支援、docker-compose.prod.yml（PG WAL、AOF、記憶體限制）、Makefile 生產目標（build-prod/push-prod/deploy-prod/roll/db-backup）、.gitignore 修復、移除過時 version 欄位
 - [x] **Prometheus Metrics實作** — commit `83832e8f`，prometheus/client_golang 接入，定義 Kong-相容 metrics（kong_nginx_requests_total, kong_nginx_connections_total, kong_service_latency_ms, cont_db_*, cont_redis_*），QA: /metrics ✅ HTTP 200，包含 Go runtime + 自定義 metrics
 - [x] **Cont Auth 正式實作（JWT / bcrypt）** — commit `cfd7f15d`，users table、AuthRequired middleware、JWT 登入廢除 mock
