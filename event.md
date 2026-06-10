@@ -2,16 +2,15 @@
 
 ## 🔴 未完成（進行中）
 
-（暂无）
+- k8s/ 目錄：Namespace + ConfigMap/Secret + postgres + redis + admin-api + frontend + proxy 完整 manifests
+- proxy/Dockerfile：OpenResty -proxy 映像檔建置
+- deploy.sh：前置檢查（kubectl/cluster）、影像建置+推送（REGISTRY）、JWT_SECRET 自動生成、`./deploy.sh apply`/`delete` 生命周期、rollout status
+- Makefile 新增：k8s-apply、k8s-delete、k8s-status、k8s-logs、k8s-port-forward targets
+- 支援 `make deploy-prod` 搭配 REGISTRY + JWT_SECRET 環境變數一鍵部署至 Kubernetes
 
 ## 🟡 預計優化
 
 （暂无）
-  - k8s/ 目錄：Namespace + ConfigMap/Secret + postgres + redis + admin-api + frontend + proxy 完整 manifests
-  - proxy/Dockerfile：OpenResty -proxy 映像檔建置
-  - deploy.sh：前置檢查（kubectl/cluster）、影像建置+推送（REGISTRY）、JWT_SECRET 自動生成、`./deploy.sh apply`/`delete` 生命周期、rollout status
-  - Makefile 新增：k8s-apply、k8s-delete、k8s-status、k8s-logs、k8s-port-forward targets
-  - 支援 `make deploy-prod` 搭配 REGISTRY + JWT_SECRET 環境變數一鍵部署至 Kubernetes
 
 ## ✅ 已完成
 
@@ -100,6 +99,12 @@
 - [x] **Services Create/Edit/Delete API QA** — Create ✅ Read ✅ Delete ✅（Update PATCH ✅）
 - [x] **Plugins Create/Delete API QA** — Create ✅ Delete ✅（Update PATCH ✅）
 - [x] **Routes Create/Delete API QA** — Create ✅ Read ✅ Delete ✅（Update PATCH ✅）
+- [x] **Users.tsx API 修復 + role/enabled 管理** — commit `e304fbe9`
+  - Users.tsx 原本使用錯誤的 `/api/users` 路徑，正確為 `/users`
+  - 移除自定義 axios userClient，改用 kong.ts API 函數（getUsers/createUser/updateUser/deleteUser）
+  - 新增 createUser 到 kong.ts exports
+  - 新增 role/enabled 欄位至 User介面、表格、編輯 Modal
+  - QA: GET→200 ✅, POST→201 ✅, PUT→200 ✅, DELETE→204 ✅
 
 ---
 
