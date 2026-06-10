@@ -69,13 +69,108 @@ const PLUGIN_SCHEMAS: Record<string, PluginField[]> = {
     { name: 'allow', label: '允許 Groups', type: 'tags', placeholder: 'admin' },
     { name: 'deny', label: '拒絕 Groups', type: 'tags' },
   ],
+  'oauth2': [
+    { name: 'scopes', label: '授權範圍', type: 'tags', placeholder: 'read write' },
+    { name: 'mandatory_scope', label: '必填授權範圍', type: 'switch', valuePropName: 'checked' },
+    { name: 'token_expiration', label: 'Token 過期秒數', type: 'number', min: 0, placeholder: '7200' },
+    { name: 'authorization_code_expiration', label: '授權碼過期秒數', type: 'number', min: 0, placeholder: '300' },
+    { name: 'enable_authorization_code', label: '啟用授權碼模式', type: 'switch', valuePropName: 'checked' },
+    { name: 'enable_implicit_grant', label: '啟用隱式授權', type: 'switch', valuePropName: 'checked' },
+    { name: 'enable_client_credentials', label: '啟用客戶端憑證', type: 'switch', valuePropName: 'checked' },
+    { name: 'enable_password_grant', label: '啟用密碼授權', type: 'switch', valuePropName: 'checked' },
+    { name: 'auth_header_name', label: '認證 Header 名', type: 'input', placeholder: 'Authorization' },
+    { name: 'token_prefix', label: 'Token 前綴', type: 'input', placeholder: 'Bearer' },
+  ],
+  'rate-limiting-advanced': [
+    { name: 'limit', label: '請求上限（陣列）', type: 'tags', placeholder: '100, 200' },
+    { name: 'window_size', label: '時間窗口（秒）', type: 'tags', placeholder: '60, 3600' },
+    { name: 'sync_rate', label: 'Redis 同步頻率', type: 'number', min: 0, placeholder: '0' },
+    { name: 'strategy', label: '策略', type: 'select', options: ['local', 'redis', 'cluster'], placeholder: 'local' },
+    { name: 'hide_client_headers', label: '隱藏限制 Header', type: 'switch', valuePropName: 'checked' },
+  ],
+  'proxy-cache-advanced': [
+    { name: 'response_code', label: '快取回應碼', type: 'tags', placeholder: '200, 301, 404' },
+    { name: 'request_method', label: '快取請求方法', type: 'tags', placeholder: 'GET, POST' },
+    { name: 'content_type', label: '快取 Content-Type', type: 'tags', placeholder: 'application/json' },
+    { name: 'cache_ttl', label: '快取 TTL（秒）', type: 'number', min: 0, placeholder: '300' },
+    { name: 'strategy', label: '儲存策略', type: 'select', options: ['memory', 'redis'], placeholder: 'memory' },
+    { name: 'memory_cache_threshold', label: '記憶體快取閾值', type: 'number', min: 1, placeholder: '10000' },
+  ],
+  'gzip': [
+    { name: 'enabled', label: '啟用壓縮', type: 'switch', valuePropName: 'checked' },
+    { name: 'level', label: '壓縮級別', type: 'number', min: 0, max: 9, placeholder: '5' },
+    { name: 'minimum_body_size', label: '最小 body 大小（bytes）', type: 'number', min: 0, placeholder: '12' },
+  ],
+  'websocket-size-limit': [
+    { name: 'size', label: 'WebSocket 訊息大小上限（bytes）', type: 'number', min: 1, placeholder: '65535' },
+  ],
+  'request-transformer': [
+    { name: 'add.headers', label: '新增 Header', type: 'tags', placeholder: 'X-Custom-Header: value' },
+    { name: 'add.querystring', label: '新增 Query', type: 'tags', placeholder: 'key=value' },
+    { name: 'add.form', label: '新增 Form 參數', type: 'tags', placeholder: 'key=value' },
+    { name: 'remove.headers', label: '移除 Header', type: 'tags', placeholder: 'X-Old-Header' },
+    { name: 'remove.querystring', label: '移除 Query 參數', type: 'tags', placeholder: 'old_param' },
+    { name: 'replace.headers', label: '替換 Header', type: 'tags', placeholder: 'X-Old: X-New' },
+  ],
+  'response-transformer': [
+    { name: 'add.headers', label: '新增 Response Header', type: 'tags', placeholder: 'X-Custom-Header: value' },
+    { name: 'add.json', label: '新增 JSON 屬性', type: 'textarea', rows: 2, placeholder: '{"key": "value"}' },
+    { name: 'remove.headers', label: '移除 Response Header', type: 'tags', placeholder: 'X-Old-Header' },
+  ],
+  'correlation-id': [
+    { name: 'header_name', label: 'Header 名稱', type: 'input', placeholder: 'Kong-Request-ID' },
+    { name: 'generator', label: 'ID 生成方式', type: 'select', options: ['uuid', 'uuid#counter', 'tracking'], placeholder: 'uuid' },
+    { name: 'echo_downstream', label: '向下游迴聲', type: 'switch', valuePropName: 'checked' },
+  ],
+  'session': [
+    { name: 'secret', label: 'Session 密鑰', type: 'input', placeholder: 'secret' },
+    { name: 'cookie_name', label: 'Cookie 名稱', type: 'input', placeholder: 'session' },
+    { name: 'cookie_lifetime', label: 'Cookie 生命週期（秒）', type: 'number', min: 0, placeholder: '3600' },
+    { name: 'cookie_renew', label: 'Renew 時間（秒）', type: 'number', min: 0, placeholder: '600' },
+    { name: 'cookie_secure', label: 'Secure Cookie', type: 'switch', valuePropName: 'checked' },
+    { name: 'cookie_samesite', label: 'SameSite 策略', type: 'select', options: ['Strict', 'Lax', 'Off'], placeholder: 'Lax' },
+    { name: 'storage', label: '儲存方式', type: 'select', options: ['cookie', 'redis', 'memcached'], placeholder: 'cookie' },
+  ],
+  'syslog': [
+    { name: 'host', label: 'Syslog 主機', type: 'input', placeholder: '127.0.0.1' },
+    { name: 'port', label: 'Syslog 端口', type: 'number', min: 1, max: 65535, placeholder: '514' },
+    { name: 'facility', label: 'Syslog facility', type: 'select', options: ['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23'], placeholder: '0' },
+    { name: 'log_level', label: '日誌級別', type: 'select', options: ['debug','info','notice','warning','err','crit','alert','emerg'], placeholder: 'info' },
+  ],
+  'loggly': [
+    { name: 'host', label: 'Loggly 主機', type: 'input', placeholder: 'logs-01.loggly.com' },
+    { name: 'port', label: 'Loggly 端口', type: 'number', min: 1, max: 65535, placeholder: '514' },
+    { name: 'token', label: 'Loggly Token', type: 'input', placeholder: 'your-customer-token' },
+  ],
+  'bot-detection': [
+    { name: 'allow', label: '允許名單', type: 'tags', placeholder: 'friendly-bot' },
+    { name: 'deny', label: '拒絕名單', type: 'tags', placeholder: 'malicious-bot' },
+  ],
+  'ldap-auth': [
+    { name: 'ldap_host', label: 'LDAP 主機', type: 'input', placeholder: 'ldap.example.com' },
+    { name: 'ldap_port', label: 'LDAP 端口', type: 'number', min: 1, max: 65535, placeholder: '389' },
+    { name: 'base_dn', label: 'Base DN', type: 'input', placeholder: 'dc=example,dc=com' },
+    { name: 'search_filter', label: '搜尋過濾', type: 'input', placeholder: '(uid=$(username))' },
+    { name: 'bind_dn', label: 'Bind DN', type: 'input', placeholder: 'cn=readonly,dc=example,dc=com' },
+    { name: 'ssl_verify', label: 'SSL 驗證', type: 'switch', valuePropName: 'checked' },
+  ],
 }
 
 const ALL_PLUGINS = [
-  'rate-limiting','jwt','cors','prometheus','key-auth','proxy-cache',
-  'ip-restriction','acl','oauth2','logging','tcp-log','udp-log','file-log',
-  'http-log','statsd','datadog','zipkin','opentelemetry','request-transformer',
-  'response-transformer','-correlation-id','ip-v41'
+  // Auth plugins
+  'jwt', 'key-auth', 'oauth2', 'acl', 'ldap-auth',
+  // Security / Rate limiting
+  'cors', 'ip-restriction', 'bot-detection', 'rate-limiting', 'rate-limiting-advanced',
+  // Caching / Protocol
+  'proxy-cache', 'proxy-cache-advanced', 'gzip', 'websocket-size-limit',
+  // Observability
+  'prometheus', 'datadog', 'zipkin', 'opentelemetry', 'statsd',
+  // Logging
+  'http-log', 'tcp-log', 'udp-log', 'file-log', 'syslog', 'loggly',
+  // Request/Response
+  'request-transformer', 'response-transformer', 'correlation-id',
+  // Sessions
+  'session',
 ]
 
 function renderField(field: PluginField, value: any, onChange: (val: any) => void) {
