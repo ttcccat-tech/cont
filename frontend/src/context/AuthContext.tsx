@@ -67,11 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canDelete = (entity: string) => {
     if (!user) return false
-    // Delete is same as write for now (admin/editor only)
-    if (entity === 'plugins' || entity === 'upstreams') {
-      return user.role === 'admin'
-    }
-    return user.role === 'admin'
+    const perm = user.permissions[entity]
+    if (!perm) return false
+    // level 3 = admin (full), level 2 = editor (can delete services/routes/consumers/targets)
+    return perm.level >= 3
   }
 
   return (
