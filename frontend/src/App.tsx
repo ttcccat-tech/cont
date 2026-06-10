@@ -19,6 +19,7 @@ import ApiKeyRequests from './pages/ApiKeyRequests'
 import ApiDocs from './pages/ApiDocs'
 import { getToken, clearAuth } from './api/kong'
 import { WorkspaceProvider } from './context/WorkspaceContext'
+import { AuthProvider } from './context/AuthContext'
 
 const { Header, Content } = Layout
 
@@ -93,8 +94,9 @@ export default function App() {
         <Route path="/*" element={
           <ProtectedRoute>
             <WorkspaceProvider>
-              <AppLayout>
-                <Routes>
+              <AuthProvider>
+                <AppLayout>
+                  <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/services" element={<Services />} />
@@ -113,8 +115,9 @@ export default function App() {
                   <Route path="/groups" element={<Groups />} />
                 </Routes>
               </AppLayout>
-            </WorkspaceProvider>
-          </ProtectedRoute>
+            </AuthProvider>
+          </WorkspaceProvider>
+        </ProtectedRoute>
         } />
       </Routes>
     </BrowserRouter>

@@ -3,6 +3,7 @@ import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Div
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, KeyOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, CopyOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import api, { KongConsumer } from '../api/kong'
+import { useAuth } from '../context/AuthContext'
 
 interface JWTCredential {
   id: string
@@ -27,6 +28,7 @@ export default function ConsumersPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const { canWrite, canDelete } = useAuth()
 
   // Credential drawer
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -235,7 +237,9 @@ export default function ConsumersPage() {
         <h1>消費者管理</h1>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchConsumers}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setModalOpen(true) }}>新增消費者</Button>
+          {canWrite('consumers') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setModalOpen(true) }}>新增消費者</Button>
+          )}
         </Space>
       </div>
 
@@ -250,9 +254,11 @@ export default function ConsumersPage() {
             render: (_, r) => (
               <Space>
                 <Button size="small" icon={<LockOutlined />} onClick={() => openCredentials(r)}>憑證管理</Button>
-                <Popconfirm title={`確認刪除消費者「${r.username}」？`} onConfirm={() => r.id && handleDelete(r.id)}>
-                  <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
-                </Popconfirm>
+                {canDelete('consumers') && (
+                  <Popconfirm title={`確認刪除消費者「${r.username}」？`} onConfirm={() => r.id && handleDelete(r.id)}>
+                    <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
+                  </Popconfirm>
+                )}
               </Space>
             )
           }

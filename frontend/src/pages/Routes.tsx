@@ -3,6 +3,7 @@ import { Table, Button, Space, Tag, message, Modal, Form, Input, Select, Switch,
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import api, { KongRoute, KongService } from '../api/kong'
+import { useAuth } from '../context/AuthContext'
 
 export default function RoutesPage() {
   const [routes, setRoutes] = useState<KongRoute[]>([])
@@ -12,6 +13,7 @@ export default function RoutesPage() {
   const [editing, setEditing] = useState<KongRoute | null>(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const { canWrite, canDelete } = useAuth()
 
   const fetchAll = () => {
     setLoading(true)
@@ -91,10 +93,14 @@ export default function RoutesPage() {
       title: '操作', key: 'action', width: 160,
       render: (_, record) => (
         <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>編輯</Button>
-          <Popconfirm title="確認刪除？" onConfirm={() => record.id && handleDelete(record.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
-          </Popconfirm>
+          {canWrite('routes') && (
+            <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>編輯</Button>
+          )}
+          {canDelete('routes') && (
+            <Popconfirm title="確認刪除？" onConfirm={() => record.id && handleDelete(record.id)}>
+              <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -106,7 +112,9 @@ export default function RoutesPage() {
         <h1>路由管理</h1>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchAll}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增路由</Button>
+          {canWrite('routes') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增路由</Button>
+          )}
         </Space>
       </div>
       <Table columns={columns} dataSource={routes as any} rowKey="id" loading={loading} pagination={{ pageSize: 10 }} locale={{ emptyText: '暫無路由' }} />

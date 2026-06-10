@@ -749,6 +749,28 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 	}
 }
 
+// GetMe returns the current authenticated user's info and permissions
+func GetMe(jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		role, _ := c.Get("role")
+		c.JSON(200, gin.H{
+			"id":           userID,
+			"username":     username,
+			"role":         role,
+			"permissions": map[string]any{
+				"services":  map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
+				"routes":    map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
+				"plugins":   map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
+				"consumers": map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
+				"upstreams": map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
+				"workspace": map[string]any{"mode": "rw", "level": levelFromRole(role.(string))},
+			},
+		})
+	}
+}
+
 func levelFromRole(role string) int {
 	switch role {
 	case "admin":

@@ -3,6 +3,7 @@ import { Table, Button, Space, Tag, message, Modal, Form, Input, InputNumber, Po
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import api, { KongService } from '../api/kong'
+import { useAuth } from '../context/AuthContext'
 
 const API = import.meta.env.VITE_API_BASE || 'http://localhost:8001'
 
@@ -13,6 +14,7 @@ export default function Services() {
   const [editing, setEditing] = useState<KongService | null>(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const { canWrite, canDelete } = useAuth()
 
   const fetchServices = () => {
     setLoading(true)
@@ -110,10 +112,14 @@ export default function Services() {
       width: 160,
       render: (_, record) => (
         <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>編輯</Button>
-          <Popconfirm title="確認刪除？" onConfirm={() => record.id && handleDelete(record.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
-          </Popconfirm>
+          {canWrite('services') && (
+            <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>編輯</Button>
+          )}
+          {canDelete('services') && (
+            <Popconfirm title="確認刪除？" onConfirm={() => record.id && handleDelete(record.id)}>
+              <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -125,7 +131,9 @@ export default function Services() {
         <h1>服務管理</h1>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchServices}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增服務</Button>
+          {canWrite('services') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增服務</Button>
+          )}
         </Space>
       </div>
 

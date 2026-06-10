@@ -3,6 +3,7 @@ import { Table, Button, Space, Tag, message, Modal, Form, Input, Select, Switch,
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import api, { KongPlugin, KongService, KongRoute, KongConsumer } from '../api/kong'
+import { useAuth } from '../context/AuthContext'
 
 // Plugin configuration schemas
 interface PluginField {
@@ -132,6 +133,7 @@ export default function PluginsPage() {
   const [form] = Form.useForm()
   const [configForm] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const { canWrite, canDelete } = useAuth()
 
   const fetchAll = () => {
     setLoading(true)
@@ -229,9 +231,11 @@ export default function PluginsPage() {
       render: (_, record) => (
         <Space>
           <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(record)}>配置</Button>
-          <Popconfirm title="確認刪除此插件？" onConfirm={() => record.id && handleDelete(record.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
-          </Popconfirm>
+          {canDelete('plugins') && (
+            <Popconfirm title="確認刪除此插件？" onConfirm={() => record.id && handleDelete(record.id)}>
+              <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -246,7 +250,9 @@ export default function PluginsPage() {
         <h1>插件管理</h1>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchAll}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增插件</Button>
+          {canWrite('plugins') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增插件</Button>
+          )}
         </Space>
       </div>
 
