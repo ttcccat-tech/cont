@@ -6,7 +6,26 @@
 
 ## 🟡 預計優化
 
-- [ ] **API Input Validation & Sanitization** — 現有多數 POST/PUT/PATCH handler 直接解析 JSON body 未做結構驗證（如空字串、長度限制、特殊字元），且 store 層直接拼接 SQL（無 parameterization 驗證）。需全面補齊：每個請求的 body schema 驗證、字串長度/格式限制、SQL injection 防禦層。
+- [ ] **自動化部署腳本** — Makefile/Shell 實現 `make deploy-prod`（build + push + apply kubernetes/yaml），降低部署摩擦
+
+## ✅ 已完成
+
+- [x] **Plugin System 完整化** — commit `caac9e45`
+  - 修復 ALL_PLUGINS bug：移除 `-correlation-id`（dash prefix）、`ip-v41`（typo）、`logging`（non-plugin）
+  - 新增 24 個真實 Kong plugin types（auth、security、caching、observability、logging、transformation、sessions）
+  - 新增 14 個 plugin schemas：oauth2、rate-limiting-advanced、proxy-cache-advanced、gzip、websocket-size-limit、request-transformer、response-transformer、correlation-id、session、syslog、loggly、bot-detection、ldap-auth、acl（schema 修復）
+  - 前端 build ✅ 驗證通過
+
+## ✅ 已完成
+
+- [x] **API Input Validation & Sanitization** — commit `8af8f9bf`
+  - models.go: 為所有 entities 新增 binding tags（required, max, min, oneof, url, email）
+  - 新增 routes/validation.go：註冊 `fqdn` 和 `host_port` 自定義 validators
+  - routes.go: 新增 `badRequest()` helper，結構化 validation error 回應（`{message, errors[]}`）
+  - 15 個 ShouldBindJSON error handlers 全面更新為 badRequest()
+  - `IsValidTarget()` / `IsValidHostname()` / `SanitizeString()` 等輔助函數用於程式碼層驗證
+  - Store 層 SQL 已全面參數化（無 SQL injection 風險）
+- [x] **Editor 角色的 targets/upstreams Delete 權限確認**
 
 ## ✅ 已完成
 
