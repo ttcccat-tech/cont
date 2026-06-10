@@ -45,3 +45,40 @@ test-route:
 # Prometheus metrics
 metrics:
 	curl -s http://localhost:8000/metrics | head -20
+
+# ── Production Deployment ────────────────────────────────────
+# Build and tag with git hash for traceability
+VERSION ?= $(shell git rev-parse --short HEAD)
+IMAGE_ADMIN_API := cont-admin-api:$(VERSION)
+IMAGE_FRONTEND := cont-frontend:$(VERSION)
+
+# Build production images with version tags
+build-prod:
+	docker compose build --build-arg GIT_COMMIT=$(VERSION) admin-api frontend
+	docker tag cont-admin-api $(IMAGE_ADMIN_API)
+	docker tag cont-frontend $(IMAGE_FRONTEND)
+	@echo "Built: $(IMAGE_ADMIN_API) and $(IMAGE_FRONTEND)"
+
+# Push images to registry (configure REGISTRY in environment)
+push-prod:
+	docker tag cont-admin-api $(REGISTRY)/cont-admin-api:$(VERSION)
+	docker tag cont-frontend $(REGISTRY)/cont-frontend:$(VERSION)
+	docker push $(REGISTRY)/cont-admin-api:$(VERSION)
+	docker push $(REGISTRY)/cont-frontend:$(VERSION)
+
+# Deploy to production (single node)
+deploy-prod:
+	JWT_SECRET=$$(openssl rand -hex 32) \
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+	@echo "Production deployed with version $(VERSION)"
+
+# Rolling restart (zero-downtime)
+roll:
+	docker compose up -d --no-deps admin-api
+	@echo "Rolled admin-api"
+
+# Database backup
+db-backup:
+	@mkdir -p backups
+	docker compose exec -T postgres pg_dump -U kong cont > backups/cont-$(shell date +%Y%m%d-%H%M%S).sql
+	@echo "Backup saved to backups/"

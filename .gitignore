@@ -1,2 +1,4 @@
 # Build output
-frontend/dist/admin-api/cont-admin-api
+frontend/dist/
+admin-api/cont-admin-api
+admin-api/*.exe
