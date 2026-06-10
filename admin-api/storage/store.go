@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	_ "github.com/lib/pq"
@@ -1266,9 +1267,16 @@ func (s *Store) ListAPIKeyRequests() ([]APIKeyRequest, error) {
 		var r APIKeyRequest
 		var consumerName, desc, reviewedBy, reviewedAt sql.NullString
 		var createdAt, updatedAt sql.NullString
+		var applicantUserID, applicantUsername sql.NullString
 		if err := rows.Scan(&r.ID, &r.KeyName, &consumerName, &desc, &r.Status,
-			&r.ApplicantUserID, &r.ApplicantUsername, &reviewedBy, &reviewedAt, &createdAt, &updatedAt); err != nil {
+			&applicantUserID, &applicantUsername, &reviewedBy, &reviewedAt, &createdAt, &updatedAt); err != nil {
 			return nil, err
+		}
+		if applicantUserID.Valid {
+			r.ApplicantUserID = applicantUserID.String
+		}
+		if applicantUsername.Valid {
+			r.ApplicantUsername = applicantUsername.String
 		}
 		if consumerName.Valid {
 			r.ConsumerName = consumerName.String
@@ -1309,17 +1317,28 @@ func (s *Store) CreateAPIKeyRequest(r *APIKeyRequest) (*APIKeyRequest, error) {
 }
 
 func (s *Store) GetAPIKeyRequest(id string) (*APIKeyRequest, error) {
+	intID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return nil, err
+	}
 	var r APIKeyRequest
 	var consumerName, desc, reviewedBy, reviewedAt sql.NullString
 	var createdAt, updatedAt sql.NullString
-	err := s.db.QueryRow(
+	var applicantUserID, applicantUsername sql.NullString
+	err = s.db.QueryRow(
 		`SELECT id, key_name, consumer_name, description, status, applicant_user_id, applicant_username,
 		        reviewed_by, reviewed_at, created_at, updated_at
-		 FROM api_key_requests WHERE id=$1`, id,
+		 FROM api_key_requests WHERE id=$1`, intID,
 	).Scan(&r.ID, &r.KeyName, &consumerName, &desc, &r.Status,
-		&r.ApplicantUserID, &r.ApplicantUsername, &reviewedBy, &reviewedAt, &createdAt, &updatedAt)
+		&applicantUserID, &applicantUsername, &reviewedBy, &reviewedAt, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
+	}
+	if applicantUserID.Valid {
+		r.ApplicantUserID = applicantUserID.String
+	}
+	if applicantUsername.Valid {
+		r.ApplicantUsername = applicantUsername.String
 	}
 	if consumerName.Valid {
 		r.ConsumerName = consumerName.String
@@ -1343,19 +1362,27 @@ func (s *Store) GetAPIKeyRequest(id string) (*APIKeyRequest, error) {
 }
 
 func (s *Store) UpdateAPIKeyRequest(id string, r *APIKeyRequest) (*APIKeyRequest, error) {
-	err := s.db.QueryRow(
-		`UPDATE api_key_requests SET key_name=$2, consumer_name=$3, description=$4, status=$5,
-		 reviewed_by=$6, reviewed_at=NOW(), updated_at=NOW() WHERE id=$1 RETURNING updated_at`,
-		id, r.KeyName, nullString(r.ConsumerName), nullString(r.Description), r.Status, nullString(r.ReviewedBy),
-	).Scan(&r.UpdatedAt)
+	intID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	return r, nil
+	_, err = s.db.Exec(
+		`UPDATE api_key_requests SET key_name=$2, consumer_name=$3, description=$4, status=$5,
+		 reviewed_by=$6, reviewed_at=NOW(), updated_at=NOW() WHERE id=$1`,
+		intID, r.KeyName, nullString(r.ConsumerName), nullString(r.Description), r.Status, nullString(r.ReviewedBy),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetAPIKeyRequest(id)
 }
 
 func (s *Store) DeleteAPIKeyRequest(id string) error {
-	_, err := s.db.Exec(`DELETE FROM api_key_requests WHERE id=$1`, id)
+	intID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`DELETE FROM api_key_requests WHERE id=$1`, intID)
 	return err
 }
 

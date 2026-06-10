@@ -1099,6 +1099,13 @@ func DeleteUser(store *storage.Store) gin.HandlerFunc {
 
 // ── Auth Groups ─────────────────────────────────────────────────────────────
 
+type UpdateAuthGroupRequest struct {
+	Name        string            `json:"name" binding:"omitempty,max=255"`
+	Label       string            `json:"label" binding:"omitempty"`
+	Description string            `json:"description,omitempty"`
+	Permissions []storage.PermissionEntry `json:"permissions,omitempty"`
+}
+
 func ListAuthGroups(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		groups, err := store.ListAuthGroups()
@@ -1148,12 +1155,29 @@ func GetAuthGroup(store *storage.Store) gin.HandlerFunc {
 func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		var g storage.AuthGroup
-		if err := c.ShouldBindJSON(&g); err != nil {
+		var req UpdateAuthGroupRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
 			badRequest(c, err)
 			return
 		}
-		updated, err := store.UpdateAuthGroup(id, &g)
+		// Fetch existing to merge
+		existing, err := store.GetAuthGroup(id)
+		if err != nil {
+			c.JSON(404, gin.H{"message": "group not found"})
+			return
+		}
+		// Apply partial updates
+		if req.Name != "" {
+			existing.Name = req.Name
+		}
+		if req.Label != "" {
+			existing.Label = req.Label
+		}
+		existing.Description = req.Description
+		if req.Permissions != nil {
+			existing.Permissions = req.Permissions
+		}
+		updated, err := store.UpdateAuthGroup(id, existing)
 		if err != nil {
 			if isUniqueViolation(err) {
 				c.JSON(409, gin.H{"message": "group name already exists"})
@@ -1218,6 +1242,22 @@ func ListAuditLogs(store *storage.Store) gin.HandlerFunc {
 
 // ── Alert Rules ─────────────────────────────────────────────────────────────
 
+type UpdateAlertRuleRequest struct {
+	Name                 string  `json:"name" binding:"omitempty,max=255"`
+	Description          string  `json:"description,omitempty"`
+	MetricType           string  `json:"metric_type" binding:"omitempty,oneof=error_rate latency"`
+	ServiceName          string  `json:"service_name"`
+	ThresholdValue       float64 `json:"threshold_value"`
+	Operator             string  `json:"operator" binding:"omitempty,oneof=> < >= <= =="`
+	DurationSeconds      int     `json:"duration_seconds" binding:"omitempty,min=1"`
+	Enabled              *bool   `json:"enabled"`
+	NotificationChannels string  `json:"notification_channels,omitempty"`
+	SlackWebhookURL      string  `json:"slack_webhook_url,omitempty"`
+	EmailWebhookURL      string  `json:"email_webhook_url,omitempty"`
+	DiscordWebhookURL    string  `json:"discord_webhook_url,omitempty"`
+	AlertSuppressSeconds int     `json:"alert_suppress_seconds"`
+}
+
 func ListAlertRules(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rules, err := store.ListAlertRules()
@@ -1263,12 +1303,42 @@ func GetAlertRule(store *storage.Store) gin.HandlerFunc {
 func UpdateAlertRule(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		var r storage.AlertRule
-		if err := c.ShouldBindJSON(&r); err != nil {
+		var req UpdateAlertRuleRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
 			badRequest(c, err)
 			return
 		}
-		updated, err := store.UpdateAlertRule(id, &r)
+		existing, err := store.GetAlertRule(id)
+		if err != nil {
+			c.JSON(404, gin.H{"message": "alert rule not found"})
+			return
+		}
+		if req.Name != "" {
+			existing.Name = req.Name
+		}
+		existing.Description = req.Description
+		if req.MetricType != "" {
+			existing.MetricType = req.MetricType
+		}
+		existing.ServiceName = req.ServiceName
+		if req.ThresholdValue != 0 {
+			existing.ThresholdValue = req.ThresholdValue
+		}
+		if req.Operator != "" {
+			existing.Operator = req.Operator
+		}
+		if req.DurationSeconds != 0 {
+			existing.DurationSeconds = req.DurationSeconds
+		}
+		if req.Enabled != nil {
+			existing.Enabled = *req.Enabled
+		}
+		existing.NotificationChannels = req.NotificationChannels
+		existing.SlackWebhookURL = req.SlackWebhookURL
+		existing.EmailWebhookURL = req.EmailWebhookURL
+		existing.DiscordWebhookURL = req.DiscordWebhookURL
+		existing.AlertSuppressSeconds = req.AlertSuppressSeconds
+		updated, err := store.UpdateAlertRule(id, existing)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
@@ -1294,6 +1364,14 @@ func DeleteAlertRule(store *storage.Store) gin.HandlerFunc {
 }
 
 // ── API Key Requests ────────────────────────────────────────────────────────
+
+type UpdateAPIKeyReq struct {
+	KeyName       string `json:"key_name" binding:"omitempty,max=255"`
+	ConsumerName  string `json:"consumer_name"`
+	Description   string `json:"description,omitempty"`
+	Status        string `json:"status" binding:"omitempty,oneof=pending approved rejected"`
+	ReviewedBy    string `json:"reviewed_by,omitempty"`
+}
 
 func ListAPIKeyRequests(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -1343,12 +1421,28 @@ func GetAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 func UpdateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		var r storage.APIKeyRequest
-		if err := c.ShouldBindJSON(&r); err != nil {
+		var req UpdateAPIKeyReq
+		if err := c.ShouldBindJSON(&req); err != nil {
 			badRequest(c, err)
 			return
 		}
-		updated, err := store.UpdateAPIKeyRequest(id, &r)
+		existing, err := store.GetAPIKeyRequest(id)
+		if err != nil {
+			c.JSON(404, gin.H{"message": "API key request not found"})
+			return
+		}
+		if req.KeyName != "" {
+			existing.KeyName = req.KeyName
+		}
+		existing.ConsumerName = req.ConsumerName
+		existing.Description = req.Description
+		if req.Status != "" {
+			existing.Status = req.Status
+		}
+		if req.ReviewedBy != "" {
+			existing.ReviewedBy = req.ReviewedBy
+		}
+		updated, err := store.UpdateAPIKeyRequest(id, existing)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return

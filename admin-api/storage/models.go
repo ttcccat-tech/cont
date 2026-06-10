@@ -72,7 +72,7 @@ type APIKeyRequest struct {
 	KeyName            string `json:"key_name" binding:"required,max=255"`
 	ConsumerName       string `json:"consumer_name"`
 	Description        string `json:"description,omitempty"`
-	Status             string `json:"status" binding:"required,oneof=pending approved rejected"`
+	Status             string `json:"status" binding:"omitempty,oneof=pending approved rejected"`
 	ApplicantUserID    string `json:"applicant_user_id"`
 	ApplicantUsername  string `json:"applicant_username"`
 	ReviewedBy         string `json:"reviewed_by,omitempty"`
