@@ -89,6 +89,43 @@ func nextList(c *gin.Context, count int, size, offset int) {
 	}
 }
 
+// badRequest sends a 400 with a structured validation error message
+func badRequest(c *gin.Context, err error) {
+	if err == nil {
+		c.JSON(400, gin.H{"message": "invalid request body"})
+		return
+	}
+	msg := err.Error()
+	if strings.HasPrefix(msg, "Key:") {
+		var fields []string
+		errStr := msg
+		for {
+			idx := strings.Index(errStr, "Error:FieldLevel")
+			if idx == -1 {
+				break
+			}
+			rest := errStr[idx+len("Error:FieldLevel"):]
+			spaceIdx := strings.Index(rest, " ")
+			if spaceIdx > 0 {
+				field := rest[:spaceIdx]
+				if field != "" {
+					fields = append(fields, field)
+				}
+			}
+			if len(rest) > 50 {
+				errStr = rest[50:]
+			} else {
+				break
+			}
+		}
+		if len(fields) > 0 {
+			c.JSON(400, gin.H{"message": "validation failed", "errors": fields})
+			return
+		}
+	}
+	c.JSON(400, gin.H{"message": msg})
+}
+
 func makeCursor(offset int) string {
 	return "?offset=" + iToS(offset)
 }
@@ -148,7 +185,7 @@ func CreateService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var s storage.Service
 		if err := c.ShouldBindJSON(&s); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.CreateService(&s)
@@ -183,7 +220,7 @@ func UpdateService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var s storage.Service
 		if err := c.ShouldBindJSON(&s); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.UpdateService(c.Param("id"), &s)
@@ -227,7 +264,7 @@ func CreateRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var r storage.Route
 		if err := c.ShouldBindJSON(&r); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		// Resolve service.name → service.id if service_id is empty
@@ -271,7 +308,7 @@ func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var r storage.Route
 		if err := c.ShouldBindJSON(&r); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.UpdateRoute(c.Param("id"), &r)
@@ -315,7 +352,7 @@ func CreateUpstream(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var u storage.Upstream
 		if err := c.ShouldBindJSON(&u); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.CreateUpstream(&u)
@@ -346,7 +383,7 @@ func UpdateUpstream(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var u storage.Upstream
 		if err := c.ShouldBindJSON(&u); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.UpdateUpstream(c.Param("id"), &u)
@@ -389,7 +426,7 @@ func CreateTarget(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var t storage.Target
 		if err := c.ShouldBindJSON(&t); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		t.UpstreamID = c.Param("id")
@@ -406,7 +443,7 @@ func UpdateTarget(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var t storage.Target
 		if err := c.ShouldBindJSON(&t); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.UpdateTarget(c.Param("id"), c.Param("target_id"), &t)
@@ -446,7 +483,7 @@ func CreateConsumer(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var con storage.Consumer
 		if err := c.ShouldBindJSON(&con); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.CreateConsumer(&con)
@@ -477,7 +514,7 @@ func UpdateConsumer(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var con storage.Consumer
 		if err := c.ShouldBindJSON(&con); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.UpdateConsumer(c.Param("id"), &con)
@@ -521,7 +558,7 @@ func CreatePlugin(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var p storage.Plugin
 		if err := c.ShouldBindJSON(&p); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.CreatePlugin(&p)
@@ -552,7 +589,7 @@ func UpdatePlugin(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var p storage.Plugin
 		if err := c.ShouldBindJSON(&p); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.UpdatePlugin(c.Param("id"), &p)
@@ -595,7 +632,7 @@ func CreateWorkspace(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var w storage.Workspace
 		if err := c.ShouldBindJSON(&w); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.CreateWorkspace(&w)
@@ -626,7 +663,7 @@ func UpdateWorkspace(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var w storage.Workspace
 		if err := c.ShouldBindJSON(&w); err != nil {
-			c.JSON(400, gin.H{"message": err.Error()})
+badRequest(c, err)
 			return
 		}
 		result, err := store.UpdateWorkspace(c.Param("id"), &w)
@@ -977,7 +1014,7 @@ func CreateUser(store *storage.Store) gin.HandlerFunc {
 			Role        string `json:"role" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request: " + err.Error()})
+badRequest(c, err)
 			return
 		}
 		password := req.Password
