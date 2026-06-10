@@ -622,6 +622,36 @@ func GetWorkspace(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+func UpdateWorkspace(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var w storage.Workspace
+		if err := c.ShouldBindJSON(&w); err != nil {
+			c.JSON(400, gin.H{"message": err.Error()})
+			return
+		}
+		result, err := store.UpdateWorkspace(c.Param("id"), &w)
+		if err == sql.ErrNoRows {
+			c.JSON(404, gin.H{"message": "workspace not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.JSON(200, result)
+	}
+}
+
+func DeleteWorkspace(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := store.DeleteWorkspace(c.Param("id")); err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 type LoginRequest struct {

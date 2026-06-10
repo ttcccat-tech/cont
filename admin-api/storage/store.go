@@ -804,6 +804,23 @@ func (s *Store) GetWorkspace(id string) (*Workspace, error) {
 	return &w, nil
 }
 
+func (s *Store) UpdateWorkspace(id string, w *Workspace) (*Workspace, error) {
+	err := s.db.QueryRow(`
+		UPDATE workspaces SET name=$1 WHERE id=$2
+		RETURNING id, name, created_at`,
+		w.Name, id,
+	).Scan(&w.ID, &w.Name, &w.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return w, nil
+}
+
+func (s *Store) DeleteWorkspace(id string) error {
+	_, err := s.db.Exec(`DELETE FROM workspaces WHERE id=$1`, id)
+	return err
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 func jsonScanSlice(out *[]string, data []byte) {

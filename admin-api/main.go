@@ -73,9 +73,9 @@ func main() {
 	{
 		svcs := admin.Group("/services")
 		{
-			svcs.GET("", routes.ListServices(store))
+			svcs.GET("", routes.RequirePermission("services", false), routes.ListServices(store))
 			svcs.POST("", routes.RequirePermission("services", true), routes.CreateService(store))
-			svcs.GET("/:id", routes.GetService(store))
+			svcs.GET("/:id", routes.RequirePermission("services", false), routes.GetService(store))
 			svcs.PUT("/:id", routes.RequirePermission("services", true), routes.UpdateService(store))
 			svcs.PATCH("/:id", routes.RequirePermission("services", true), routes.UpdateService(store))
 			svcs.DELETE("/:id", routes.RequirePermission("services", true), routes.DeleteService(store))
@@ -83,9 +83,9 @@ func main() {
 
 		rt := admin.Group("/routes")
 		{
-			rt.GET("", routes.ListRoutes(store))
+			rt.GET("", routes.RequirePermission("routes", false), routes.ListRoutes(store))
 			rt.POST("", routes.RequirePermission("routes", true), routes.CreateRoute(store))
-			rt.GET("/:id", routes.GetRoute(store))
+			rt.GET("/:id", routes.RequirePermission("routes", false), routes.GetRoute(store))
 			rt.PUT("/:id", routes.RequirePermission("routes", true), routes.UpdateRoute(store))
 			rt.PATCH("/:id", routes.RequirePermission("routes", true), routes.UpdateRoute(store))
 			rt.DELETE("/:id", routes.RequirePermission("routes", true), routes.DeleteRoute(store))
@@ -93,13 +93,13 @@ func main() {
 
 		up := admin.Group("/upstreams")
 		{
-			up.GET("", routes.ListUpstreams(store))
+			up.GET("", routes.RequirePermission("upstreams", false), routes.ListUpstreams(store))
 			up.POST("", routes.RequirePermission("upstreams", true), routes.CreateUpstream(store))
-			up.GET("/:id", routes.GetUpstream(store))
+			up.GET("/:id", routes.RequirePermission("upstreams", false), routes.GetUpstream(store))
 			up.PUT("/:id", routes.RequirePermission("upstreams", true), routes.UpdateUpstream(store))
 			up.PATCH("/:id", routes.RequirePermission("upstreams", true), routes.UpdateUpstream(store))
 			up.DELETE("/:id", routes.RequirePermission("upstreams", true), routes.DeleteUpstream(store))
-			up.GET("/:id/targets", routes.ListTargets(store))
+			up.GET("/:id/targets", routes.RequirePermission("targets", false), routes.ListTargets(store))
 			up.POST("/:id/targets", routes.RequirePermission("targets", true), routes.CreateTarget(store))
 			up.PUT("/:id/targets/:target_id", routes.RequirePermission("targets", true), routes.UpdateTarget(store))
 			up.PATCH("/:id/targets/:target_id", routes.RequirePermission("targets", true), routes.UpdateTarget(store))
@@ -108,9 +108,9 @@ func main() {
 
 		cons := admin.Group("/consumers")
 		{
-			cons.GET("", routes.ListConsumers(store))
+			cons.GET("", routes.RequirePermission("consumers", false), routes.ListConsumers(store))
 			cons.POST("", routes.RequirePermission("consumers", true), routes.CreateConsumer(store))
-			cons.GET("/:id", routes.GetConsumer(store))
+			cons.GET("/:id", routes.RequirePermission("consumers", false), routes.GetConsumer(store))
 			cons.PUT("/:id", routes.RequirePermission("consumers", true), routes.UpdateConsumer(store))
 			cons.PATCH("/:id", routes.RequirePermission("consumers", true), routes.UpdateConsumer(store))
 			cons.DELETE("/:id", routes.RequirePermission("consumers", true), routes.DeleteConsumer(store))
@@ -118,9 +118,9 @@ func main() {
 
 		plugs := admin.Group("/plugins")
 		{
-			plugs.GET("", routes.ListPlugins(store))
+			plugs.GET("", routes.RequirePermission("plugins", false), routes.ListPlugins(store))
 			plugs.POST("", routes.RequirePermission("plugins", true), routes.CreatePlugin(store))
-			plugs.GET("/:id", routes.GetPlugin(store))
+			plugs.GET("/:id", routes.RequirePermission("plugins", false), routes.GetPlugin(store))
 			plugs.PUT("/:id", routes.RequirePermission("plugins", true), routes.UpdatePlugin(store))
 			plugs.PATCH("/:id", routes.RequirePermission("plugins", true), routes.UpdatePlugin(store))
 			plugs.DELETE("/:id", routes.RequirePermission("plugins", true), routes.DeletePlugin(store))
@@ -129,9 +129,12 @@ func main() {
 		// Workspaces
 		ws := admin.Group("/workspaces")
 		{
-			ws.GET("", routes.ListWorkspaces(store))
+			ws.GET("", routes.RequirePermission("workspaces", false), routes.ListWorkspaces(store))
 			ws.POST("", routes.RequirePermission("workspaces", true), routes.CreateWorkspace(store))
-			ws.GET("/:id", routes.GetWorkspace(store))
+			ws.GET("/:id", routes.RequirePermission("workspaces", false), routes.GetWorkspace(store))
+			ws.PUT("/:id", routes.RequirePermission("workspaces", true), routes.UpdateWorkspace(store))
+			ws.PATCH("/:id", routes.RequirePermission("workspaces", true), routes.UpdateWorkspace(store))
+			ws.DELETE("/:id", routes.RequirePermission("workspaces", true), routes.DeleteWorkspace(store))
 		}
 
 		// Roles (RBAC)

@@ -2,7 +2,19 @@
 -- Unit tests for cont/healthcheck.lua
 
 local function parse_target(target_str)
-    -- Replicate healthcheck target parsing logic
+    -- Replicate healthcheck target parsing logic (IPv6-aware)
+    if string.sub(target_str, 1, 1) == "[" then
+        local bracket_end = string.find(target_str, "%]")
+        if bracket_end then
+            local host = string.sub(target_str, 2, bracket_end - 1)
+            local rest = string.sub(target_str, bracket_end + 1)
+            if string.sub(rest, 1, 1) == ":" then
+                local port = tonumber(string.sub(rest, 2))
+                return host, port or 80
+            end
+            return host, 80
+        end
+    end
     local host, port = string.match(target_str, "([^:]+):(%d+)")
     if not host then
         host = target_str
@@ -12,7 +24,7 @@ local function parse_target(target_str)
 end
 
 describe("healthcheck.lua", function()
-    describe("target parsing", function()
+    describe("parse_target", function()
         it("parses host:port format", function()
             local host, port = parse_target("192.168.1.100:8080")
             assert.are.equal("192.168.1.100", host)
@@ -26,10 +38,8 @@ describe("healthcheck.lua", function()
         end)
 
         it("handles IPv6 addresses with port", function()
-            -- IPv6:port uses brackets. Pattern [^:]+ captures up to last :,
-            -- so [::1]:8080 → host="1]" (wrong), port=8080
             local host, port = parse_target("[::1]:8080")
-            assert.are.equal("1]", host)
+            assert.are.equal("::1", host)
             assert.are.equal(8080, port)
         end)
 
@@ -42,6 +52,18 @@ describe("healthcheck.lua", function()
         it("handles port 80 explicitly", function()
             local host, port = parse_target("localhost:80")
             assert.are.equal("localhost", host)
+            assert.are.equal(80, port)
+        end)
+
+        it("handles IPv6 loopback without port", function()
+            local host, port = parse_target("[::1]")
+            assert.are.equal("::1", host)
+            assert.are.equal(80, port)
+        end)
+
+        it("handles IPv4 address without port", function()
+            local host, port = parse_target("10.0.0.5")
+            assert.are.equal("10.0.0.5", host)
             assert.are.equal(80, port)
         end)
     end)
