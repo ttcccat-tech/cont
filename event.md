@@ -11,6 +11,7 @@
   - Lua ⏳ — proxy/lua/cont/*.lua 單元測試框架尚未建立
 
 - [ ] **使用者管理（RBAC 權限）** — 為 Cont 新增 Role-Based Access Control：定義 admin/editor/viewer 角色、對應權限矩陣、角色指派 API，防止一般使用者誤刪系統設定
+  - ✅ — commit `7f58a251`，storage/rbac.go（PermissionMatrix：admin/editor/viewer 權限矩陣）、storage/postgres.go（role column migration）、routes/routes.go（RequirePermission middleware、GET /roles、GET /roles/:role/permissions）、main.go（所有寫操作 RBAC middleware）
 
 ---
 
