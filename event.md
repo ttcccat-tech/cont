@@ -6,7 +6,20 @@
 
 ## 🟡 預計優化
 
-（暂无）
+- [ ] **RBAC 細粒度權限整合前端** — 前端根据用户 role 动态显示/隐藏操作按钮，viewer 角色禁止显示 Create/Delete/Edit 按钮
+- [ ] **Editor 角色权限细化** — editor 对 plugins/upstreams 为只读，但目前 PUT/PATCH 仍通过（检查 CanWrite 逻辑是否正确）
+
+## ✅ 已完成
+
+- [x] **RBAC GET 端點補全** — commit `ecf213e8`
+  - 所有 GET 端點（services, routes, upstreams, targets, consumers, plugins, workspaces）新增 `RequirePermission(entity, false)` 檢查
+  - 之前只有 POST/PUT/PATCH/DELETE 有 RBAC，GET 完全開放 — viewer/editor 可讀取不應讀取的 entities
+  - QA 驗證：viewer POST /services → 403 ✅，DELETE → 403 ✅；viewer GET /services → 200 ✅
+- [x] **Workspace CRUD 完整化** — commit `ecf213e8`
+  - 新增 `store.UpdateWorkspace()`, `store.DeleteWorkspace()` 方法
+  - 新增 `routes.UpdateWorkspace()`, `routes.DeleteWorkspace()` handler
+  - main.go 新增 PUT/PATCH/DELETE 端點（原本只有 GET/POST/List）
+  - QA 驗證：PATCH → 200 ✅，PUT → 200 ✅，DELETE → 204 ✅
 
 ## ✅ 已完成
 
