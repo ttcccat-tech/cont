@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cont-admin-api
+  namespace: cont
+  labels:
+    app: cont-admin-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cont-admin-api
+  template:
+    metadata:
+      labels:
+        app: cont-admin-api
+    spec:
+      containers:
+        - name: admin-api
+          # Replace REGISTRY with your registry (e.g. docker.io/username)
+          # Then use: REGISTRY=docker.io/myuser make build-prod push-prod
+          image: cont-admin-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: cont-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cont-secrets
+                  key: JWT_SECRET
+            - name: POSTGRES_URL
+              value: "postgres://kong:kongpass@cont-postgres:5432/cont?sslmode=disable"
+            - name: REDIS_URL
+              value: "cont-redis:6379"
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cont-admin-api
+  namespace: cont
+spec:
+  selector:
+    app: cont-admin-api
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP

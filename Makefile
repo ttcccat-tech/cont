@@ -82,3 +82,44 @@ db-backup:
 	@mkdir -p backups
 	docker compose exec -T postgres pg_dump -U kong cont > backups/cont-$(shell date +%Y%m%d-%H%M%S).sql
 	@echo "Backup saved to backups/"
+
+# ── Kubernetes Deployment ─────────────────────────────────────────────────────
+.PHONY: k8s-apply k8s-delete k8s-status k8s-logs k8s-port-forward
+
+# Apply all k8s manifests (requires kubectl + running cluster)
+k8s-apply:
+	@echo "Applying k8s manifests..." && \
+	kubectl apply -f k8s/namespace.yaml && \
+	kubectl apply -f k8s/config.yaml && \
+	kubectl apply -f k8s/postgres.yaml && \
+	kubectl apply -f k8s/postgres-svc.yaml && \
+	kubectl apply -f k8s/redis.yaml && \
+	kubectl apply -f k8s/redis-svc.yaml && \
+	kubectl apply -f k8s/admin-api.yaml && \
+	kubectl apply -f k8s/frontend.yaml && \
+	kubectl apply -f k8s/proxy.yaml && \
+	kubectl rollout status deployment/cont-admin-api -n cont --timeout=120s || true && \
+	kubectl get pods -n cont
+
+# Delete all k8s resources
+k8s-delete:
+	@kubectl delete -f k8s/ --ignore-not-found && \
+	echo "All cont k8s resources deleted."
+
+# Show pod status
+k8s-status:
+	@kubectl get pods,svc -n cont -o wide
+
+# Tail logs from all pods
+k8s-logs:
+	@kubectl logs -n cont -l app=cont-admin-api --tail=50 -f &
+	@kubectl logs -n cont -l app=cont-proxy --tail=50 -f &
+	@wait
+
+# Port-forward for local dev access to k8s-deployed cont
+k8s-port-forward:
+	@echo "Forwarding ports (Ctrl-C to stop):" && \
+	kubectl port-forward -n cont svc/cont-admin-api 8001:8001 & \
+	kubectl port-forward -n cont svc/cont-proxy 8000:8000 & \
+	kubectl port-forward -n cont svc/cont-frontend 3003:80 & \
+	wait

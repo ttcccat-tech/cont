@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cont-config
+  namespace: cont
+data:
+  ADMIN_PORT: "8001"
+  API_PORT: "8001"
+  PROXY_PORT: "8000"
+  LOG_LEVEL: "info"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cont-secrets
+  namespace: cont
+type: Opaque
+stringData:
+  # JWT_SECRET must be set before apply; generate with:
+  # openssl rand -hex 32
+  JWT_SECRET: "REPLACE_WITH_REAL_SECRET"
+  # POSTGRES_PASSWORD defaults; override with real value
+  POSTGRES_PASSWORD: "kongpass"

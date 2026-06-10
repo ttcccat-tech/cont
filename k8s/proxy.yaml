@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cont-proxy
+  namespace: cont
+  labels:
+    app: cont-proxy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cont-proxy
+  template:
+    metadata:
+      labels:
+        app: cont-proxy
+    spec:
+      containers:
+        - name: proxy
+          image: cont-proxy:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: proxy
+          env:
+            - name: LUA_PACKAGE_PATH
+              value: /usr/local/openresty/lualib/?.lua;/usr/local/openresty/lualib/?/init.lua;./?.lua;./?/init.lua
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cont-proxy
+  namespace: cont
+spec:
+  selector:
+    app: cont-proxy
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  type: LoadBalancer

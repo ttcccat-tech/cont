@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cont
+  labels:
+    app.kubernetes.io/name: cont
+    app.kubernetes.io/managed-by: kubectl
