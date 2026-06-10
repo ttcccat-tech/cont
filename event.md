@@ -6,7 +6,11 @@
 
 ## 🟡 預計優化
 
-- [ ] **單元測試覆蓋率提升** — 為 admin-api (Go) 和 proxy (Lua) 核心模組建立單元測試，提升程式碼品質與回歸防護
+- [ ] **單元測試覆蓋率提升（Go：admin-api ✅ / Lua：proxy ⏳）** — 為 admin-api (Go) 和 proxy (Lua) 核心模組建立單元測試，提升程式碼品質與回歸防護
+  - Go ✅ — admin-api/storage/models_test.go（14 tests）、admin-api/routes/routes_test.go（8 tests）、admin-api/routes/auth_test.go（7 tests）→ 共 29 tests，commit `c4b52414` + `d06594e3`
+  - Lua ⏳ — proxy/lua/cont/*.lua 單元測試框架尚未建立
+
+- [ ] **使用者管理（RBAC 權限）** — 為 Cont 新增 Role-Based Access Control：定義 admin/editor/viewer 角色、對應權限矩陣、角色指派 API，防止一般使用者誤刪系統設定
 
 ---
 
