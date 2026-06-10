@@ -2,11 +2,11 @@
 
 ## 🔴 未完成（進行中）
 
-（暂无）
+- [ ] **前端無使用者管理頁面（Users.tsx）** — 無法在 UI 新增/編輯/刪除使用者，只能透過 Groups PermissionMatrix 設定角色；需實作完整的使用者 CRUD 頁面
 
 ## 🟡 預計優化
 
-（暂无）
+- [ ] **Editor 角色的 targets/upstreams Delete 權限確認** — PermissionMatrix 允許 editor Delete targets/upstreams，但 level 計算是否正確反映需 QA 驗證
 
 ## ✅ 已完成
 

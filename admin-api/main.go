@@ -141,6 +141,17 @@ func main() {
 		// Roles (RBAC)
 		admin.GET("/roles", routes.ListRoles())
 		admin.GET("/roles/:role/permissions", routes.GetRolePermissions())
+
+		// Users (admin only)
+		users := admin.Group("/users")
+		{
+			users.GET("", routes.RequirePermission("users", false), routes.ListUsers(store))
+			users.POST("", routes.RequirePermission("users", true), routes.CreateUser(store))
+			users.GET("/:id", routes.RequirePermission("users", false), routes.GetUser(store))
+			users.PUT("/:id", routes.RequirePermission("users", true), routes.UpdateUser(store))
+			users.PATCH("/:id", routes.RequirePermission("users", true), routes.UpdateUser(store))
+			users.DELETE("/:id", routes.RequirePermission("users", true), routes.DeleteUser(store))
+		}
 	}
 
 	port := os.Getenv("ADMIN_PORT")

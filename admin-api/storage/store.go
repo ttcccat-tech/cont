@@ -882,13 +882,16 @@ func firstLine(s string) string {
 func (s *Store) GetUserByUsername(username string) (*User, error) {
 	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at FROM users WHERE username = $1 AND enabled = true`, username)
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt)
+	var displayName, email sql.NullString
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &displayName, &email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	u.DisplayName = displayName.String
+	u.Email = email.String
 	return &u, nil
 }
 
@@ -899,6 +902,53 @@ func (s *Store) CreateUser(u *User) (*User, error) {
 		return nil, err
 	}
 	return u, nil
+}
+
+func (s *Store) ListUsers() ([]User, error) {
+	rows, err := s.db.Query(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at FROM users ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []User
+	for rows.Next() {
+		var u User
+		var displayName, email sql.NullString
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &displayName, &email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		u.DisplayName = displayName.String
+		u.Email = email.String
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) GetUser(id string) (*User, error) {
+	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at FROM users WHERE id = $1`, id)
+	var u User
+	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt); err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (s *Store) UpdateUser(id string, u *User) error {
+	_, err := s.db.Exec(`UPDATE users SET display_name=$1, email=$2, role=$3, enabled=$4, updated_at=NOW() WHERE id=$5`,
+		u.DisplayName, u.Email, u.Role, u.Enabled, id)
+	return err
+}
+
+func (s *Store) DeleteUser(id string) error {
+	_, err := s.db.Exec(`DELETE FROM users WHERE id=$1`, id)
+	return err
+}
+
+func (s *Store) UpdateUserPassword(id, passwordHash string) error {
+	_, err := s.db.Exec(`UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2`, passwordHash, id)
+	return err
 }
 
 func (s *Store) SeedDefaultUsers() error {

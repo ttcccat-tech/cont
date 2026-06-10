@@ -937,3 +937,125 @@ func containsSubstr(s, substr string) bool {
 	}
 	return false
 }
+
+// ── Users CRUD ─────────────────────────────────────────────────────────
+
+func ListUsers(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		users, err := store.ListUsers()
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, users)
+	}
+}
+
+func GetUser(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		user, err := store.GetUser(id)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		if user == nil {
+			c.JSON(404, gin.H{"error": "user not found"})
+			return
+		}
+		c.JSON(200, user)
+	}
+}
+
+func CreateUser(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Username    string `json:"username" binding:"required"`
+			Password    string `json:"password"`
+			DisplayName string `json:"display_name"`
+			Email       string `json:"email"`
+			Role        string `json:"role" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request: " + err.Error()})
+			return
+		}
+		password := req.Password
+		if password == "" {
+			password = "ChangeMe123"
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to hash password"})
+			return
+		}
+		user, err := store.CreateUser(&storage.User{
+			Username:    req.Username,
+			PasswordHash: string(hash),
+			DisplayName: req.DisplayName,
+			Email:       req.Email,
+			Role:        req.Role,
+			Enabled:     true,
+		})
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(201, user)
+	}
+}
+
+func UpdateUser(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var req struct {
+			DisplayName string `json:"display_name"`
+			Email       string `json:"email"`
+			Role        string `json:"role"`
+			Enabled     *bool  `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request"})
+			return
+		}
+		existing, _ := store.GetUser(id)
+		if existing == nil {
+			c.JSON(404, gin.H{"error": "user not found"})
+			return
+		}
+		if req.DisplayName != "" {
+			existing.DisplayName = req.DisplayName
+		}
+		if req.Email != "" {
+			existing.Email = req.Email
+		}
+		if req.Role != "" {
+			existing.Role = req.Role
+		}
+		if req.Enabled != nil {
+			existing.Enabled = *req.Enabled
+		}
+		if err := store.UpdateUser(id, existing); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		updated, _ := store.GetUser(id)
+		c.JSON(200, updated)
+	}
+}
+
+func DeleteUser(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		existing, _ := store.GetUser(id)
+		if existing == nil {
+			c.JSON(404, gin.H{"error": "user not found"})
+			return
+		}
+		if err := store.DeleteUser(id); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(204, nil)
+	}
+}
