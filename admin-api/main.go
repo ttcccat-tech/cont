@@ -50,6 +50,16 @@ func main() {
 	r.GET("/status", routes.Status(store))
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
+	// Swagger docs (public, before auth)
+	r.GET("/docs", func(c *gin.Context) {
+		c.Header("Content-Type", "application/x-yaml")
+		c.File("docs/swagger.yaml")
+	})
+	r.GET("/docs.json", func(c *gin.Context) {
+		c.Header("Content-Type", "application/json")
+		c.File("docs/swagger.yaml")
+	})
+
 	// Auth
 	auth := r.Group("/auth")
 	{

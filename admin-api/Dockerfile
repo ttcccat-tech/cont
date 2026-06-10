@@ -9,5 +9,6 @@ FROM alpine:3.19
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/cont-admin-api .
+COPY --from=builder /app/docs ./docs
 EXPOSE 8001
 ENTRYPOINT ["./cont-admin-api"]

@@ -1,0 +1,941 @@
+swagger: "2.0"
+info:
+  title: Cont Admin API
+  description: |
+    Cont - Kong-compatible Admin API for managing services, routes, upstreams,
+    consumers, plugins, and workspaces. Designed as a lightweight Kong Admin
+    interface with JWT authentication.
+  version: "0.1.0"
+  contact:
+    name: Cont Project
+    url: https://github.com/ttcccat-tech/cont
+host: "localhost:8001"
+basePath: "/"
+schemes:
+  - http
+  - https
+
+securityDefinitions:
+  Bearer:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: "JWT token. Format: Bearer <token>"
+
+paths:
+  /status:
+    get:
+      summary: API status
+      description: Returns API version, uptime, and database connectivity.
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            properties:
+              version:
+                type: string
+                example: "cont 0.1.0"
+              uptime:
+                type: integer
+                example: 3600
+              database:
+                type: object
+                properties:
+                  reachable:
+                    type: boolean
+
+  /auth/login:
+    post:
+      summary: Login
+      description: Authenticate with username and password to receive a JWT token.
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - username
+              - password
+            properties:
+              username:
+                type: string
+                example: "admin"
+              password:
+                type: string
+                example: "admin123"
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            type: object
+            properties:
+              token:
+                type: string
+              expires_in:
+                type: integer
+        "401":
+          description: Invalid credentials
+
+  # ── Services ─────────────────────────────────────────────────────────────
+  /services:
+    get:
+      summary: List services
+      security:
+        - Bearer: []
+      parameters:
+        - name: size
+          in: query
+          type: integer
+          description: Page size (max 1000)
+        - name: offset
+          in: query
+          type: integer
+          description: Offset for pagination
+      responses:
+        "200":
+          description: List of services
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/Service"
+              next:
+                type: string
+        "401":
+          description: Unauthorized
+    post:
+      summary: Create service
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Service"
+      responses:
+        "201":
+          description: Service created
+          schema:
+            $ref: "#/definitions/Service"
+        "400":
+          description: Invalid request
+        "409":
+          description: Service already exists
+
+  /services/{id}:
+    get:
+      summary: Get service
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: Service details
+          schema:
+            $ref: "#/definitions/Service"
+        "404":
+          description: Not found
+    put:
+      summary: Update service (replace)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Service"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Service"
+        "404":
+          description: Not found
+    patch:
+      summary: Update service (patch)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Service"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Service"
+        "404":
+          description: Not found
+    delete:
+      summary: Delete service
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  # ── Routes ───────────────────────────────────────────────────────────────
+  /routes:
+    get:
+      summary: List routes
+      security:
+        - Bearer: []
+      parameters:
+        - name: size
+          in: query
+          type: integer
+        - name: offset
+          in: query
+          type: integer
+      responses:
+        "200":
+          description: List of routes
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/Route"
+    post:
+      summary: Create route
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Route"
+      responses:
+        "201":
+          description: Route created
+          schema:
+            $ref: "#/definitions/Route"
+        "400":
+          description: Invalid request
+
+  /routes/{id}:
+    get:
+      summary: Get route
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: Route details
+          schema:
+            $ref: "#/definitions/Route"
+        "404":
+          description: Not found
+    put:
+      summary: Update route (replace)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Route"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Route"
+        "404":
+          description: Not found
+    patch:
+      summary: Update route (patch)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Route"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Route"
+        "404":
+          description: Not found
+    delete:
+      summary: Delete route
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  # ── Upstreams ─────────────────────────────────────────────────────────────
+  /upstreams:
+    get:
+      summary: List upstreams
+      security:
+        - Bearer: []
+      responses:
+        "200":
+          description: List of upstreams
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/Upstream"
+    post:
+      summary: Create upstream
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Upstream"
+      responses:
+        "201":
+          description: Upstream created
+          schema:
+            $ref: "#/definitions/Upstream"
+
+  /upstreams/{id}:
+    get:
+      summary: Get upstream
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: Upstream details
+          schema:
+            $ref: "#/definitions/Upstream"
+        "404":
+          description: Not found
+    put:
+      summary: Update upstream (replace)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Upstream"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Upstream"
+    patch:
+      summary: Update upstream (patch)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Upstream"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Upstream"
+    delete:
+      summary: Delete upstream
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /upstreams/{id}/targets:
+    get:
+      summary: List upstream targets
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: List of targets
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/Target"
+    post:
+      summary: Create target
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Target"
+      responses:
+        "201":
+          description: Target created
+          schema:
+            $ref: "#/definitions/Target"
+
+  /upstreams/{id}/targets/{target_id}:
+    put:
+      summary: Update target (replace)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - name: target_id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Target"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Target"
+    patch:
+      summary: Update target (patch)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - name: target_id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Target"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Target"
+    delete:
+      summary: Delete target
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - name: target_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  # ── Consumers ─────────────────────────────────────────────────────────────
+  /consumers:
+    get:
+      summary: List consumers
+      security:
+        - Bearer: []
+      responses:
+        "200":
+          description: List of consumers
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/Consumer"
+    post:
+      summary: Create consumer
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Consumer"
+      responses:
+        "201":
+          description: Consumer created
+          schema:
+            $ref: "#/definitions/Consumer"
+
+  /consumers/{id}:
+    get:
+      summary: Get consumer
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: Consumer details
+          schema:
+            $ref: "#/definitions/Consumer"
+        "404":
+          description: Not found
+    put:
+      summary: Update consumer (replace)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Consumer"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Consumer"
+    patch:
+      summary: Update consumer (patch)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Consumer"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Consumer"
+    delete:
+      summary: Delete consumer
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  # ── Plugins ───────────────────────────────────────────────────────────────
+  /plugins:
+    get:
+      summary: List plugins
+      security:
+        - Bearer: []
+      responses:
+        "200":
+          description: List of plugins
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/Plugin"
+    post:
+      summary: Create plugin
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Plugin"
+      responses:
+        "201":
+          description: Plugin created
+          schema:
+            $ref: "#/definitions/Plugin"
+
+  /plugins/{id}:
+    get:
+      summary: Get plugin
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: Plugin details
+          schema:
+            $ref: "#/definitions/Plugin"
+        "404":
+          description: Not found
+    put:
+      summary: Update plugin (replace)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Plugin"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Plugin"
+    patch:
+      summary: Update plugin (patch)
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Plugin"
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: "#/definitions/Plugin"
+    delete:
+      summary: Delete plugin
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  # ── Workspaces ─────────────────────────────────────────────────────────────
+  /workspaces:
+    get:
+      summary: List workspaces
+      security:
+        - Bearer: []
+      responses:
+        "200":
+          description: List of workspaces
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/Workspace"
+    post:
+      summary: Create workspace
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Workspace"
+      responses:
+        "201":
+          description: Workspace created
+          schema:
+            $ref: "#/definitions/Workspace"
+
+  /workspaces/{id}:
+    get:
+      summary: Get workspace
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: Workspace details
+          schema:
+            $ref: "#/definitions/Workspace"
+        "404":
+          description: Not found
+
+definitions:
+  Service:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Unique identifier
+      name:
+        type: string
+        description: Service name (unique)
+      protocol:
+        type: string
+        enum: [http, https, tcp, tls]
+        example: "http"
+      host:
+        type: string
+        example: "example.com"
+      port:
+        type: integer
+        example: 80
+      path:
+        type: string
+        example: "/api"
+      created_at:
+        type: integer
+        description: Unix timestamp
+      updated_at:
+        type: integer
+
+  Route:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      service:
+        type: object
+        description: "Reference to service. Use either service.id or service.name"
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+      protocols:
+        type: array
+        items:
+          type: string
+        example: ["http", "https"]
+      hosts:
+        type: array
+        items:
+          type: string
+        example: ["example.com"]
+      paths:
+        type: array
+        items:
+          type: string
+        example: ["/api"]
+      methods:
+        type: array
+        items:
+          type: string
+        example: ["GET", "POST"]
+      created_at:
+        type: integer
+      updated_at:
+        type: integer
+
+  Upstream:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      algorithm:
+        type: string
+        enum: [round-robin, consistent-hashing, least-connections]
+        example: "round-robin"
+      slots:
+        type: integer
+        description: Number of slots for consistent hashing
+        example: 10000
+      created_at:
+        type: integer
+
+  Target:
+    type: object
+    properties:
+      id:
+        type: string
+      upstream_id:
+        type: string
+      target:
+        type: string
+        example: "192.168.1.100:8000"
+      weight:
+        type: integer
+        description: Load balancing weight
+        example: 100
+      created_at:
+        type: integer
+
+  Consumer:
+    type: object
+    properties:
+      id:
+        type: string
+      username:
+        type: string
+        description: Unique username
+      created_at:
+        type: integer
+      updated_at:
+        type: integer
+
+  Plugin:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+        description: Plugin name (e.g. "rate-limiting", "cors")
+      service:
+        type: object
+        description: Associated service (optional)
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+      consumer:
+        type: object
+        description: Associated consumer (optional)
+        properties:
+          id:
+            type: string
+          username:
+            type: string
+      config:
+        type: object
+        description: Plugin configuration (key-value)
+        example:
+          minute: 100
+          policy: "local"
+      created_at:
+        type: integer
+      updated_at:
+        type: integer
+
+  Workspace:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      created_at:
+        type: integer
