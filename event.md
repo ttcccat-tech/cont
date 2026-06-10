@@ -6,10 +6,14 @@
 
 ## 🟡 預計優化
 
-- [ ] **Editor 角色的 targets/upstreams Delete 權限確認** — PermissionMatrix 允許 editor Delete targets/upstreams，但 level 計算是否正確反映需 QA 驗證
+（暂无）
 
 ## ✅ 已完成
 
+- [x] **Editor 角色的 targets/upstreams Delete 權限確認** — commit `97fcb767`
+  - buildPermissions() 修復：移除 `canD && e != "targets"` guard，使 targets 的 level=3（等同 admin 刪除權限）
+  - editor 在 PermissionMatrix 的 targets.Delete=true 正確反映到前端 canDelete 判斷（perm.level >= 3）
+  - upstreams.Delete=false（editor 無法刪除 upstream）已驗證正確，後端 RequirePermission("upstreams", true) 會阻擋
 - [x] **前端無使用者管理頁面（Users.tsx）** — commit `e6d90ccf`
   - Users.tsx 原本存在但後端無 /users CRUD routes，導致 404
   - 新增 store.go: ListUsers/GetUser/UpdateUser/DeleteUser + GetUserByUsername NULL fix
