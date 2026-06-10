@@ -6,7 +6,7 @@
 
 ## 🟡 預計優化
 
-- [ ] Cont Auth 正式實作（目前為 mock）
+- [x] **Cont Auth 正式實作（JWT / bcrypt）** — commit `cfd7f15d`，users table、AuthRequired middleware、JWT 登入廢除 mock
 - [ ] 生產部署評估（需等所有 Bug 修完 + Auth 完成）
 
 ---
