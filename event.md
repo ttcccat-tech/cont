@@ -2,12 +2,7 @@
 
 ## 🔴 未完成（進行中）
 
-- [ ] **Groups CRUD 端點實作** — 前端 Groups.tsx 已就緒，後端缺少 `/groups` GET/POST/PUT/PATCH/DELETE
-- [ ] **Audit Log 端點實作** — 前端 AuditLog.tsx 已就緒，後端缺少 `/audit` GET
-- [ ] **Alert Rules 端點實作** — 前端 AlertRules.tsx 已就緒，後端缺少 `/alerts/rules` CRUD
-- [ ] **API Key Requests 端點實作** — 前端 ApiKeyRequests.tsx 已就緒，後端缺少 `/api-keys` CRUD
-- [ ] **Config Versioning 端點實作** — 前端 ConfigVersioning.tsx 已就緒，後端缺少 snapshots/diff/rollback
-- [ ] **Health Portal 端點實作** — 前端 HealthPortal.tsx 已就緒，後端缺少 health-check /config-check
+（暂无）
 
 ## 🟡 預計優化
 
@@ -20,6 +15,17 @@
 
 ## ✅ 已完成
 
+- [x] **Groups/Alert Rules/API Keys CRUD + Config Snapshots/Health/ConfigCheck 端點實作** — commit `633746a1`
+  - Groups: GET/POST/PUT/PATCH/DELETE 全部可用，PATCH 改為 partial update
+  - Alert Rules: GET/POST/PUT/PATCH/DELETE 全部可用，PATCH 改為 partial update
+  - API Keys: GET/POST/PUT/PATCH/DELETE 全部可用
+    - APIKeyRequest.Status binding: `required` → `omitempty`（CreateAPIKeyRequest 預設 `pending`）
+    - GetAPIKeyRequest: 修復 applicant_user_id/applicant_username NULL scan
+    - UpdateAPIKeyRequest: 使用 int64 id，呼叫 GetAPIKeyRequest 回傳完整更新後資料
+    - DeleteAPIKeyRequest: 使用 int64 id
+  - Config Snapshots: GET(list)/POST/DELETE 全部可用
+  - Health Check: GET /health-check ✅
+  - Config Check: GET /config-check ✅
 - [x] **Plugin System 完整化** — commit `caac9e45`
   - 修復 ALL_PLUGINS bug：移除 `-correlation-id`（dash prefix）、`ip-v41`（typo）、`logging`（non-plugin）
   - 新增 24 個真實 Kong plugin types（auth、security、caching、observability、logging、transformation、sessions）
