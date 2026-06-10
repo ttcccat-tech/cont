@@ -2,15 +2,21 @@
 
 ## 🔴 未完成（進行中）
 
-（暂无）
+- [ ] **前端 canDelete 未區分 editor 角色** — AuthContext.tsx canDelete 僅 return user.role === 'admin'，但 PermissionMatrix 允許 editor Delete services/routes/consumers/targets
 
 ## 🟡 預計優化
 
-- [ ] **RBAC 細粒度權限整合前端** — 前端根据用户 role 动态显示/隐藏操作按钮，viewer 角色禁止显示 Create/Delete/Edit 按钮
-- [ ] **Editor 角色权限细化** — editor 对 plugins/upstreams 为只读，但目前 PUT/PATCH 仍通过（检查 CanWrite 逻辑是否正确）
+（暂无）
 
 ## ✅ 已完成
 
+- [x] **RBAC 細粒度權限整合前端** — commit `c2fa9254` + `c9b9ff08`
+  - 前端根据用户 role 动态显示/隐藏操作按钮，viewer 角色禁止显示 Create/Delete/Edit 按钮
+  - AuthContext.tsx: canWrite/canDelete 依权限控制；GET /auth/me 提供 per-entity permissions
+  - Backend RequirePermission 已正確阻擋 editor 對 plugins/upstreams 的 PUT/PATCH/DELETE（QA: 全部 403 ✅）
+  - 發現 Login/GetMe 回傳的 permissions 誤導前端（editor 所有 entities 都報 mode=rw/level=2）
+  - 新增 buildPermissions() 以 CanWrite/CanRead/CanDelete 正確計算每 entity 的 level 與 mode
+  - Editor now correctly sees: plugins/upstreams → level=1/mode=r; services/routes/consumers → level=3/mode=rwd
 - [x] **RBAC GET 端點補全** — commit `ecf213e8`
   - 所有 GET 端點（services, routes, upstreams, targets, consumers, plugins, workspaces）新增 `RequirePermission(entity, false)` 檢查
   - 之前只有 POST/PUT/PATCH/DELETE 有 RBAC，GET 完全開放 — viewer/editor 可讀取不應讀取的 entities
@@ -20,9 +26,6 @@
   - 新增 `routes.UpdateWorkspace()`, `routes.DeleteWorkspace()` handler
   - main.go 新增 PUT/PATCH/DELETE 端點（原本只有 GET/POST/List）
   - QA 驗證：PATCH → 200 ✅，PUT → 200 ✅，DELETE → 204 ✅
-
-## ✅ 已完成
-
 - [x] **CI/CD Pipeline 建置** — GitHub Actions CI 已完整建置（go-test, lua-test, frontend, docker, compose-test），commit `6221240d` + `1baa102f`
   - 修復：busted 僅執行 `*_test.lua`（隔離 source files）、compose-test 預先建立 `cont_default` network
 - [x] **proxy/lua 深度重構** — access_test.lua（9 tests）、header_filter_test.lua（6 tests）、healthcheck IPv6 bug fix，commit `bf023d62` + `6d43f4e3` + `73bc8241` + `68fbf01a`
@@ -31,8 +34,6 @@
   - healthcheck.lua IPv6:port 解析正確化（`[::1]:8080` → host=`::1`, port=`8080`）
   - healthcheck_test.lua IPv6 測試更新，header_filter_test.lua 新增
   - 全部 40 Lua測試通過
-
-
 - [x] **單元測試覆蓋率提升（Go：admin-api ✅ / Lua：proxy ✅）** — 為 admin-api (Go) 和 proxy (Lua) 核心模組建立單元測試，提升程式碼品質與回歸防護
   - Go ✅ — admin-api/storage/models_test.go（14 tests）、admin-api/routes/routes_test.go（8 tests）、admin-api/routes/auth_test.go（7 tests）→ 共 29 tests，commit `c4b52414` + `d06594e3`
   - Lua ✅ — proxy/lua/cont/metrics_test.lua（6 tests）、status_test.lua（9 tests）、healthcheck_test.lua（8 tests）→ 共 23 tests，commit `05c27cef`。busted 測試框架、lua-cjson 安裝完成
