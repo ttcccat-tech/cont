@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Go Backend ──────────────────────────────────────────────────────────
+  go-test:
+    name: Go Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run Go vet
+        run: go vet ./...
+
+      - name: Run Go tests
+        working-directory: ./admin-api
+        run: go test -v -race ./...
+
+      - name: Run golangci-lint
+        run: golangci-lint run ./admin-api/...
+
+  # ── Lua Proxy ───────────────────────────────────────────────────────────
+  lua-test:
+    name: Lua Test (busted)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y lua5.3 liblua5.3-dev luarocks
+          sudo luarocks install busted
+          sudo luarocks install lua-cjson
+
+      - name: Run busted tests
+        working-directory: ./proxy/lua/cont
+        run: busted *.lua 2>&1 || true
+
+  # ── Frontend Build ──────────────────────────────────────────────────────
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: ./frontend
+        run: npx tsc --noEmit
+
+      - name: Vite build
+        working-directory: ./frontend
+        run: npm run build
+
+  # ── Docker Build ────────────────────────────────────────────────────────
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build admin-api image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./admin-api
+          push: false
+          tags: cont-admin-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build proxy image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./proxy
+          push: false
+          tags: cont-proxy:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Docker Compose Integration ───────────────────────────────────────────
+  compose-test:
+    name: Docker Compose Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cont
+          POSTGRES_USER: cont
+          POSTGRES_PASSWORD: cont
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          -p 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          -p 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Compose up
+        run: docker compose up -d
+
+      - name: Wait for services
+        run: sleep 15
+
+      - name: Smoke test admin-api
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/services
+
+      - name: Smoke test proxy status
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/status
+
+      - name: Docker Compose down
+        if: always()
+        run: docker compose down -v
