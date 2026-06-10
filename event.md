@@ -2,7 +2,7 @@
 
 ## 🔴 未完成（進行中）
 
-- [ ] **前端無使用者管理頁面（Users.tsx）** — 無法在 UI 新增/編輯/刪除使用者，只能透過 Groups PermissionMatrix 設定角色；需實作完整的使用者 CRUD 頁面
+（暂无）
 
 ## 🟡 預計優化
 
@@ -10,6 +10,12 @@
 
 ## ✅ 已完成
 
+- [x] **前端無使用者管理頁面（Users.tsx）** — commit `e6d90ccf`
+  - Users.tsx 原本存在但後端無 /users CRUD routes，導致 404
+  - 新增 store.go: ListUsers/GetUser/UpdateUser/DeleteUser + GetUserByUsername NULL fix
+  - 新增 routes.go: ListUsers/GetUser/CreateUser/UpdateUser/DeleteUser handlers
+  - main.go: /users GET/POST/PUT/PATCH/DELETE routes (RequirePermission users)
+  - QA: GET→200 ✅, POST→201 ✅ (可立即登入) ✅, PATCH→200 ✅, DELETE→204 ✅
 - [x] **前端 canDelete 未區分 editor 角色** — commit `e75f574b`
   - AuthContext.tsx canDelete 僅 return user.role === 'admin'，忽略 PermissionMatrix
   - 修復：使用 perm.level >= 3 判斷（level 3 = admin），與 canWrite 一致的邏輯
