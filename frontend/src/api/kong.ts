@@ -189,6 +189,7 @@ export const triggerHealthCheck = () => analyticsClient.post('/health/check', {}
 export const getStatsOverview = () => analyticsClient.get('/stats/overview').then(r => r.data)
 
 export const getUsers = () => analyticsClient.get('/users').then(r => r.data)
+export const createUser = (payload: Record<string, unknown>) => analyticsClient.post('/users', payload).then(r => r.data)
 export const inviteUser = (email: string, groupId: string) =>
   analyticsClient.post('/users/invite', { email, group_id: groupId }).then(r => r.data)
 export const updateUser = (id: string, payload: Record<string, unknown>) =>

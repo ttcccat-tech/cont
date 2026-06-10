@@ -2,33 +2,16 @@ import { useEffect, useState } from 'react'
 import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Select } from 'antd'
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import axios from 'axios'
-import api, { Workspace, getToken, listWorkspaces } from '../api/kong'
-
-// Dedicated axios instance for users page — has auth interceptor
-const userClient = axios.create()
-userClient.interceptors.request.use((config) => {
-  const token = getToken()
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
-userClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('kgo_token')
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  }
-)
+import { Workspace, listWorkspaces, getUsers, createUser, updateUser, deleteUser } from '../api/kong'
 
 interface User {
   id: string
   username: string
   display_name?: string
   email?: string
-  created_at: number
+  role: string
+  enabled: boolean
+  created_at: string
   groups: { name: string; label: string }[]
 }
 
@@ -44,8 +27,8 @@ export default function Users() {
 
   const fetchUsers = () => {
     setLoading(true)
-    userClient.get('/api/users')
-      .then(r => setUsers(Array.isArray(r.data) ? r.data : []))
+    getUsers()
+      .then(r => setUsers(Array.isArray(r) ? r : []))
       .catch(() => message.error('無法連接 API'))
       .finally(() => setLoading(false))
   }
@@ -62,6 +45,8 @@ export default function Users() {
         username: user.username,
         display_name: user.display_name,
         email: user.email,
+        role: user.role,
+        enabled: user.enabled,
       })
       setWorkspaceIds((user as any).workspace_ids || [])
     } else {
@@ -78,10 +63,10 @@ export default function Users() {
       setSubmitting(true)
       const payload = { ...values, workspace_ids: workspaceIds }
       if (editingUser?.id) {
-        await userClient.put(`/api/users/${editingUser.id}`, payload)
+        await updateUser(editingUser.id, payload)
         message.success('更新成功')
       } else {
-        await userClient.post('/api/users', { ...payload, password: values.password || 'ChangeMe123' })
+        await createUser({ ...payload, password: values.password || 'ChangeMe123' })
         message.success('建立成功')
       }
       setModalOpen(false)
@@ -124,6 +109,21 @@ export default function Users() {
       key: 'email',
     },
     {
+      title: '角色',
+      dataIndex: 'role',
+      key: 'role',
+      render: v => {
+        const colors: Record<string, string> = { admin: 'red', editor: 'blue', viewer: 'green' }
+        return<Tag color={colors[v] || 'default'}>{v}</Tag>
+      },
+    },
+    {
+      title: '啟用',
+      dataIndex: 'enabled',
+      key: 'enabled',
+      render: v => v ? <Tag color="green">是</Tag> : <Tag color="red">否</Tag>,
+    },
+    {
       title: '群組',
       dataIndex: 'groups',
       key: 'groups',
@@ -137,7 +137,7 @@ export default function Users() {
       key: 'created_at',
       render: v => {
         if (!v) return '-'
-        const d = typeof v === 'number' ? new Date(v * 1000) : new Date(v)
+        const d = new Date(v)
         return isNaN(d.getTime()) ? '-' : d.toLocaleString('zh-TW')
       },
     },
@@ -190,6 +190,19 @@ export default function Users() {
           </Form.Item>
           <Form.Item name="email" label="Email">
             <Input type="email" />
+          </Form.Item>
+          <Form.Item name="role" label="角色" rules={[{ required: true, message: '必填' }]}>
+            <Select options={[
+              { value: 'admin', label: 'Admin' },
+              { value: 'editor', label: 'Editor' },
+              { value: 'viewer', label: 'Viewer' },
+            ]} />
+          </Form.Item>
+          <Form.Item name="enabled" label="啟用" initialValue={true}>
+            <Select options={[
+              { value: true, label: '是' },
+              { value: false, label: '否' },
+            ]} />
           </Form.Item>
           <Form.Item label="工作區">
             <Select
