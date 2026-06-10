@@ -2,7 +2,7 @@
 
 ## 🔴 未完成（進行中）
 
-- [ ] **前端 canDelete 未區分 editor 角色** — AuthContext.tsx canDelete 僅 return user.role === 'admin'，但 PermissionMatrix 允許 editor Delete services/routes/consumers/targets
+（暂无）
 
 ## 🟡 預計優化
 
@@ -10,6 +10,10 @@
 
 ## ✅ 已完成
 
+- [x] **前端 canDelete 未區分 editor 角色** — commit `e75f574b`
+  - AuthContext.tsx canDelete 僅 return user.role === 'admin'，忽略 PermissionMatrix
+  - 修復：使用 perm.level >= 3 判斷（level 3 = admin），與 canWrite 一致的邏輯
+  - Editor now correctly sees delete buttons for services/routes/consumers/targets
 - [x] **RBAC 細粒度權限整合前端** — commit `c2fa9254` + `c9b9ff08`
   - 前端根据用户 role 动态显示/隐藏操作按钮，viewer 角色禁止显示 Create/Delete/Edit 按钮
   - AuthContext.tsx: canWrite/canDelete 依权限控制；GET /auth/me 提供 per-entity permissions
