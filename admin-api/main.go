@@ -27,6 +27,18 @@ func main() {
 	// Wire up store
 	store := storage.NewStore(db, rdb)
 
+	// Seed default users
+	if err := store.SeedDefaultUsers(); err != nil {
+		log.Printf("Warning: failed to seed default users: %v", err)
+	}
+
+	// JWT secret
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "cont-dev-secret-change-in-production"
+		log.Printf("WARNING: JWT_SECRET not set, using default. DO NOT use in production.")
+	}
+
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -40,12 +52,13 @@ func main() {
 	// Auth
 	auth := r.Group("/auth")
 	{
-		auth.POST("/login", routes.Login(store))
-		auth.POST("/sso/mock", routes.SSOMock(store))
+		auth.POST("/login", routes.Login(store, jwtSecret))
+		// SSO endpoints can be added here for OAuth2/OIDC providers
 	}
 
-	// Admin API — Kong-compatible
+	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")
+	admin.Use(routes.AuthRequired(jwtSecret))
 	{
 		svcs := admin.Group("/services")
 		{

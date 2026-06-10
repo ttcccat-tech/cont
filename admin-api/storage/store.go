@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func NewStore(db *sql.DB, rdb *Redis) *Store {
@@ -857,4 +858,61 @@ func orSlice(v []string, def []string) []string {
 
 func firstLine(s string) string {
 	return strings.Split(s, "\n")[0]
+}
+
+// User methods
+
+func (s *Store) GetUserByUsername(username string) (*User, error) {
+	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at FROM users WHERE username = $1 AND enabled = true`, username)
+	var u User
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (s *Store) CreateUser(u *User) (*User, error) {
+	err := s.db.QueryRow(`INSERT INTO users (username, password_hash, display_name, email, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at`,
+		u.Username, u.PasswordHash, u.DisplayName, u.Email, u.Role).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+func (s *Store) SeedDefaultUsers() error {
+	// Check if admin already exists
+	existing, _ := s.GetUserByUsername("admin")
+	if existing != nil {
+		return nil
+	}
+	// Create admin with bcrypt hash of "admin123"
+	hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	_, err = s.CreateUser(&User{
+		Username:    "admin",
+		PasswordHash: string(hash),
+		DisplayName: "Administrator",
+		Email:       "admin@cont.local",
+		Role:        "admin",
+	})
+	if err != nil {
+		return err
+	}
+	// Create regular user
+	hash2, _ := bcrypt.GenerateFromPassword([]byte("user123"), bcrypt.DefaultCost)
+	_, err = s.CreateUser(&User{
+		Username:    "user",
+		PasswordHash: string(hash2),
+		DisplayName: "Regular User",
+		Email:       "user@cont.local",
+		Role:        "user",
+	})
+	return err
 }

@@ -106,6 +106,19 @@ func RunMigrations(db *sql.DB) error {
 			name TEXT UNIQUE NOT NULL,
 			created_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
+		`CREATE TABLE IF NOT EXISTS users (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			username TEXT UNIQUE NOT NULL,
+			password_hash TEXT NOT NULL,
+			display_name TEXT,
+			email TEXT UNIQUE,
+			role TEXT DEFAULT 'user',
+			enabled BOOLEAN DEFAULT true,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
+		`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
 		// Indexes for route matching performance
 		`CREATE INDEX IF NOT EXISTS idx_routes_service ON routes(service_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_plugins_route ON plugins(route_id)`,

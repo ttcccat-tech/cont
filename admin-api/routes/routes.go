@@ -3,10 +3,48 @@ package routes
 import (
 	"database/sql"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
+	"golang.org/x/crypto/bcrypt"
 )
+
+// AuthRequired returns a gin middleware that validates JWT tokens
+func AuthRequired(jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			authHeader = c.GetHeader("Kong-Admin-Token")
+		}
+		if authHeader == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+			return
+		}
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
+			return []byte(jwtSecret), nil
+		})
+		if err != nil || !token.Valid {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			return
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
+			return
+		}
+		c.Set("user_id", claims["sub"])
+		c.Set("username", claims["username"])
+		c.Set("role", claims["role"])
+		c.Next()
+	}
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -642,37 +680,65 @@ var demoUsers = map[string]struct {
 	},
 }
 
-func Login(store *storage.Store) gin.HandlerFunc {
+func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(400, gin.H{"error": "invalid request"})
 			return
 		}
-		user, ok := demoUsers[req.Username]
-		if !ok || user.Password != req.Password {
+		user, err := store.GetUserByUsername(req.Username)
+		if err != nil || user == nil {
 			c.JSON(401, gin.H{"error": "invalid credentials"})
 			return
 		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+			c.JSON(401, gin.H{"error": "invalid credentials"})
+			return
+		}
+		// Generate JWT
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"sub":      user.ID,
+			"username": user.Username,
+			"role":     user.Role,
+			"exp":      time.Now().Add(24 * time.Hour).Unix(),
+			"iat":      time.Now().Unix(),
+		})
+		tokenStr, err := token.SignedString([]byte(jwtSecret))
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to generate token"})
+			return
+		}
 		c.JSON(200, LoginResponse{
-			Token: "cont-token-" + req.Username + "-demo",
+			Token: tokenStr,
 			User: UserInfo{
-				ID:          req.Username + "-001",
-				Username:    req.Username,
+				ID:          user.ID,
+				Username:    user.Username,
 				DisplayName: user.DisplayName,
 				Email:       user.Email,
-				Groups:      user.Groups,
-				CreatedAt:   "2026-01-01T00:00:00Z",
+				Groups:      []map[string]any{{"name": user.Role, "label": strings.Title(user.Role)}},
+				CreatedAt:   user.CreatedAt,
 			},
 			Permissions: map[string]any{
-				"services":  map[string]any{"mode": "rw", "level": user.Level},
-				"routes":    map[string]any{"mode": "rw", "level": user.Level},
-				"plugins":   map[string]any{"mode": "rw", "level": user.Level},
-				"consumers": map[string]any{"mode": "rw", "level": user.Level},
-				"upstreams": map[string]any{"mode": "rw", "level": user.Level},
-				"workspace": map[string]any{"mode": "rw", "level": user.Level},
+				"services":  map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
+				"routes":    map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
+				"plugins":   map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
+				"consumers": map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
+				"upstreams": map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
+				"workspace": map[string]any{"mode": "rw", "level": levelFromRole(user.Role)},
 			},
 		})
+	}
+}
+
+func levelFromRole(role string) int {
+	switch role {
+	case "admin":
+		return 3
+	case "editor":
+		return 2
+	default:
+		return 1
 	}
 }
 

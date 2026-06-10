@@ -145,6 +145,19 @@ type Workspace struct {
 	CreatedAt string `json:"created_at,omitempty"`
 }
 
+type User struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name,omitempty"`
+	Email       string `json:"email,omitempty"`
+	Role        string `json:"role"`
+	Enabled     bool   `json:"enabled"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
+	// PasswordHash is never returned via JSON
+	PasswordHash string `json:"-"`
+}
+
 // ── /status response ────────────────────────────────────────────────────────
 
 type StatusResponse struct {
