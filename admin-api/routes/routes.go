@@ -787,7 +787,7 @@ func buildPermissions(role string) map[string]any {
 		if canW {
 			lvl = 2
 		}
-		if canD && e != "targets" { // targets share upstream's delete; skip extra
+		if canD {
 			lvl = 3
 		}
 
