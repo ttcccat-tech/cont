@@ -6,15 +6,19 @@
 
 ## 🟡 預計優化
 
-- [ ] **CI/CD Pipeline 建置** — 為 Cont 建立 GitHub Actions / GitLab CI 自動化流程：Go lint (golangci-lint) + test、Lua busted tests、Frontend build + test、Docker image build + push、docker-compose 整合測試
-  - 目標：每個 PR 自動執行全堆疊測試，生產部署前通過全部 quality gates
-
-- [ ] **proxy/lua 深度重構（access.lua / header_filter.lua）** — proxy Lua 核心模組缺少單元測試，且多個 handler 實作粗糙（healthcheck 僅框架、TODO 遍地在）。建立完整測試覆蓋並重構關鍵模組
-  - access_test.lua / header_filter_test.lua 建立
-  - healthcheck.lua 實作 active probing（Redis 健康狀態寫回）
-  - init.lua / worker.lua 穩定性強化
+（暂无）
 
 ## ✅ 已完成
+
+- [x] **CI/CD Pipeline 建置** — GitHub Actions CI 已完整建置（go-test, lua-test, frontend, docker, compose-test），commit `6221240d` + `1baa102f`
+  - 修復：busted 僅執行 `*_test.lua`（隔離 source files）、compose-test 預先建立 `cont_default` network
+- [x] **proxy/lua 深度重構** — access_test.lua（9 tests）、header_filter_test.lua（6 tests）、healthcheck IPv6 bug fix，commit `bf023d62` + `6d43f4e3` + `73bc8241` + `68fbf01a`
+  - access.lua 路由匹配 +負載平衡單元測試
+  - header_filter.lua 重構為回傳函式（避免載入時執行）、nginx.conf 整合修復
+  - healthcheck.lua IPv6:port 解析正確化（`[::1]:8080` → host=`::1`, port=`8080`）
+  - healthcheck_test.lua IPv6 測試更新，header_filter_test.lua 新增
+  - 全部 40 Lua測試通過
+
 
 - [x] **單元測試覆蓋率提升（Go：admin-api ✅ / Lua：proxy ✅）** — 為 admin-api (Go) 和 proxy (Lua) 核心模組建立單元測試，提升程式碼品質與回歸防護
   - Go ✅ — admin-api/storage/models_test.go（14 tests）、admin-api/routes/routes_test.go（8 tests）、admin-api/routes/auth_test.go（7 tests）→ 共 29 tests，commit `c4b52414` + `d06594e3`
