@@ -2,11 +2,7 @@
 
 ## 🔴 未完成（進行中）
 
-- k8s/ 目錄：Namespace + ConfigMap/Secret + postgres + redis + admin-api + frontend + proxy 完整 manifests
-- proxy/Dockerfile：OpenResty -proxy 映像檔建置
-- deploy.sh：前置檢查（kubectl/cluster）、影像建置+推送（REGISTRY）、JWT_SECRET 自動生成、`./deploy.sh apply`/`delete` 生命周期、rollout status
-- Makefile 新增：k8s-apply、k8s-delete、k8s-status、k8s-logs、k8s-port-forward targets
-- 支援 `make deploy-prod` 搭配 REGISTRY + JWT_SECRET 環境變數一鍵部署至 Kubernetes
+（暂无）
 
 ## 🟡 預計優化
 
@@ -105,6 +101,30 @@
   - 新增 createUser 到 kong.ts exports
   - 新增 role/enabled 欄位至 User介面、表格、編輯 Modal
   - QA: GET→200 ✅, POST→201 ✅, PUT→200 ✅, DELETE→204 ✅
+- [x] **k8s/ 目錄完整 manifests（Namespace + ConfigMap/Secret + postgres + redis + admin-api + frontend + proxy）** — commit `3f8e2a1b`
+  - k8s/ 包含 9 個 YAML：namespace.yaml、config.yaml（含 ConfigMap + Secret）、postgres.yaml + postgres-svc.yaml、redis.yaml + redis-svc.yaml、admin-api.yaml、frontend.yaml、proxy.yaml
+  - 全部 Deployment 含 livenessProbe/readinessProbe、资源限制、镜像拉取策略
+  - postgres 使用 emptyDir 持久化卷（測試用）
+  - proxy 使用 LoadBalancer Service 其餘使用 ClusterIP
+- [x] **proxy/Dockerfile：OpenResty proxy 映像檔建置** — commit `3f8e2a1b`
+  - proxy/Dockerfile 基於 openresty/openresty:alpine，複製 lua/ 和 nginx.conf
+  - QA: `docker build -t cont-proxy:test ./proxy` ✅ 建置成功
+- [x] **deploy.sh：前置檢查、影像建置+推送（REGISTRY）、JWT_SECRET 自動生成、apply/delete 生命周期、rollout status** — commit `3f8e2a1b`
+  - 前置檢查：kubectl 存在性 + cluster 可達性
+  - REGISTRY 環境變數控制是否建置+推送
+  - JWT_SECRET 未設定時自動生成（openssl rand -hex 32）
+  - `./deploy.sh apply` 依賴順序 apply 所有 manifests + rollout status
+  - `./deploy.sh delete` 清理所有資源
+- [x] **Makefile 新增：k8s-apply、k8s-delete、k8s-status、k8s-logs、k8s-port-forward targets** — commit `3f8e2a1b`
+  - k8s-apply：依賴順序 apply + rollout status
+  - k8s-delete：清理所有 k8s 資源
+  - k8s-status：顯示 pods 和 svc 狀態
+  - k8s-logs：tail 所有 pods logs
+  - k8s-port-forward：轉發 admin-api/proxy/frontend 端口到本機
+- [x] **支援 `make deploy-prod` 搭配 REGISTRY + JWT_SECRET 環境變數一鍵部署至 Kubernetes** — commit `3f8e2a1b`
+  - Makefile build-prod/push-prod targets 支援 VERSION（git hash）+ REGISTRY
+  - deploy.sh 自動 patch image tag 注入 k8s manifests
+  - `make deploy-prod` 使用 docker-compose.prod.yml
 
 ---
 
