@@ -2,11 +2,12 @@
 
 ## 🔴 未完成（進行中）
 
-（暂无）
+- （暂无）
 
 ## 🟡 預計優化
 
-（暂无）
+- Cont 單元測試覆蓋率提升（admin-api CRUD handlers HTTP 層測試）
+- Cont 自動化部署腳本增強（Helm chart / Kustomize 替換 raw YAML）
 
 ## ✅ 已完成
 
