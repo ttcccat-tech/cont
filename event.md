@@ -6,7 +6,7 @@
 
 ## 🟡 預計優化
 
-（暂无）
+- [ ] **API Input Validation & Sanitization** — 現有多數 POST/PUT/PATCH handler 直接解析 JSON body 未做結構驗證（如空字串、長度限制、特殊字元），且 store 層直接拼接 SQL（無 parameterization 驗證）。需全面補齊：每個請求的 body schema 驗證、字串長度/格式限制、SQL injection 防禦層。
 
 ## ✅ 已完成
 
