@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ttcccat-tech/cont/admin-api/routes"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
 )
@@ -45,9 +46,9 @@ func main() {
 	r.Use(gin.Recovery())
 	r.Use(corsMiddleware())
 
-	// Health
+	// Health + Metrics
 	r.GET("/status", routes.Status(store))
-	r.GET("/metrics", routes.Metrics(store))
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// Auth
 	auth := r.Group("/auth")

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -122,23 +123,10 @@ func Status(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
-func Metrics(store *storage.Store) gin.HandlerFunc {
+func Metrics() gin.HandlerFunc {
+	h := promhttp.Handler()
 	return func(c *gin.Context) {
-		// Prometheus metrics compatible with Kong
-		c.Header("Content-Type", "text/plain; charset=utf-8")
-		c.String(http.StatusOK, `# HELP kong_nginx_requests_total Total number of requests
-# TYPE kong_nginx_requests_total counter
-kong_nginx_requests_total 0
-
-# HELP kong_nginx_connections_total Number of connections
-# TYPE kong_nginx_connections_total gauge
-kong_nginx_connections_total{state="active"} 0
-kong_nginx_connections_total{state="accepted"} 0
-kong_nginx_connections_total{state="handled"} 0
-kong_nginx_connections_total{state="reading"} 0
-kong_nginx_connections_total{state="writing"} 0
-kong_nginx_connections_total{state="waiting"} 0
-`)
+		h.ServeHTTP(c.Writer, c.Request)
 	}
 }
 
