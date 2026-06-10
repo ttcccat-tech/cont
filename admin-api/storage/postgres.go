@@ -28,7 +28,17 @@ func NewPostgres(url string) (*sql.DB, error) {
 	return db, nil
 }
 
+// RoleColumnMigration adds role column if it doesn't exist (for existing dbs)
+const RoleColumnMigration = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'viewer'
+`
+
 func RunMigrations(db *sql.DB) error {
+	// Add role column if it doesn't exist
+	if _, err := db.Exec(RoleColumnMigration); err != nil {
+		return fmt.Errorf("role column migration failed: %w", err)
+	}
+
 	migrations := []string{
 		`CREATE TABLE IF NOT EXISTS services (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

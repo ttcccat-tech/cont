@@ -754,6 +754,96 @@ func SSOMock(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// RequireRole returns a gin middleware that checks if user has required role
+func RequireRole(roles ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userRole, exists := c.Get("role")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "role not found in token"})
+			return
+		}
+		roleStr, ok := userRole.(string)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "invalid role format"})
+			return
+		}
+		for _, r := range roles {
+			if roleStr == r {
+				c.Next()
+				return
+			}
+		}
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	}
+}
+
+// RequirePermission returns a gin middleware that checks if user has permission for an entity
+func RequirePermission(entity string, write bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userRole, exists := c.Get("role")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "role not found in token"})
+			return
+		}
+		roleStr, ok := userRole.(string)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "invalid role format"})
+			return
+		}
+		if write {
+			if !storage.CanWrite(roleStr, entity) {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "write permission denied for " + entity})
+				return
+			}
+		} else {
+			if !storage.CanRead(roleStr, entity) {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "read permission denied for " + entity})
+				return
+			}
+		}
+		c.Next()
+	}
+}
+
+// ── Roles ─────────────────────────────────────────────────────────────────────
+
+type RoleInfo struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Permissions []string `json:"permissions"`
+}
+
+func ListRoles() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		roles := []RoleInfo{
+			{
+				Name:        "admin",
+				Description: "Full CRUD access to all entities",
+				Permissions: []string{"services:rw", "routes:rw", "plugins:rw", "consumers:rw", "upstreams:rw", "targets:rw", "workspaces:rw", "users:rw"},
+			},
+			{
+				Name:        "editor",
+				Description: "CRUD services/routes/consumers, read plugins/upstreams",
+				Permissions: []string{"services:rw", "routes:rw", "plugins:r", "consumers:rw", "upstreams:r", "targets:rw", "workspaces:r", "users:r"},
+			},
+			{
+				Name:        "viewer",
+				Description: "Read-only access to all entities",
+				Permissions: []string{"services:r", "routes:r", "plugins:r", "consumers:r", "upstreams:r", "targets:r", "workspaces:r", "users:r"},
+			},
+		}
+		c.JSON(200, gin.H{"data": roles})
+	}
+}
+
+func GetRolePermissions() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role := c.Param("role")
+		p := storage.GetPermissions(role)
+		c.JSON(200, gin.H{"role": role, "permissions": p})
+	}
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 func isUniqueViolation(err error) bool {
