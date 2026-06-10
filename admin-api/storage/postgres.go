@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -28,7 +29,16 @@ func NewPostgres(url string) (*sql.DB, error) {
 	return db, nil
 }
 
-// RoleColumnMigration adds role column if it doesn't exist (for existing dbs)
+func (s *Store) Ping() error {
+	return s.db.Ping()
+}
+
+func (s *Store) PingRedis() error {
+	if s.rdb == nil {
+		return fmt.Errorf("redis not configured")
+	}
+	return s.rdb.Ping(context.Background())
+}
 const RoleColumnMigration = `
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'viewer'
 `
@@ -135,6 +145,83 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_plugins_service ON plugins(service_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_plugins_consumer ON plugins(consumer_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_targets_upstream ON targets(upstream_id)`,
+
+		// Auth Groups
+		`CREATE TABLE IF NOT EXISTS auth_groups (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			name TEXT UNIQUE NOT NULL,
+			label TEXT,
+			description TEXT,
+			permissions JSONB DEFAULT '[]',
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+
+		// Resources
+		`CREATE TABLE IF NOT EXISTS resources (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			path TEXT NOT NULL,
+			type TEXT
+		)`,
+
+		// Audit Logs
+		`CREATE TABLE IF NOT EXISTS audit_logs (
+			id SERIAL PRIMARY KEY,
+			audit_type TEXT NOT NULL,
+			target_type TEXT NOT NULL,
+			target_id TEXT,
+			actor_user_id TEXT,
+			actor_username TEXT,
+			description TEXT,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC)`,
+
+		// Alert Rules
+		`CREATE TABLE IF NOT EXISTS alert_rules (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL,
+			description TEXT,
+			metric_type TEXT NOT NULL,
+			service_name TEXT,
+			threshold_value REAL NOT NULL,
+			operator TEXT NOT NULL,
+			duration_seconds INTEGER DEFAULT 60,
+			enabled BOOLEAN DEFAULT true,
+			notification_channels TEXT,
+			slack_webhook_url TEXT,
+			email_webhook_url TEXT,
+			discord_webhook_url TEXT,
+			alert_suppress_seconds INTEGER DEFAULT 300,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+
+		// API Key Requests
+		`CREATE TABLE IF NOT EXISTS api_key_requests (
+			id SERIAL PRIMARY KEY,
+			key_name TEXT NOT NULL,
+			consumer_name TEXT,
+			description TEXT,
+			status TEXT DEFAULT 'pending',
+			applicant_user_id TEXT,
+			applicant_username TEXT,
+			reviewed_by TEXT,
+			reviewed_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+
+		// Config Snapshots
+		`CREATE TABLE IF NOT EXISTS config_snapshots (
+			id SERIAL PRIMARY KEY,
+			version_label TEXT NOT NULL,
+			diff_from_prev TEXT,
+			actor_user_id TEXT,
+			actor_username TEXT,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

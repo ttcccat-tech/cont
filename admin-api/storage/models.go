@@ -7,6 +7,91 @@ import (
 	"time"
 )
 
+// ── Auth Groups & Resources ────────────────────────────────────────────────
+
+type PermissionEntry struct {
+	ResourceID string `json:"resource_id"`
+	Mode       string `json:"mode"` // deny, read, write
+}
+
+type AuthGroup struct {
+	ID          string             `json:"id"`
+	Name        string             `json:"name" binding:"required,max=255"`
+	Label       string             `json:"label"`
+	Description string             `json:"description,omitempty"`
+	Permissions []PermissionEntry  `json:"permissions,omitempty"`
+	CreatedAt   string             `json:"created_at,omitempty"`
+	UpdatedAt   string             `json:"updated_at,omitempty"`
+}
+
+type Resource struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Type string `json:"type,omitempty"`
+}
+
+// ── Audit Log ──────────────────────────────────────────────────────────────
+
+type AuditLog struct {
+	ID           int64  `json:"id"`
+	AuditType    string `json:"audit_type"`    // create, update, delete
+	TargetType   string `json:"target_type"`   // service, route, consumer, etc.
+	TargetID     string `json:"target_id"`
+	ActorUserID  string `json:"actor_user_id"`
+	ActorUsername string `json:"actor_username"`
+	Description  string `json:"description"`
+	CreatedAt    string `json:"created_at"`
+}
+
+// ── Alert Rules ────────────────────────────────────────────────────────────
+
+type AlertRule struct {
+	ID                  int64   `json:"id"`
+	Name                string  `json:"name" binding:"required,max=255"`
+	Description         string  `json:"description,omitempty"`
+	MetricType          string  `json:"metric_type" binding:"required,oneof=error_rate latency"`
+	ServiceName         string  `json:"service_name"`
+	ThresholdValue      float64 `json:"threshold_value"`
+	Operator            string  `json:"operator" binding:"required,oneof=> < >= <= =="`
+	DurationSeconds     int     `json:"duration_seconds" binding:"min=1"`
+	Enabled             bool    `json:"enabled"`
+	NotificationChannels string `json:"notification_channels,omitempty"`
+	SlackWebhookURL     string  `json:"slack_webhook_url,omitempty"`
+	EmailWebhookURL     string  `json:"email_webhook_url,omitempty"`
+	DiscordWebhookURL   string  `json:"discord_webhook_url,omitempty"`
+	AlertSuppressSeconds int    `json:"alert_suppress_seconds"`
+	CreatedAt           string  `json:"created_at,omitempty"`
+	UpdatedAt           string  `json:"updated_at,omitempty"`
+}
+
+// ── API Key Requests ───────────────────────────────────────────────────────
+
+type APIKeyRequest struct {
+	ID                 int64  `json:"id"`
+	KeyName            string `json:"key_name" binding:"required,max=255"`
+	ConsumerName       string `json:"consumer_name"`
+	Description        string `json:"description,omitempty"`
+	Status             string `json:"status" binding:"required,oneof=pending approved rejected"`
+	ApplicantUserID    string `json:"applicant_user_id"`
+	ApplicantUsername  string `json:"applicant_username"`
+	ReviewedBy         string `json:"reviewed_by,omitempty"`
+	ReviewedAt         string `json:"reviewed_at,omitempty"`
+	CreatedAt          string `json:"created_at,omitempty"`
+	UpdatedAt          string `json:"updated_at,omitempty"`
+}
+
+// ── Config Snapshots ───────────────────────────────────────────────────────
+
+type ConfigSnapshot struct {
+	ID           int64   `json:"id"`
+	VersionLabel string  `json:"version_label"`
+	DiffFromPrev *string `json:"diff_from_prev,omitempty"`
+	ActorUserID  string  `json:"actor_user_id"`
+	ActorUsername string `json:"actor_username"`
+	CreatedAt    string  `json:"created_at"`
+}
+
 // ── Kong-compatible entities ───────────────────────────────────────────────
 
 type Service struct {

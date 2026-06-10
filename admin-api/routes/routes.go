@@ -1096,3 +1096,360 @@ func DeleteUser(store *storage.Store) gin.HandlerFunc {
 		c.JSON(204, nil)
 	}
 }
+
+// ── Auth Groups ─────────────────────────────────────────────────────────────
+
+func ListAuthGroups(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		groups, err := store.ListAuthGroups()
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		if groups == nil {
+			groups = []storage.AuthGroup{}
+		}
+		c.JSON(200, groups)
+	}
+}
+
+func CreateAuthGroup(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var g storage.AuthGroup
+		if err := c.ShouldBindJSON(&g); err != nil {
+			badRequest(c, err)
+			return
+		}
+		created, err := store.CreateAuthGroup(&g)
+		if err != nil {
+			if isUniqueViolation(err) {
+				c.JSON(409, gin.H{"message": "group name already exists"})
+				return
+			}
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(201, created)
+	}
+}
+
+func GetAuthGroup(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		g, err := store.GetAuthGroup(id)
+		if err != nil {
+			c.JSON(404, gin.H{"message": "group not found"})
+			return
+		}
+		c.JSON(200, g)
+	}
+}
+
+func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var g storage.AuthGroup
+		if err := c.ShouldBindJSON(&g); err != nil {
+			badRequest(c, err)
+			return
+		}
+		updated, err := store.UpdateAuthGroup(id, &g)
+		if err != nil {
+			if isUniqueViolation(err) {
+				c.JSON(409, gin.H{"message": "group name already exists"})
+				return
+			}
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, updated)
+	}
+}
+
+func DeleteAuthGroup(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		existing, _ := store.GetAuthGroup(id)
+		if existing == nil {
+			c.JSON(404, gin.H{"message": "group not found"})
+			return
+		}
+		if err := store.DeleteAuthGroup(id); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(204, nil)
+	}
+}
+
+// ── Resources ───────────────────────────────────────────────────────────────
+
+func ListResources(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		resources, err := store.ListResources()
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		if resources == nil {
+			resources = []storage.Resource{}
+		}
+		c.JSON(200, gin.H{"resources": resources})
+	}
+}
+
+// ── Audit Logs ──────────────────────────────────────────────────────────────
+
+func ListAuditLogs(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		_, size := paginate(c)
+		_, offset := paginate(c)
+		logs, err := store.ListAuditLogs(size, offset)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		if logs == nil {
+			logs = []storage.AuditLog{}
+		}
+		c.JSON(200, logs)
+	}
+}
+
+// ── Alert Rules ─────────────────────────────────────────────────────────────
+
+func ListAlertRules(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rules, err := store.ListAlertRules()
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		if rules == nil {
+			rules = []storage.AlertRule{}
+		}
+		c.JSON(200, rules)
+	}
+}
+
+func CreateAlertRule(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var r storage.AlertRule
+		if err := c.ShouldBindJSON(&r); err != nil {
+			badRequest(c, err)
+			return
+		}
+		created, err := store.CreateAlertRule(&r)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(201, created)
+	}
+}
+
+func GetAlertRule(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		r, err := store.GetAlertRule(id)
+		if err != nil {
+			c.JSON(404, gin.H{"message": "alert rule not found"})
+			return
+		}
+		c.JSON(200, r)
+	}
+}
+
+func UpdateAlertRule(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var r storage.AlertRule
+		if err := c.ShouldBindJSON(&r); err != nil {
+			badRequest(c, err)
+			return
+		}
+		updated, err := store.UpdateAlertRule(id, &r)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, updated)
+	}
+}
+
+func DeleteAlertRule(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		existing, _ := store.GetAlertRule(id)
+		if existing == nil {
+			c.JSON(404, gin.H{"message": "alert rule not found"})
+			return
+		}
+		if err := store.DeleteAlertRule(id); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(204, nil)
+	}
+}
+
+// ── API Key Requests ────────────────────────────────────────────────────────
+
+func ListAPIKeyRequests(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		reqs, err := store.ListAPIKeyRequests()
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		if reqs == nil {
+			reqs = []storage.APIKeyRequest{}
+		}
+		c.JSON(200, reqs)
+	}
+}
+
+func CreateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var r storage.APIKeyRequest
+		if err := c.ShouldBindJSON(&r); err != nil {
+			badRequest(c, err)
+			return
+		}
+		if r.Status == "" {
+			r.Status = "pending"
+		}
+		created, err := store.CreateAPIKeyRequest(&r)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(201, created)
+	}
+}
+
+func GetAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		r, err := store.GetAPIKeyRequest(id)
+		if err != nil {
+			c.JSON(404, gin.H{"message": "API key request not found"})
+			return
+		}
+		c.JSON(200, r)
+	}
+}
+
+func UpdateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var r storage.APIKeyRequest
+		if err := c.ShouldBindJSON(&r); err != nil {
+			badRequest(c, err)
+			return
+		}
+		updated, err := store.UpdateAPIKeyRequest(id, &r)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, updated)
+	}
+}
+
+func DeleteAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		existing, _ := store.GetAPIKeyRequest(id)
+		if existing == nil {
+			c.JSON(404, gin.H{"message": "API key request not found"})
+			return
+		}
+		if err := store.DeleteAPIKeyRequest(id); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(204, nil)
+	}
+}
+
+// ── Config Snapshots ────────────────────────────────────────────────────────
+
+func ListConfigSnapshots(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		snaps, err := store.ListConfigSnapshots()
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		if snaps == nil {
+			snaps = []storage.ConfigSnapshot{}
+		}
+		c.JSON(200, snaps)
+	}
+}
+
+func CreateConfigSnapshot(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var sn storage.ConfigSnapshot
+		if err := c.ShouldBindJSON(&sn); err != nil {
+			badRequest(c, err)
+			return
+		}
+		created, err := store.CreateConfigSnapshot(&sn)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(201, created)
+	}
+}
+
+func DeleteConfigSnapshot(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		existing, _ := store.GetConfigSnapshot(id)
+		if existing == nil {
+			c.JSON(404, gin.H{"message": "snapshot not found"})
+			return
+		}
+		if err := store.DeleteConfigSnapshot(id); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(204, nil)
+	}
+}
+
+// ── Health & Config Check ───────────────────────────────────────────────────
+
+func HealthCheck(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Simple liveness: DB and Redis ping
+		healthy := true
+		var errors []string
+		if err := store.Ping(); err != nil {
+			healthy = false
+			errors = append(errors, "db: "+err.Error())
+		}
+		if err := store.PingRedis(); err != nil {
+			healthy = false
+			errors = append(errors, "redis: "+err.Error())
+		}
+		if healthy {
+			c.JSON(200, gin.H{"status": "healthy"})
+		} else {
+			c.JSON(503, gin.H{"status": "unhealthy", "errors": errors})
+		}
+	}
+}
+
+func ConfigCheck() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Return current config version / status
+		c.JSON(200, gin.H{
+			"version": "1.0.0",
+			"build":   "cont-admin-api",
+		})
+	}
+}

@@ -848,6 +848,13 @@ func nullString(s string) interface{} {
 	return s
 }
 
+func stringVal(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 func orString(s, def string) string {
 	if s == "" {
 		return def
@@ -948,6 +955,489 @@ func (s *Store) DeleteUser(id string) error {
 
 func (s *Store) UpdateUserPassword(id, passwordHash string) error {
 	_, err := s.db.Exec(`UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2`, passwordHash, id)
+	return err
+}
+
+// ── Auth Groups ────────────────────────────────────────────────────────────
+
+func (s *Store) ListAuthGroups() ([]AuthGroup, error) {
+	rows, err := s.db.Query(`SELECT id, name, label, description, permissions, created_at, updated_at FROM auth_groups ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var groups []AuthGroup
+	for rows.Next() {
+		var g AuthGroup
+		var label, desc sql.NullString
+		var perms []byte
+		var createdAt, updatedAt sql.NullString
+		if err := rows.Scan(&g.ID, &g.Name, &label, &desc, &perms, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		if label.Valid {
+			g.Label = label.String
+		}
+		if desc.Valid {
+			g.Description = desc.String
+		}
+		if perms != nil {
+			json.Unmarshal(perms, &g.Permissions)
+		}
+		if createdAt.Valid {
+			g.CreatedAt = createdAt.String
+		}
+		if updatedAt.Valid {
+			g.UpdatedAt = updatedAt.String
+		}
+		groups = append(groups, g)
+	}
+	return groups, nil
+}
+
+func (s *Store) CreateAuthGroup(g *AuthGroup) (*AuthGroup, error) {
+	permsJSON, _ := json.Marshal(g.Permissions)
+	var outID string
+	err := s.db.QueryRow(
+		`INSERT INTO auth_groups (name, label, description, permissions) VALUES ($1,$2,$3,$4) RETURNING id, created_at, updated_at`,
+		g.Name, nullString(g.Label), nullString(g.Description), permsJSON,
+	).Scan(&outID, &g.CreatedAt, &g.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	g.ID = outID
+	return g, nil
+}
+
+func (s *Store) GetAuthGroup(id string) (*AuthGroup, error) {
+	var g AuthGroup
+	var label, desc sql.NullString
+	var perms []byte
+	var createdAt, updatedAt sql.NullString
+	err := s.db.QueryRow(
+		`SELECT id, name, label, description, permissions, created_at, updated_at FROM auth_groups WHERE id=$1`,
+		id,
+	).Scan(&g.ID, &g.Name, &label, &desc, &perms, &createdAt, &updatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if label.Valid {
+		g.Label = label.String
+	}
+	if desc.Valid {
+		g.Description = desc.String
+	}
+	if perms != nil {
+		json.Unmarshal(perms, &g.Permissions)
+	}
+	if createdAt.Valid {
+		g.CreatedAt = createdAt.String
+	}
+	if updatedAt.Valid {
+		g.UpdatedAt = updatedAt.String
+	}
+	return &g, nil
+}
+
+func (s *Store) UpdateAuthGroup(id string, g *AuthGroup) (*AuthGroup, error) {
+	permsJSON, _ := json.Marshal(g.Permissions)
+	err := s.db.QueryRow(
+		`UPDATE auth_groups SET name=$2, label=$3, description=$4, permissions=$5, updated_at=NOW() WHERE id=$1 RETURNING updated_at`,
+		id, g.Name, nullString(g.Label), nullString(g.Description), permsJSON,
+	).Scan(&g.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return g, nil
+}
+
+func (s *Store) DeleteAuthGroup(id string) error {
+	_, err := s.db.Exec(`DELETE FROM auth_groups WHERE id=$1`, id)
+	return err
+}
+
+// ── Resources ──────────────────────────────────────────────────────────────
+
+func (s *Store) ListResources() ([]Resource, error) {
+	rows, err := s.db.Query(`SELECT id, name, path, type FROM resources ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var resources []Resource
+	for rows.Next() {
+		var r Resource
+		var typ sql.NullString
+		if err := rows.Scan(&r.ID, &r.Name, &r.Path, &typ); err != nil {
+			return nil, err
+		}
+		if typ.Valid {
+			r.Type = typ.String
+		}
+		resources = append(resources, r)
+	}
+	return resources, nil
+}
+
+// ── Audit Log ──────────────────────────────────────────────────────────────
+
+func (s *Store) ListAuditLogs(limit, offset int) ([]AuditLog, error) {
+	rows, err := s.db.Query(
+		`SELECT id, audit_type, target_type, target_id, actor_user_id, actor_username, description, created_at
+		 FROM audit_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var logs []AuditLog
+	for rows.Next() {
+		var l AuditLog
+		var actorUID, actorUname sql.NullString
+		if err := rows.Scan(&l.ID, &l.AuditType, &l.TargetType, &l.TargetID, &actorUID, &actorUname, &l.Description, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		if actorUID.Valid {
+			l.ActorUserID = actorUID.String
+		}
+		if actorUname.Valid {
+			l.ActorUsername = actorUname.String
+		}
+		logs = append(logs, l)
+	}
+	return logs, nil
+}
+
+func (s *Store) CreateAuditLog(l *AuditLog) error {
+	_, err := s.db.Exec(
+		`INSERT INTO audit_logs (audit_type, target_type, target_id, actor_user_id, actor_username, description)
+		 VALUES ($1,$2,$3,$4,$5,$6)`,
+		l.AuditType, l.TargetType, l.TargetID, nullString(l.ActorUserID), nullString(l.ActorUsername), l.Description,
+	)
+	return err
+}
+
+// ── Alert Rules ────────────────────────────────────────────────────────────
+
+func (s *Store) ListAlertRules() ([]AlertRule, error) {
+	rows, err := s.db.Query(
+		`SELECT id, name, description, metric_type, service_name, threshold_value, operator,
+		        duration_seconds, enabled, notification_channels, slack_webhook_url,
+		        email_webhook_url, discord_webhook_url, alert_suppress_seconds, created_at, updated_at
+		 FROM alert_rules ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rules []AlertRule
+	for rows.Next() {
+		var r AlertRule
+		var desc, svcName, notifCh, slackURL, emailURL, discordURL sql.NullString
+		var createdAt, updatedAt sql.NullString
+		if err := rows.Scan(&r.ID, &r.Name, &desc, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
+			&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
+			&r.AlertSuppressSeconds, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		if desc.Valid {
+			r.Description = desc.String
+		}
+		if svcName.Valid {
+			r.ServiceName = svcName.String
+		}
+		if notifCh.Valid {
+			r.NotificationChannels = notifCh.String
+		}
+		if slackURL.Valid {
+			r.SlackWebhookURL = slackURL.String
+		}
+		if emailURL.Valid {
+			r.EmailWebhookURL = emailURL.String
+		}
+		if discordURL.Valid {
+			r.DiscordWebhookURL = discordURL.String
+		}
+		if createdAt.Valid {
+			r.CreatedAt = createdAt.String
+		}
+		if updatedAt.Valid {
+			r.UpdatedAt = updatedAt.String
+		}
+		rules = append(rules, r)
+	}
+	return rules, nil
+}
+
+func (s *Store) CreateAlertRule(r *AlertRule) (*AlertRule, error) {
+	var outID int64
+	err := s.db.QueryRow(
+		`INSERT INTO alert_rules (name, description, metric_type, service_name, threshold_value, operator,
+		 duration_seconds, enabled, notification_channels, slack_webhook_url, email_webhook_url,
+		 discord_webhook_url, alert_suppress_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		 RETURNING id, created_at, updated_at`,
+		r.Name, nullString(r.Description), r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
+		r.Operator, r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
+		nullString(r.SlackWebhookURL), nullString(r.EmailWebhookURL), nullString(r.DiscordWebhookURL),
+		r.AlertSuppressSeconds,
+	).Scan(&outID, &r.CreatedAt, &r.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	r.ID = outID
+	return r, nil
+}
+
+func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
+	var r AlertRule
+	var desc, svcName, notifCh, slackURL, emailURL, discordURL sql.NullString
+	var createdAt, updatedAt sql.NullString
+	err := s.db.QueryRow(
+		`SELECT id, name, description, metric_type, service_name, threshold_value, operator,
+		        duration_seconds, enabled, notification_channels, slack_webhook_url,
+		        email_webhook_url, discord_webhook_url, alert_suppress_seconds, created_at, updated_at
+		 FROM alert_rules WHERE id=$1`, id,
+	).Scan(&r.ID, &r.Name, &desc, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
+		&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
+		&r.AlertSuppressSeconds, &createdAt, &updatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if desc.Valid {
+		r.Description = desc.String
+	}
+	if svcName.Valid {
+		r.ServiceName = svcName.String
+	}
+	if notifCh.Valid {
+		r.NotificationChannels = notifCh.String
+	}
+	if slackURL.Valid {
+		r.SlackWebhookURL = slackURL.String
+	}
+	if emailURL.Valid {
+		r.EmailWebhookURL = emailURL.String
+	}
+	if discordURL.Valid {
+		r.DiscordWebhookURL = discordURL.String
+	}
+	if createdAt.Valid {
+		r.CreatedAt = createdAt.String
+	}
+	if updatedAt.Valid {
+		r.UpdatedAt = updatedAt.String
+	}
+	return &r, nil
+}
+
+func (s *Store) UpdateAlertRule(id string, r *AlertRule) (*AlertRule, error) {
+	err := s.db.QueryRow(
+		`UPDATE alert_rules SET name=$2, description=$3, metric_type=$4, service_name=$5, threshold_value=$6,
+		 operator=$7, duration_seconds=$8, enabled=$9, notification_channels=$10, slack_webhook_url=$11,
+		 email_webhook_url=$12, discord_webhook_url=$13, alert_suppress_seconds=$14, updated_at=NOW()
+		 WHERE id=$1 RETURNING updated_at`,
+		id, r.Name, nullString(r.Description), r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
+		r.Operator, r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
+		nullString(r.SlackWebhookURL), nullString(r.EmailWebhookURL), nullString(r.DiscordWebhookURL),
+		r.AlertSuppressSeconds,
+	).Scan(&r.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (s *Store) DeleteAlertRule(id string) error {
+	_, err := s.db.Exec(`DELETE FROM alert_rules WHERE id=$1`, id)
+	return err
+}
+
+// ── API Key Requests ───────────────────────────────────────────────────────
+
+func (s *Store) ListAPIKeyRequests() ([]APIKeyRequest, error) {
+	rows, err := s.db.Query(
+		`SELECT id, key_name, consumer_name, description, status, applicant_user_id, applicant_username,
+		        reviewed_by, reviewed_at, created_at, updated_at
+		 FROM api_key_requests ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reqs []APIKeyRequest
+	for rows.Next() {
+		var r APIKeyRequest
+		var consumerName, desc, reviewedBy, reviewedAt sql.NullString
+		var createdAt, updatedAt sql.NullString
+		if err := rows.Scan(&r.ID, &r.KeyName, &consumerName, &desc, &r.Status,
+			&r.ApplicantUserID, &r.ApplicantUsername, &reviewedBy, &reviewedAt, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		if consumerName.Valid {
+			r.ConsumerName = consumerName.String
+		}
+		if desc.Valid {
+			r.Description = desc.String
+		}
+		if reviewedBy.Valid {
+			r.ReviewedBy = reviewedBy.String
+		}
+		if reviewedAt.Valid {
+			r.ReviewedAt = reviewedAt.String
+		}
+		if createdAt.Valid {
+			r.CreatedAt = createdAt.String
+		}
+		if updatedAt.Valid {
+			r.UpdatedAt = updatedAt.String
+		}
+		reqs = append(reqs, r)
+	}
+	return reqs, nil
+}
+
+func (s *Store) CreateAPIKeyRequest(r *APIKeyRequest) (*APIKeyRequest, error) {
+	var outID int64
+	err := s.db.QueryRow(
+		`INSERT INTO api_key_requests (key_name, consumer_name, description, status, applicant_user_id, applicant_username)
+		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at, updated_at`,
+		r.KeyName, nullString(r.ConsumerName), nullString(r.Description), r.Status,
+		nullString(r.ApplicantUserID), nullString(r.ApplicantUsername),
+	).Scan(&outID, &r.CreatedAt, &r.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	r.ID = outID
+	return r, nil
+}
+
+func (s *Store) GetAPIKeyRequest(id string) (*APIKeyRequest, error) {
+	var r APIKeyRequest
+	var consumerName, desc, reviewedBy, reviewedAt sql.NullString
+	var createdAt, updatedAt sql.NullString
+	err := s.db.QueryRow(
+		`SELECT id, key_name, consumer_name, description, status, applicant_user_id, applicant_username,
+		        reviewed_by, reviewed_at, created_at, updated_at
+		 FROM api_key_requests WHERE id=$1`, id,
+	).Scan(&r.ID, &r.KeyName, &consumerName, &desc, &r.Status,
+		&r.ApplicantUserID, &r.ApplicantUsername, &reviewedBy, &reviewedAt, &createdAt, &updatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if consumerName.Valid {
+		r.ConsumerName = consumerName.String
+	}
+	if desc.Valid {
+		r.Description = desc.String
+	}
+	if reviewedBy.Valid {
+		r.ReviewedBy = reviewedBy.String
+	}
+	if reviewedAt.Valid {
+		r.ReviewedAt = reviewedAt.String
+	}
+	if createdAt.Valid {
+		r.CreatedAt = createdAt.String
+	}
+	if updatedAt.Valid {
+		r.UpdatedAt = updatedAt.String
+	}
+	return &r, nil
+}
+
+func (s *Store) UpdateAPIKeyRequest(id string, r *APIKeyRequest) (*APIKeyRequest, error) {
+	err := s.db.QueryRow(
+		`UPDATE api_key_requests SET key_name=$2, consumer_name=$3, description=$4, status=$5,
+		 reviewed_by=$6, reviewed_at=NOW(), updated_at=NOW() WHERE id=$1 RETURNING updated_at`,
+		id, r.KeyName, nullString(r.ConsumerName), nullString(r.Description), r.Status, nullString(r.ReviewedBy),
+	).Scan(&r.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (s *Store) DeleteAPIKeyRequest(id string) error {
+	_, err := s.db.Exec(`DELETE FROM api_key_requests WHERE id=$1`, id)
+	return err
+}
+
+// ── Config Snapshots ───────────────────────────────────────────────────────
+
+func (s *Store) ListConfigSnapshots() ([]ConfigSnapshot, error) {
+	rows, err := s.db.Query(
+		`SELECT id, version_label, diff_from_prev, actor_user_id, actor_username, created_at
+		 FROM config_snapshots ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var snaps []ConfigSnapshot
+	for rows.Next() {
+		var sn ConfigSnapshot
+		var diffFromPrev sql.NullString
+		var actorUID, actorUname sql.NullString
+		var createdAt sql.NullString
+		if err := rows.Scan(&sn.ID, &sn.VersionLabel, &diffFromPrev, &actorUID, &actorUname, &createdAt); err != nil {
+			return nil, err
+		}
+		if diffFromPrev.Valid {
+			sn.DiffFromPrev = &diffFromPrev.String
+		}
+		if actorUID.Valid {
+			sn.ActorUserID = actorUID.String
+		}
+		if actorUname.Valid {
+			sn.ActorUsername = actorUname.String
+		}
+		if createdAt.Valid {
+			sn.CreatedAt = createdAt.String
+		}
+		snaps = append(snaps, sn)
+	}
+	return snaps, nil
+}
+
+func (s *Store) CreateConfigSnapshot(sn *ConfigSnapshot) (*ConfigSnapshot, error) {
+	var outID int64
+	err := s.db.QueryRow(
+		`INSERT INTO config_snapshots (version_label, diff_from_prev, actor_user_id, actor_username)
+		 VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
+		sn.VersionLabel, nullString(stringVal(sn.DiffFromPrev)), nullString(sn.ActorUserID), nullString(sn.ActorUsername),
+	).Scan(&outID, &sn.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	sn.ID = outID
+	return sn, nil
+}
+
+func (s *Store) GetConfigSnapshot(id string) (*ConfigSnapshot, error) {
+	var sn ConfigSnapshot
+	var diffFromPrev sql.NullString
+	var actorUID, actorUname sql.NullString
+	var createdAt sql.NullString
+	err := s.db.QueryRow(
+		`SELECT id, version_label, diff_from_prev, actor_user_id, actor_username, created_at
+		 FROM config_snapshots WHERE id=$1`, id,
+	).Scan(&sn.ID, &sn.VersionLabel, &diffFromPrev, &actorUID, &actorUname, &createdAt)
+	if err != nil {
+		return nil, err
+	}
+	if diffFromPrev.Valid {
+		sn.DiffFromPrev = &diffFromPrev.String
+	}
+	if actorUID.Valid {
+		sn.ActorUserID = actorUID.String
+	}
+	if actorUname.Valid {
+		sn.ActorUsername = actorUname.String
+	}
+	if createdAt.Valid {
+		sn.CreatedAt = createdAt.String
+	}
+	return &sn, nil
+}
+
+func (s *Store) DeleteConfigSnapshot(id string) error {
+	_, err := s.db.Exec(`DELETE FROM config_snapshots WHERE id=$1`, id)
 	return err
 }
 

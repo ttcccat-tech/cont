@@ -2,11 +2,16 @@
 
 ## 🔴 未完成（進行中）
 
-（暂无）
+- [ ] **Groups CRUD 端點實作** — 前端 Groups.tsx 已就緒，後端缺少 `/groups` GET/POST/PUT/PATCH/DELETE
+- [ ] **Audit Log 端點實作** — 前端 AuditLog.tsx 已就緒，後端缺少 `/audit` GET
+- [ ] **Alert Rules 端點實作** — 前端 AlertRules.tsx 已就緒，後端缺少 `/alerts/rules` CRUD
+- [ ] **API Key Requests 端點實作** — 前端 ApiKeyRequests.tsx 已就緒，後端缺少 `/api-keys` CRUD
+- [ ] **Config Versioning 端點實作** — 前端 ConfigVersioning.tsx 已就緒，後端缺少 snapshots/diff/rollback
+- [ ] **Health Portal 端點實作** — 前端 HealthPortal.tsx 已就緒，後端缺少 health-check /config-check
 
 ## 🟡 預計優化
 
-- [x] **自動化部署腳本** — commit `21050c11`
+（暂无）
   - k8s/ 目錄：Namespace + ConfigMap/Secret + postgres + redis + admin-api + frontend + proxy 完整 manifests
   - proxy/Dockerfile：OpenResty -proxy 映像檔建置
   - deploy.sh：前置檢查（kubectl/cluster）、影像建置+推送（REGISTRY）、JWT_SECRET 自動生成、`./deploy.sh apply`/`delete` 生命周期、rollout status

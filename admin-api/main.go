@@ -152,6 +152,54 @@ func main() {
 			users.PATCH("/:id", routes.RequirePermission("users", true), routes.UpdateUser(store))
 			users.DELETE("/:id", routes.RequirePermission("users", true), routes.DeleteUser(store))
 		}
+
+		// Auth Groups
+		groups := admin.Group("/groups")
+		{
+			groups.GET("", routes.ListAuthGroups(store))
+			groups.POST("", routes.CreateAuthGroup(store))
+			groups.GET("/:id", routes.GetAuthGroup(store))
+			groups.PUT("/:id", routes.UpdateAuthGroup(store))
+			groups.PATCH("/:id", routes.UpdateAuthGroup(store))
+			groups.DELETE("/:id", routes.DeleteAuthGroup(store))
+		}
+
+		// Resources
+		admin.GET("/resources", routes.ListResources(store))
+
+		// Audit Logs
+		admin.GET("/audit", routes.ListAuditLogs(store))
+
+		// Alert Rules
+		alerts := admin.Group("/alerts")
+		{
+			alerts.GET("/rules", routes.ListAlertRules(store))
+			alerts.POST("/rules", routes.CreateAlertRule(store))
+			alerts.GET("/rules/:id", routes.GetAlertRule(store))
+			alerts.PUT("/rules/:id", routes.UpdateAlertRule(store))
+			alerts.PATCH("/rules/:id", routes.UpdateAlertRule(store))
+			alerts.DELETE("/rules/:id", routes.DeleteAlertRule(store))
+		}
+
+		// API Key Requests
+		apikeys := admin.Group("/api-keys")
+		{
+			apikeys.GET("", routes.ListAPIKeyRequests(store))
+			apikeys.POST("", routes.CreateAPIKeyRequest(store))
+			apikeys.GET("/:id", routes.GetAPIKeyRequest(store))
+			apikeys.PUT("/:id", routes.UpdateAPIKeyRequest(store))
+			apikeys.PATCH("/:id", routes.UpdateAPIKeyRequest(store))
+			apikeys.DELETE("/:id", routes.DeleteAPIKeyRequest(store))
+		}
+
+		// Config Snapshots
+		admin.GET("/snapshots", routes.ListConfigSnapshots(store))
+		admin.POST("/snapshots", routes.CreateConfigSnapshot(store))
+		admin.DELETE("/snapshots/:id", routes.DeleteConfigSnapshot(store))
+
+		// Health & Config Check (for HealthPortal)
+		admin.GET("/health-check", routes.HealthCheck(store))
+		admin.GET("/config-check", routes.ConfigCheck())
 	}
 
 	port := os.Getenv("ADMIN_PORT")
