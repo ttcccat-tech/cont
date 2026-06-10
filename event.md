@@ -6,7 +6,12 @@
 
 ## 🟡 預計優化
 
-- [ ] **自動化部署腳本** — Makefile/Shell 實現 `make deploy-prod`（build + push + apply kubernetes/yaml），降低部署摩擦
+- [x] **自動化部署腳本** — commit `21050c11`
+  - k8s/ 目錄：Namespace + ConfigMap/Secret + postgres + redis + admin-api + frontend + proxy 完整 manifests
+  - proxy/Dockerfile：OpenResty -proxy 映像檔建置
+  - deploy.sh：前置檢查（kubectl/cluster）、影像建置+推送（REGISTRY）、JWT_SECRET 自動生成、`./deploy.sh apply`/`delete` 生命周期、rollout status
+  - Makefile 新增：k8s-apply、k8s-delete、k8s-status、k8s-logs、k8s-port-forward targets
+  - 支援 `make deploy-prod` 搭配 REGISTRY + JWT_SECRET 環境變數一鍵部署至 Kubernetes
 
 ## ✅ 已完成
 
