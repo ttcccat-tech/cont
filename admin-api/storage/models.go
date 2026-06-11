@@ -267,11 +267,12 @@ type Workspace struct {
 
 // WorkspaceUserAssignment represents a user's assignment to a workspace
 type WorkspaceUserAssignment struct {
-	UserID    string `json:"user_id"`
-	Username  string `json:"username"`
+	WorkspaceID string `json:"workspace_id"`
+	UserID     string `json:"user_id"`
+	Username   string `json:"username"`
 	DisplayName string `json:"display_name,omitempty"`
-	Email     string `json:"email,omitempty"`
-	Role      string `json:"role"`
+	Email      string `json:"email,omitempty"`
+	Role       string `json:"role"`
 	AssignedAt string `json:"assigned_at,omitempty"`
 }
 

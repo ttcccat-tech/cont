@@ -1038,7 +1038,7 @@ func RequireWorkspacePermission(store *storage.Store, entity string, write bool)
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "no workspace access"})
 				return
 			}
-			workspaceID = workspaces[0].UserID
+			workspaceID = workspaces[0].WorkspaceID
 		}
 
 		wsRole, err := store.GetUserWorkspaceRole(userID.(string), workspaceID)
