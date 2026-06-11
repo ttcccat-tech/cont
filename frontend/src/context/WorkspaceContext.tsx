@@ -28,8 +28,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const saved = sessionStorage.getItem(WS_KEY)
     if (saved) {
-      listWorkspaces().then(list => {
-        const found = list.find(w => w.name === saved)
+      listWorkspaces().then(res => {
+        // Backend returns {data: [...]} or array — normalize to array
+        const list = Array.isArray(res) ? res : (res?.data ?? [])
+        const found = list.find((w: Workspace) => w.name === saved)
         if (found) setCurrentWorkspaceState(found)
       }).catch(() => {})
     }
@@ -37,7 +39,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     listMyWorkspaces()
-      .then(setWorkspaces)
+      .then(res => {
+        // Backend returns {data: [...]} or array — normalize to array
+        const list = Array.isArray(res) ? res : (res?.data ?? [])
+        setWorkspaces(list)
+      })
       .catch(() => setWorkspaces([]))
       .finally(() => setLoading(false))
   }, [])
