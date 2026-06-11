@@ -6,10 +6,7 @@
 
 ## 🟡 預計優化
 
-- **登入安全：登入頻率限制 + 暴力破解防護**
-  - 目前 Cont 無登入頻率限制攻擊保護
-  - 需要：login_attempts 表追蹤失敗次數、/auth/login 頻率限制（每分鐘 N 次）、短期帳號鎖定（5 分鐘）、管理者解鎖 API
-  - 候選：IP 維度的 rate limit middleware
+- （暂无）
 
 ## ✅ 已完成
 
@@ -20,6 +17,11 @@
   - Frontend: `Login.tsx` OAuth2Service redirect flow, `handleOAuthCallback()` URL token parsing
   - 動態 OAuth provider 按鈕（從 `/auth/oauth/providers` 讀取），自動檢測 URL token
   - QA: GET /auth/oauth/providers → 200 ✅, GET /auth/google → 404 (no provider configured) ✅
+- [x] **登入安全：登入頻率限制 + 暴力破解防護** — commit `99f7b99a`
+  - `login_attempts` table（username, ip_address, success, attempted_at）+ 兩個 index
+  - Store: `RecordFailedLogin()`/`ClearFailedLogins()`/`IsLockedOut()`/`GetLoginAttemptsByIP()`
+  - Login handler: lockout 檢查（5 次失敗 / 60 秒視窗 → 300 秒鎖定）、失敗記錄、成功清除
+  - Go build ✅, Docker build ✅, QA: login✅, 5x fail→429✅, locked時正確密碼亦阻擋✅
 - [x] **使用者-群組指派 UI（群組 name 支援）** — commit `5c586bf6`
   - 修復：/groups/:id/members API 原本只接受 UUID，前端傳入 group name 導致 pq error
   - store.go: 新增 GetAuthGroupByName()，可依 name 查詢 auth group
