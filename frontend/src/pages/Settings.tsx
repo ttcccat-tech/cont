@@ -161,14 +161,14 @@ export default function SettingsPage() {
           </Card>
         </Col>
 
-        {/* Kong Info */}
+        {/* Cont System Info */}
         <Col xs={24}>
-          <Card title="Kong 版本資訊" style={{ background:'var(--secondary)', border:'none' }}>
+          <Card title="系統資訊" style={{ background:'var(--secondary)', border:'none' }}>
             <Row gutter={[16,8]}>
               <Col xs={24} sm={8}>
                 <Space direction="vertical">
                   <span style={{color:'var(--muted)', fontSize:12}}>版本</span>
-                  <Tag color="green" style={{fontSize:14}}>3.4.2</Tag>
+                  <Tag color="green" style={{fontSize:14}}>Cont v2.0</Tag>
                 </Space>
               </Col>
               <Col xs={24} sm={8}>
@@ -179,18 +179,11 @@ export default function SettingsPage() {
               </Col>
               <Col xs={24} sm={8}>
                 <Space direction="vertical">
-                  <span style={{color:'var(--muted)', fontSize:12}}>Admin Token</span>
-                  <code style={{color:'var(--highlight)'}}>changeme</code>
+                  <span style={{color:'var(--muted)', fontSize:12}}>API Gateway</span>
+                  <Tag color="purple">Cont Proxy</Tag>
                 </Space>
               </Col>
             </Row>
-            <Divider style={{ borderColor:'var(--accent)' }} />
-            <Alert
-              message="部分設定（如端口、日誌等級、超時）修改後需重啟 Kong 容器才會生效。使用 docker compose restart kong 重新啟動。"
-              type="warning"
-              showIcon
-              style={{ fontSize: 12 }}
-            />
           </Card>
         </Col>
       </Row>
