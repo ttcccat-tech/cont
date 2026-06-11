@@ -46,21 +46,17 @@
   - 後端：核發後自動產生 key，寄送 email / Slack 通知
   - Admin：審批介面支援批次核准/拒絕多筆
   - Bug fix: GetAPIKeyRequest SQL scan 漏掉 key_value 欄位賦值，導致核准後 API 回傳 key_value: null
-  - QA: POST /api-keys → 201 ✅, PUT /api-keys/:id/approve →200 + key_value ✅, GET /api-keys/mine →200 ✅
+## 🟡 預計優化
 
 - [ ] **商業化：SaaS 註冊機制** — 從單機部署進化為多租戶 SaaS
-  - 方案 A（推薦）：Tenant = Workspace 超集
-    - 每個 Organization（組織）有自己的 workspace pool
-    - Organization 有獨立的 plan（Free/Pro/Enterprise）、billing、API quota
-    - 用 email 註冊Organization，email 即登入帳號
-    - 登入後預設建立一個 default workspace
-  - 方案 B：訂閱制
-    - 系統管理員在後台管理 Organization 帳號
-    - Organization 可建立多個 workspace，費用按 workspace 數量計算
-  - 核心資料模型：Organization（id, name, plan, stripe_customer_id, created_at）、OrganizationUser（org_id, user_id, role）
-  - 現有 users / workspaces / auth_groups 保持不變，新增 organization_id 作為頂層隔離層
-  - 前端：在 Settings.tsx 新增「Organization 設定」（名稱、邀請成員、升級方案）
-  - 登入頁：支援 email 註冊（SendOTP / VerifyOTP）或 OAuth（Google）
+  - Phase 1（現在做）：Organization 資料模型 + 登入頁 email 註冊（SendOTP/VerifyOTP）
+  - Phase 2：Workspace 綁定 Organization，多租戶資料隔離
+  - 方案：Organization = top-level entity，users/workspaces 隸屬 org_id
+  - 使用 email 註冊，email 即帳號，預設建立 default workspace
+  - 前端：Settings.tsx 新增 Organization 設定面板
+  - Phase 3：plan/billing/Stripe 整合（留待後續）
+
+- [ ] **Cont 單元測試覆蓋率提升（admin-api CRUD handlers HTTP 層測試）** — 現有測試覆蓋 auth/validation/routes，但 CRUD HTTP handlers 缺乏 HTTP 層測試（sqlmock 被安全策略阻擋，改用 integration test 框架或重構測試策略）
 
 ## ✅ 已完成
 
