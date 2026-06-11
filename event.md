@@ -2,6 +2,8 @@
 
 ## 🔴 未完成（進行中）
 
+（已全部修復，見下方 ✅）
+
 ## 🟡 預計優化
 
 - [ ] **Workspace 使用者管理 UI（Workspace 級 RBAC）** — 前端 Workspace 頁面新增「成員」tab，讓 admin 管理誰可以進哪些 workspace
@@ -19,10 +21,15 @@
   - 移除 `getApiKeyRequests`、`getHealthServices`、`getStatsOverview` 三個不存在後端端的 dead API calls
   - QA: services/consumers/routes/plugins LIST → 200 ✅, CREATE → 201 ✅, DELETE → 204 ✅
 
-- [x] **API path 後端不存在（404）** — commit `45ee1525`
-  - 移除前端三個無後端對應的 API function：getApiKeyRequests, getHealthServices, getStatsOverview
-  - 這些 function 定義了但從未被任何 page 使用（僅是 dead code）
-  - 後端正確端點：GET /api-keys（需登入認證）
+- [x] **API path 後端不存在（404）+ HealthPortal 修復** — commit `45ee1525` + `74891876` + `fdc9dc97`
+  - ApiKeyRequests: `/apikeys/requests` → `/api-keys`（後端實作於 `/api-keys`）
+  - HealthPortal: 移除 `/health/services`、`/health/summary`、`/health/check`（後端無此端點）
+  - 改用 `/services` 端點顯示服務狀態（unknown）
+  - handleCheck / handleEditSave 改為 no-op（後端無實作）
+
+- [x] **Docker build layer cache 導致 JS 未更新** — 手動 `docker builder prune` + `docker build --no-cache` 解決
+  - `docker compose build` 未清除 builder cache，導致新 dist 內容未寫入 image
+  - 解決：先 `npm run build` → `docker builder prune` → `docker build --no-cache --force-rm` → recreate container
 
 - [x] **Workspace 多租戶隔離（RBAC + 資料隔離）** — commit `3c80a047` + `82ab87ca`
   - `workspace_auth_groups` table（workspace_id, auth_group_id, role）
