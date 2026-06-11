@@ -937,7 +937,7 @@ func (s *Store) ListUserWorkspaces(userID string) ([]WorkspaceUserAssignment, er
 		if err := rows.Scan(&w.WorkspaceID, &name, &created, &w.Role); err != nil {
 			return nil, err
 		}
-		w.Username = name.String // reuse name field as workspace name for frontend
+		w.WorkspaceName = name.String
 		if created.Valid {
 			w.AssignedAt = created.String
 		}

@@ -104,7 +104,7 @@ export interface PermissionEntry { resource_id: string; mode: PermissionMode }
 export interface Resource { id: string; name: string; path: string; type?: string }
 export interface AuthGroup { id?: string; name: string; label: string; description?: string; permissions?: PermissionEntry[]; created_at?: number }
 export interface Workspace { id: string; name: string; label: string; description?: string; kong_workspace_id?: string; created_at?: number; group_ids?: string[] }
-export interface WorkspaceUserAssignment { workspace_id: string; user_id: string; username: string; display_name?: string; email?: string; role: string; assigned_at?: string }
+export interface WorkspaceUserAssignment { workspace_id: string; workspace_name?: string; user_id: string; username: string; display_name?: string; email?: string; role: string; assigned_at?: string }
 export interface AuditEntry { id: number; audit_type: string; target_type: string; target_id: string; actor_username: string; actor_user_id: string; description: string; created_at: string }
 
 function parsePromMetrics(text: string): Record<string, number> {

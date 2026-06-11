@@ -174,7 +174,7 @@ export default function Users() {
     setWsLoading(true)
     try {
       const ws = await getUserWorkspaces(user.id)
-      setUserWorkspaces(ws.map((w: any) => ({ id: w.workspace_id, name: w.username, role: w.role })))
+      setUserWorkspaces(ws.map((w: any) => ({ id: w.workspace_id, name: w.workspace_name || w.name || 'Unknown', role: w.role })))
     } catch (e) {
       message.error('無法載入工作區列表')
     } finally {

@@ -44,10 +44,12 @@
   - QA: Prometheus scrape ✅ (cont-admin-api: up), Grafana ✅ (HTTP 200), dashboard provisioned ✅
   - 使用方式：`docker compose -f monitoring/docker-compose.monitoring.yml up -d`
 
-- [ ] **API Key 申請 Flow 完整化** — 申請 → 審批 → 核發 → 通知，整個流程 UI 完善化
+- [x] **API Key 申請 Flow 完整化** — commit `8345bcd6`
   - ApiKeyRequests.tsx：申請表單（reason、scope、expire）、狀態追蹤（pending/approved/rejected）
   - 後端：核發後自動產生 key，寄送 email / Slack 通知
-  - Admin：審批介面可一次核准/拒絕多筆
+  - Admin：審批介面支援批次核准/拒絕多筆
+  - Bug fix: GetAPIKeyRequest SQL scan 漏掉 key_value 欄位賦值，導致核准後 API 回傳 key_value: null
+  - QA: POST /api-keys → 201 ✅, PUT /api-keys/:id/approve →200 + key_value ✅, GET /api-keys/mine →200 ✅
 
 - [ ] **商業化：SaaS 註冊機制** — 從單機部署進化為多租戶 SaaS
   - 方案 A（推薦）：Tenant = Workspace 超集
