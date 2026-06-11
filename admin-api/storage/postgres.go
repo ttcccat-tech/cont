@@ -350,6 +350,22 @@ func RunMigrations(db *sql.DB) error {
 		// Add org_id to users for multi-tenancy
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_users_org ON users(org_id)`,
+
+		// Phase 2: Add org_id to entity tables for multi-tenant isolation
+		`ALTER TABLE services   ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+		`ALTER TABLE routes      ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+		`ALTER TABLE upstreams   ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+		`ALTER TABLE targets     ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+		`ALTER TABLE consumers   ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+		`ALTER TABLE plugins     ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+		`ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_services_org   ON services(org_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_routes_org     ON routes(org_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_upstreams_org ON upstreams(org_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_targets_org    ON targets(org_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_consumers_org  ON consumers(org_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_plugins_org    ON plugins(org_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_workspaces_org ON workspaces(org_id)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

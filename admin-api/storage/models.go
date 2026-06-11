@@ -113,6 +113,7 @@ type Service struct {
 	ReadTimeout     int    `json:"read_timeout,omitempty" binding:"omitempty,min=0,max=600000"`
 	WriteTimeout    int    `json:"write_timeout,omitempty" binding:"omitempty,min=0,max=600000"`
 	Enabled         bool   `json:"enabled"`
+	OrgID           string `json:"org_id,omitempty"`
 	CreatedAt       string `json:"created_at,omitempty"`
 	UpdatedAt       string `json:"updated_at,omitempty"`
 }
@@ -132,6 +133,7 @@ type Route struct {
 	HTTPSRedirectStatusCode int      `json:"https_redirect_status_code,omitempty" binding:"omitempty,oneof=301 302 307 308"`
 	ConnectionTimeout       int      `json:"connection_timeout,omitempty" binding:"omitempty,min=0,max=600000"`
 	Enabled                 bool     `json:"enabled"`
+	OrgID                   string   `json:"org_id,omitempty"`
 	CreatedAt               string   `json:"created_at,omitempty"`
 	UpdatedAt               string   `json:"updated_at,omitempty"`
 }
@@ -193,6 +195,7 @@ type Upstream struct {
 	Slots        int    `json:"slots,omitempty" binding:"omitempty,min=10,max=65536"`
 	Healthchecks string `json:"healthchecks,omitempty"`
 	Enabled      bool   `json:"enabled"`
+	OrgID        string `json:"org_id,omitempty"`
 	CreatedAt    string `json:"created_at,omitempty"`
 	UpdatedAt    string `json:"updated_at,omitempty"`
 }
@@ -203,6 +206,7 @@ type Target struct {
 	Target     string `json:"target,omitempty" binding:"omitempty"`
 	Weight     int    `json:"weight,omitempty" binding:"omitempty,min=0,max=1000"`
 	Enabled    bool   `json:"enabled"`
+	OrgID      string `json:"org_id,omitempty"`
 	CreatedAt  string `json:"created_at,omitempty"`
 }
 
@@ -211,6 +215,7 @@ type Consumer struct {
 	Username  string `json:"username,omitempty" binding:"required,max=255"`
 	CustomID  string `json:"custom_id,omitempty" binding:"omitempty,max=255"`
 	Enabled   bool   `json:"enabled"`
+	OrgID     string `json:"org_id,omitempty"`
 	CreatedAt string `json:"created_at,omitempty"`
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
@@ -261,6 +266,7 @@ type Plugin struct {
 	Consumer   *PluginScope    `json:"consumer,omitempty"`
 	Config     json.RawMessage `json:"config,omitempty"`
 	Enabled    bool            `json:"enabled"`
+	OrgID      string          `json:"org_id,omitempty"`
 	CreatedAt  string          `json:"created_at,omitempty"`
 	UpdatedAt  string          `json:"updated_at,omitempty"`
 }
@@ -268,6 +274,7 @@ type Plugin struct {
 type Workspace struct {
 	ID        string `json:"id"`
 	Name      string `json:"name" binding:"required,max=255"`
+	OrgID     string `json:"org_id,omitempty"`
 	CreatedAt string `json:"created_at,omitempty"`
 }
 
