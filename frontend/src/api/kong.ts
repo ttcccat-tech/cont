@@ -155,6 +155,10 @@ export const setWorkspaceUser = (workspaceId: string, userId: string, role: stri
 export const removeWorkspaceUser = (workspaceId: string, userId: string) =>
   analyticsClient.delete(`/workspaces/${workspaceId}/users/${userId}`)
 
+// User workspace assignments (GET /workspaces/users/:userId)
+export const getUserWorkspaces = (userId: string) =>
+  analyticsClient.get<{ data: WorkspaceUserAssignment[] }>(`/workspaces/users/${userId}`).then(r => r.data?.data ?? [])
+
 export const listResources = () => analyticsClient.get<{ resources: Resource[] }>('/resources').then(r => r.data?.resources ?? [])
 
 export const getAuditLogs = () => analyticsClient.get<AuditEntry[]>('/audit').then(r => r.data)

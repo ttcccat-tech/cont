@@ -914,10 +914,10 @@ func (s *Store) DeleteWorkspace(id string) error {
 // ── User Workspaces ─────────────────────────────────────────────────────────
 
 // ListUserWorkspaces returns all workspaces a user has access to (direct assignment)
-// Returns standard Workspace objects so the frontend can use them directly
-func (s *Store) ListUserWorkspaces(userID string) ([]Workspace, error) {
+// Returns WorkspaceUserAssignment objects so the frontend gets role information
+func (s *Store) ListUserWorkspaces(userID string) ([]WorkspaceUserAssignment, error) {
 	rows, err := s.db.Query(`
-		SELECT w.id, w.name, w.created_at
+		SELECT w.id, w.name, w.created_at, uw.role
 		FROM user_workspaces uw
 		JOIN workspaces w ON w.id = uw.workspace_id
 		WHERE uw.user_id = $1
@@ -926,17 +926,20 @@ func (s *Store) ListUserWorkspaces(userID string) ([]Workspace, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Workspace
+	var out []WorkspaceUserAssignment
+	if out == nil {
+		out = []WorkspaceUserAssignment{}
+	}
 	for rows.Next() {
-		var w Workspace
+		var w WorkspaceUserAssignment
 		var name sql.NullString
 		var created sql.NullString
-		if err := rows.Scan(&w.ID, &name, &created); err != nil {
+		if err := rows.Scan(&w.UserID, &name, &created, &w.Role); err != nil {
 			return nil, err
 		}
-		w.Name = name.String
+		w.Username = name.String // reuse name field as workspace name for frontend
 		if created.Valid {
-			w.CreatedAt = created.String
+			w.AssignedAt = created.String
 		}
 		out = append(out, w)
 	}

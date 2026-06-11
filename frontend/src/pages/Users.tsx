@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Select, Drawer, Checkbox, List, Divider, Alert } from 'antd'
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, GroupOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, GroupOutlined, WorkspaceOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { Workspace, listWorkspaces, getUsers, createUser, updateUser, deleteUser, getGroups, getGroupMembers, setGroupMembers, AuthGroup } from '../api/kong'
+import { Workspace, listWorkspaces, getUsers, createUser, updateUser, deleteUser, getGroups, getGroupMembers, setGroupMembers, getUserWorkspaces, setWorkspaceUser, removeWorkspaceUser, AuthGroup } from '../api/kong'
 
 interface User {
   id: string
@@ -31,6 +31,13 @@ export default function Users() {
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
   const [groupLoading, setGroupLoading] = useState(false)
   const [groupSaving, setGroupSaving] = useState(false)
+
+  // Workspace assignment
+  const [wsDrawerOpen, setWsDrawerOpen] = useState(false)
+  const [wsAssigningUser, setWsAssigningUser] = useState<User | null>(null)
+  const [userWorkspaces, setUserWorkspaces] = useState<{ id: string; name: string; role: string }[]>([])
+  const [wsLoading, setWsLoading] = useState(false)
+  const [wsSaving, setWsSaving] = useState(false)
 
   const fetchUsers = () => {
     setLoading(true)
@@ -160,6 +167,53 @@ export default function Users() {
     }
   }
 
+  // ── Workspace assignment ──────────────────────────────────
+  const openWsDrawer = async (user: User) => {
+    setWsAssigningUser(user)
+    setWsDrawerOpen(true)
+    setWsLoading(true)
+    try {
+      const ws = await getUserWorkspaces(user.id)
+      setUserWorkspaces(ws.map((w: any) => ({ id: w.workspace_id || w.id || (user as any).id, name: w.name || (user as any).username, role: w.role })))
+    } catch (e) {
+      message.error('無法載入工作區列表')
+    } finally {
+      setWsLoading(false)
+    }
+  }
+
+  const handleSaveWorkspaces = async () => {
+    if (!wsAssigningUser?.id) return
+    setWsSaving(true)
+    try {
+      // For each selected workspace, upsert the assignment
+      const selectedWsIds = userWorkspaces.map(w => w.id)
+      // Get current workspaces for this user
+      const currentWsIds = selectedWsIds // Already computed
+      await Promise.all(
+        allWorkspaces.map(async (ws) => {
+          const isSelected = selectedWsIds.includes(ws.id)
+          const isCurrentlyAssigned = userWorkspaces.some(uw => uw.id === ws.id)
+          if (isSelected && !isCurrentlyAssigned) {
+            // Add assignment
+            const role = userWorkspaces.find(uw => uw.id === ws.id)?.role || 'viewer'
+            await setWorkspaceUser(ws.id, wsAssigningUser.id, role)
+          } else if (!isSelected && isCurrentlyAssigned) {
+            // Remove assignment
+            await removeWorkspaceUser(ws.id, wsAssigningUser.id)
+          }
+        })
+      )
+      message.success('工作區指派已更新')
+      setWsDrawerOpen(false)
+      fetchUsers()
+    } catch (e: any) {
+      message.error('儲存失敗: ' + (e?.message || ''))
+    } finally {
+      setWsSaving(false)
+    }
+  }
+
   const columns: ColumnsType<User> = [
     {
       title: 'Username',
@@ -217,6 +271,7 @@ export default function Users() {
       width: 220,
       render: (_, r) => (
         <Space>
+          <Button size="small" icon={<WorkspaceOutlined />} onClick={() => openWsDrawer(r)}>指派工作區</Button>
           <Button size="small" icon={<GroupOutlined />} onClick={() => openGroupDrawer(r)}>指派群組</Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openModal(r)}>編輯</Button>
           <Popconfirm title={`確認刪除使用者「${r.username}」？`} onConfirm={() => r.id && handleDelete(r.id, r.username)}>
@@ -339,6 +394,74 @@ export default function Users() {
                 </List.Item>
               )}
               locale={{ emptyText: '尚無可用群組' }}
+            />
+          </>
+        )}
+      </Drawer>
+
+      {/* Workspace Assignment Drawer */}
+      <Drawer
+        title={<Space><WorkspaceOutlined /> 指派工作區：<Tag color="blue">{wsAssigningUser?.username}</Tag></Space>}
+        open={wsDrawerOpen}
+        onClose={() => setWsDrawerOpen(false)}
+        width={480}
+        extra={
+          <Button type="primary" loading={wsSaving} onClick={handleSaveWorkspaces}>
+            儲存
+          </Button>
+        }
+      >
+        {wsLoading ? (
+          <div style={{ textAlign: 'center', padding: 32 }}>載入中...</div>
+        ) : (
+          <>
+            <Alert
+              message="勾選使用者可存取的工作區。每個工作區可選擇角色（檢視/編輯/管理）。"
+              type="info"
+              style={{ marginBottom: 16 }}
+            />
+            <List
+              dataSource={allWorkspaces}
+              renderItem={ws => {
+                const assigned = userWorkspaces.find(uw => uw.id === ws.id)
+                return (
+                  <List.Item
+                    key={ws.id}
+                    extra={
+                      <Checkbox
+                        checked={!!assigned}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setUserWorkspaces(prev => [...prev, { id: ws.id, name: ws.label || ws.name, role: 'viewer' }])
+                          } else {
+                            setUserWorkspaces(prev => prev.filter(uw => uw.id !== ws.id))
+                          }
+                        }}
+                      />
+                    }
+                  >
+                    <List.Item.Meta
+                      title={<b style={{ color: 'var(--highlight)' }}>{ws.label || ws.name}</b>}
+                      description={
+                        assigned ? (
+                          <Select
+                            size="small"
+                            value={assigned.role}
+                            style={{ width: 120, marginTop: 4 }}
+                            onChange={val => setUserWorkspaces(prev => prev.map(uw => uw.id === ws.id ? { ...uw, role: val } : uw))}
+                            options={[
+                              { value: 'viewer', label: '檢視' },
+                              { value: 'editor', label: '編輯' },
+                              { value: 'admin', label: '管理' },
+                            ]}
+                          />
+                        ) : <span style={{ color: 'var(--muted)' }}>未指派</span>
+                      }
+                    />
+                  </List.Item>
+                )
+              }}
+              locale={{ emptyText: '尚無可用工作區' }}
             />
           </>
         )}
