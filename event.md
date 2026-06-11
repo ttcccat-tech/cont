@@ -56,9 +56,12 @@
   - QA: Targets Create→201 ✅, PATCH weight→200 ✅, Delete→204 ✅
   - QA: Consumers Create→201 ✅, Delete→204 ✅; AuthGroups Create→201 ✅, Delete→204 ✅
 
-- [ ] **Cont SaaS Phase 2：Workspace 綁定 Organization + 多租戶資料隔離** — 待實作
+- [x] **Cont SaaS Phase 2：Workspace 綁定 Organization + 多租戶資料隔離** — commit `d390a3b6`
   - Phase 1 已完成（Organization 資料模型、users.org_id、OTP 註冊 flow）
-  - Phase 2 待做：Workspace 與 Organization 綁定、資料庫查詢自動加上 org_id 過濾、多租戶隔離中介層
+  - Phase 2 step 1-4 完成：Services/Routes/Upstreams/Consumers/Plugins/Workspaces org_id 過濾
+    - store.go: 所有 CRUD methods 新增 orgID 參數與 WHERE org_id 過濾
+    - routes.go: 所有 handlers 透過 getOrgID(c) 傳入 orgID，admin bypass
+    - QA: Workspace Create→201 ✅, Read→200 ✅, Update→200 ✅, Delete→204 ✅
   - Phase 3 待做：plan/billing/Stripe 整合
 
 ## ✅ 已完成
