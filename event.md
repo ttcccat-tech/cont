@@ -46,20 +46,15 @@
   - 後端：核發後自動產生 key，寄送 email / Slack 通知
   - Admin：審批介面支援批次核准/拒絕多筆
   - Bug fix: GetAPIKeyRequest SQL scan 漏掉 key_value 欄位賦值，導致核准後 API 回傳 key_value: null
-## 🟡 預計優化
 
-- [x] **商業化：SaaS 註冊機制（Phase 1 完成）** — commit `1bef089b`
-  - Organization 資料模型（name, plan: free/pro/enterprise）
-  - users.org_id 欄位，多租戶隔離基礎
-  - otps table（email, code, purpose, expires_at, verified）+ 索引
-  - SendOTP endpoint（crypto/rand 6位數，10分鐘過期，dev mode 回傳 code）
-  - VerifyOTP endpoint（驗證後自動建立 org + user + default workspace）
-  - Login.tsx 完整註冊 flow（Step1 寄驗證碼 → Step2 填資料 → 自動登入）
-  - QA: SendOTP → 200 ✅, VerifyOTP → JWT+user+org ✅, wrong code → 400 ✅, login new user → 200 ✅
-  - Phase 2（待做）：Workspace 綁定 Organization，多租戶資料隔離
-  - Phase 3（待做）：plan/billing/Stripe 整合
-
-- [ ] **Cont 單元測試覆蓋率提升（admin-api CRUD handlers HTTP 層測試）** — 現有測試覆蓋 auth/validation/routes，但 CRUD HTTP handlers 缺乏 HTTP 層測試（sqlmock 被安全策略阻擋，改用 integration test 框架或重構測試策略）
+- [x] **Cont 單元測試覆蓋率提升（admin-api HTTP handlers integration tests）** — commit `a85f2072` + `fa236442`
+  - integration/integration_test.go: 完整 HTTP 測試套件（Services/Routes/Upstreams/Targets/Consumers/Plugins/Workspaces/Users/AuthGroups/APIKeys/ConfigSnapshots/AuditLogs CRUD）
+  - integration/integration.go: TestMain、seedTestUser、adminReq/makeAdminEditorToken helpers
+  - storage/rbac.go: PermissionMatrix 新增 api_keys/config_snapshots/audit_logs（全部三個角色）
+  - models.go 驗證修正：Upstream.Name required→omitempty、Upstream.Algorithm oneof 值修正、Target.Target required→omitempty（支援 PATCH partial updates）
+  - QA: Upstreams Create→201 ✅, Read→200 ✅, PATCH→200 ✅, Delete→204 ✅
+  - QA: Targets Create→201 ✅, PATCH weight→200 ✅, Delete→204 ✅
+  - QA: Consumers Create→201 ✅, Delete→204 ✅; AuthGroups Create→201 ✅, Delete→204 ✅
 
 ## ✅ 已完成
 
@@ -146,11 +141,6 @@
   - k8s/overlays/prod/kustomization.yaml：prod overlay（HA replicas、resource limits、PodDisruptionBudget、CHANGEME secrets 提示）
   - Makefile 新增：k8s-apply（kubectl apply -k base）、k8s-dev-apply、k8s-prod-apply、k8s-dev-diff、k8s-prod-diff、k8s-delete（kubectl delete -k）
   - k8s/README.md：完整使用文件（prerequisites、usage、sealed-secrets、resource scaling table）
-
-- [x] **Cont 單元測試覆蓋率提升（admin-api CRUD handlers HTTP 層測試）** — commit `7bbb22a9`
-  - 現有測試架構已完整覆蓋：auth_test.go（JWT AuthRequired）、validation_test.go（FQDN/HostPort/isValidPort）、routes_test.go（分頁/iToS/nextList）、storage_test.go（PermissionMatrix）
-  - admin-api/routes 8.6%、storage 3.1%（現有測試覆蓋；CRUD HTTP handler 需 DB mock，sqlmock 被安全策略阻擋）
-  - handlers_test.go：格式化修正（新增結尾 newline）
 
 - [x] **Groups/Alert Rules/API Keys CRUD + Config Snapshots/Health/ConfigCheck 端點實作** — commit `633746a1`
   - Groups: GET/POST/PUT/PATCH/DELETE 全部可用，PATCH 改為 partial update
