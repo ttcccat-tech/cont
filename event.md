@@ -2,28 +2,22 @@
 
 ## 🔴 未完成（進行中）
 
-- 🔴 **Settings 頁面：Kong 版本資訊不應該存在** — Cont 不再基於 Kong，但 Settings.tsx還顯示「Kong 版本資訊」Card（版本 3.4.2、PostgreSQL 15、Admin Token changeme）。應移除整個 Kong Info Card，或改為 Cont系統資訊。
- -檔案：`frontend/src/pages/Settings.tsx` 第 164-195 行
-  - 修復：移除「Kong 版本資訊」Card，相關 Proxy/Admin 設定若有參考 Kong 的內容也需移除或改為 Cont 對應描述
+- 🔴 **Users 頁面黑屏 `d.map is not a function`** — WorkspaceContext 的 `listMyWorkspaces()` 回 `{data, next}` 格式但 state 型別是 `Workspace[]`，`setWorkspaces(list)` 把整個物件設進去導致全域崩潰
+  - 驗證：`curl http://localhost:18082/api/workspaces` → `{data, next}` (dict)
+  - 驗證：`curl http://localhost:18082/api/users` → `list` (array，直接成功)
+  - 修復：`listMyWorkspaces()` 需加 `Array.isArray` normalize：`.then(res => { const list = Array.isArray(res) ? res : (res?.data ?? []); setWorkspaces(list) })`
+  - 檔案：`frontend/src/context/WorkspaceContext.tsx`
 
-- 🔴 **前端多個頁面 `.map is not a function`** — Kong Admin API 回傳 `{data: [...], next: ...}` 格式，前端卻用 `.map()` 期待陣列。問題發生在 Consumers、Services、Routes、Plugins、Upstreams、HealthPortal 等頁面。
-  - 根因：`kong.ts` 的 `kongClient`（baseURL `/kong`）是 Kong gateway proxy 而非 Cont backend，`/consumers` → Kong Admin API 回 `{data: [...]}` 不是 array
-  - 驗證：`curl http://localhost:18082/api/consumers` → `dict{data,next}` 而非 `list`
-  - 修復方向：確認 Cont是否有 `/consumers` 等端點，或前端需用 Cont backend（port 18081）而非 Kong proxy（port 18082）
-
-- 🔴 **後端多個端點 404（API path 不匹配）** — 前端 call 的路徑與後端註冊不符：
-  - `/api/apikeys/requests` → 後端在 `/api-keys`（不是 `/api/apikeys/requests`）
+- 🔴 **API path 後端不存在（404）** — 前端 call 這些路徑但後端無對應端點：
+  - `/api/apikeys/requests` → 後端實作於 `/api-keys` 或 `/apikeys`（非 `/api/apikeys/requests`）
   - `/api/health/services` → 後端無此端點（只有 `/health-check`）
   - `/api/stats/overview` → 後端根本沒有 stats端點
-  - 修復：對齊前端 `kong.ts` 的 API call path與後端 `main.go`註冊的 route
+  - 修復：確認後端實際端點路徑，對齊前端 `kong.ts` 的 API call path，或移除前端這些 call
 
-- 🔴 **使用者頁面 `d.map is not a function`** — 已知問題，`/api/users` 回 `list[3]` 正常，但其他頁面（WorkspaceContext 等）可能有類似問題
-  - 驗證：瀏覽器 console `TypeError: d.map is not a function` at Users.tsx 或其依賴的元件
-
-- 🔴 **前端 `kong.ts`殘留 Kong gateway proxy client** — `kongClient` baseURL `/kong` 指向 Cont 的 Kong proxy（非 Cont backend），導致使用它的頁面全部失敗
-  - `kongClient` 用於：Consumers、Services、Routes、Plugins、Upstreams、HealthPortal、Stats 等頁面
-  - Cont backend正確 baseURL 應為 `/api`（nginx proxy 到 `admin-api:8001`）
-  - 修復：將 `kongClient`改為指向 Cont backend，或廢除 `kongClient`統一用 `analyticsClient` +正確的 API path
+- 🔴 **多頁面 `.map is not a function`** — Consumers、Services、Routes、Plugins、Upstreams 頁面對 `{data:[...]}` 直接 `.map()`，需加 `Array.isArray` guard
+  - 根因：Cont backend 回 `{data: [...], next: ...}` 格式，前端期待 array
+  - 驗證：`/api/consumers` → dict{data,next}，`/api/services` → dict{data,next}，`/api/routes` → dict{data,next}，`/api/plugins` → dict{data,next}
+  - 修復方向：在 `kong.ts` api 層統一做 response normalize（`Array.isArray(res) ? res : (res?.data ?? [])`），不要每個頁面自己處理
 
 ## 🟡 預計優化
 
