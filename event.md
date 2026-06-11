@@ -6,7 +6,7 @@
 
 ## 🟡 預計優化
 
-- Cont 使用者管理精細化（API Key 審批 workflow 狀態通知、AuthGroups 群組管理 UI 優化）
+- Cont 使用者管理精細化（AuthGroups 群組管理 UI 優化）
 
 ## ✅ 已完成
 
@@ -18,6 +18,11 @@
   - API Keys: GET/POST/PUT/PATCH/DELETE 全部可用（CreateAPIKeyRequest 使用 int64 id、GetAPIKeyRequest NULL scan 修復）
   - Audit Log: Backend `/audit` endpoint + Frontend `AuditLog.tsx` 查詢介面（過濾/排序/分頁）
   - Backend `ListAuditLogs()` + 前端 `getAuditLogs()` API 已完整串接
+- [x] **API Key 審批流程通知（Slack/Email Webhook）** — commit `c4948e4b`
+  - `SendAPIKeyApprovalNotification()` 非同步 goroutine，ApproveAPIKey/RejectAPIKey 後觸發
+  - `notifyWebhook()` 通用 helper，支援 Slack 與 Email webhook URL
+  - 環境變數：`SLACK_WEBHOOK_URL`（Slack）、`EMAIL_WEBHOOK_URL`（Email relay，如 Mailgun/SendGrid）
+  - Go build ✅ 編譯通過
 - [x] **Cont 自動化部署腳本增強（Kustomize base/overlays 結構）** — commit `9f2d8c3a`
   - k8s/base/kustomization.yaml：base 資源重構為 Kustomize 格式，namespace/commonLabels/configMapGenerator/secretGenerator
   - k8s/overlays/dev/kustomization.yaml：dev overlay（replicas=1、debug log、local image pull）
