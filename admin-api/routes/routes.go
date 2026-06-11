@@ -815,7 +815,7 @@ func levelFromRole(role string) int {
 // user can actually do with each entity, based on the real RBAC rules (CanWrite/CanRead).
 // This is what we return to the frontend so it can show/hide buttons correctly.
 func buildPermissions(role string) map[string]any {
-	entities := []string{"services", "routes", "plugins", "consumers", "upstreams", "targets", "workspaces", "users"}
+	entities := []string{"services", "routes", "plugins", "consumers", "upstreams", "targets", "workspaces", "users", "groups"}
 	perms := make(map[string]any)
 	for _, e := range entities {
 		canR := storage.CanRead(role, e)
@@ -1316,6 +1316,60 @@ func DeleteAuthGroup(store *storage.Store) gin.HandlerFunc {
 			Description:   "Deleted AuthGroup: " + existing.Name,
 		})
 		c.JSON(204, nil)
+	}
+}
+
+// ── Auth Group Members ───────────────────────────────────────────────────────
+
+type GroupMembersRequest struct {
+	UserIDs []string `json:"user_ids"`
+}
+
+func GetGroupMembers(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		ids, err := store.ListGroupMembers(id)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		type MemberInfo struct {
+			ID          string `json:"id"`
+			Username    string `json:"username"`
+			DisplayName string `json:"display_name"`
+			Email       string `json:"email"`
+			Role        string `json:"role"`
+		}
+		members := []MemberInfo{}
+		for _, uid := range ids {
+			u, err := store.GetUser(uid)
+			if err == nil && u != nil {
+				members = append(members, MemberInfo{
+					ID:          u.ID,
+					Username:    u.Username,
+					DisplayName: u.DisplayName,
+					Email:       u.Email,
+					Role:        u.Role,
+				})
+			}
+		}
+		c.JSON(200, gin.H{"members": members})
+	}
+}
+
+func SetGroupMembers(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var req GroupMembersRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request"})
+			return
+		}
+		if err := store.SetGroupMembers(id, req.UserIDs); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"message": "members updated"})
 	}
 }
 

@@ -157,6 +157,16 @@ func RunMigrations(db *sql.DB) error {
 			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
 
+		// User<-> Auth Group mapping (many-to-many)
+		`CREATE TABLE IF NOT EXISTS user_auth_groups (
+			user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+			group_id UUID REFERENCES auth_groups(id) ON DELETE CASCADE,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			PRIMARY KEY (user_id, group_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_user_auth_groups_user ON user_auth_groups(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_user_auth_groups_group ON user_auth_groups(group_id)`,
+
 		// Resources
 		`CREATE TABLE IF NOT EXISTS resources (
 			id TEXT PRIMARY KEY,

@@ -1057,6 +1057,62 @@ func (s *Store) DeleteAuthGroup(id string) error {
 	return err
 }
 
+// ── Auth Group Members ───────────────────────────────────────────────────────
+
+// ListGroupMembers returns all user IDs in an auth group
+func (s *Store) ListGroupMembers(groupID string) ([]string, error) {
+	rows, err := s.db.Query(`SELECT user_id FROM user_auth_groups WHERE group_id=$1`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// AddUserToGroup adds a user to an auth group
+func (s *Store) AddUserToGroup(userID, groupID string) error {
+	_, err := s.db.Exec(
+		`INSERT INTO user_auth_groups (user_id, group_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+		userID, groupID,
+	)
+	return err
+}
+
+// RemoveUserFromGroup removes a user from an auth group
+func (s *Store) RemoveUserFromGroup(userID, groupID string) error {
+	_, err := s.db.Exec(`DELETE FROM user_auth_groups WHERE user_id=$1 AND group_id=$2`, userID, groupID)
+	return err
+}
+
+// SetGroupMembers replaces all members of a group with the given user IDs
+func (s *Store) SetGroupMembers(groupID string, userIDs []string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Remove all existing members
+	if _, err := tx.Exec(`DELETE FROM user_auth_groups WHERE group_id=$1`, groupID); err != nil {
+		return err
+	}
+	// Add new members
+	for _, uid := range userIDs {
+		if _, err := tx.Exec(`INSERT INTO user_auth_groups (user_id, group_id) VALUES ($1,$2)`, uid, groupID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // ── Resources ──────────────────────────────────────────────────────────────
 
 func (s *Store) ListResources() ([]Resource, error) {
