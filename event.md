@@ -6,13 +6,6 @@
 
 ## 🟡 預計優化
 
-- [ ] **Consumer Credentials 管理（KeyAuth / BasicAuth / HMACAuth）** — 讓 Consumer 能建立/管理自己的 API credentials
-  - Backend: `consumer_credentials` table（type, consumer_id, key, secret, enabled, created_at）
-  - API: GET/POST /consumers/:id/:credential_type（key-auth, basic-auth, hmac-auth）/credentials
-  - Backend credential validation middleware in proxy access.lua
-  - Frontend: Consumer 頁面新增 Credentials tab（列出/建立/刪除 credentials）
-  - KeyAuth: key in header (`X-API-Key: <key>`) or query string (`?apikey=<key>`)
-  - BasicAuth: Authorization header (`Basic <base64(username:password)>`)
 - [ ] **Workspace 多租戶隔離（RBAC + 資料隔離）** — 將 AuthGroups 與 Workspaces 綁定，實現 workspace 級權限隔離
   - `workspace_auth_groups` table（workspace_id, auth_group_id, role）
   - `GET /workspaces/:id` 時過濾只看自己有權限的 workspace
@@ -21,6 +14,13 @@
 
 ## ✅ 已完成
 
+- [x] **Consumer Credentials 管理（KeyAuth / BasicAuth / HMACAuth）** — commit `ea2053af`
+  - Backend: `consumer_credentials` table（type, consumer_id, key, secret, enabled, created_at）
+  - API: GET/POST/DELETE /consumers/:id/key-auth|basic-auth|hmac-auth/credentials
+  - Store: ListConsumerCredentials/CreateConsumerCredential/GetConsumerCredentialByKey/DeleteConsumerCredential
+  - Proxy access.lua: validate_consumer_auth() + has_consumer_auth() middleware
+  - Internal: GET /internal/validate-cred/:type/:key（無認證）for proxy auth validation
+  - QA: List→200 ✅, Create→201 ✅, Validate→200 ✅, Delete→204 ✅
 - [x] **Cont Auth OAuth2/OIDC SSO（Google provider）** — commit `a8a3c0f8`
   - Backend: `oauth_providers` + `oauth_states` tables, `oauth_provider`/`oauth_subject` users columns
   - `routes/oauth.go`: `ListOAuthProviders()`/`InitiateOAuth()`/`HandleOAuthCallback()` — 完整 authorization code flow
