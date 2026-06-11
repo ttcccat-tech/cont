@@ -22,6 +22,9 @@ export default function WorkspaceDetailPage() {
   const [activeTab, setActiveTab] = useState('members')
   const [form] = Form.useForm()
   const [searchText, setSearchText] = useState('')
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [batchRoleUpdateOpen, setBatchRoleUpdateOpen] = useState(false)
+  const [batchRole, setBatchRole] = useState('viewer')
 
   useEffect(() => {
     if (!id) return
@@ -97,6 +100,22 @@ export default function WorkspaceDetailPage() {
       fetchMembers()
     } catch (e: any) {
       message.error('移除失敗: ' + (e?.message || ''))
+    }
+  }
+
+  const handleBatchUpdateRole = async () => {
+    if (!id || selectedRowKeys.length === 0) return
+    setSubmitting(true)
+    try {
+      await Promise.all(selectedRowKeys.map(userId => setWorkspaceUser(id, String(userId), batchRole)))
+      message.success(`已更新 ${selectedRowKeys.length} 位成員角色`)
+      setBatchRoleUpdateOpen(false)
+      setSelectedRowKeys([])
+      fetchMembers()
+    } catch (e: any) {
+      message.error('批次更新失敗: ' + (e?.message || ''))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -211,8 +230,14 @@ export default function WorkspaceDetailPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
                   <span style={{ color: 'var(--muted)' }}>
                     已指派 <b>{members.length}</b> 位成員（顯示 {filteredMembers.length} 位）
+                    {selectedRowKeys.length > 0 && <span style={{ marginLeft: 12 }}>已選 <b>{selectedRowKeys.length}</b> 位</span>}
                   </span>
                   <Space>
+                    {selectedRowKeys.length > 0 && (
+                      <Button size="small" onClick={() => setBatchRoleUpdateOpen(true)}>
+                        批次更新角色
+                      </Button>
+                    )}
                     <Input
                       prefix={<SearchOutlined style={{ color: 'var(--muted)' }} />}
                       placeholder="搜尋成員..."
@@ -232,6 +257,10 @@ export default function WorkspaceDetailPage() {
                   dataSource={filteredMembers}
                   rowKey="user_id"
                   loading={membersLoading}
+                  rowSelection={{
+                    selectedRowKeys,
+                    onChange: setSelectedRowKeys,
+                  }}
                   pagination={{ pageSize: 10 }}
                   locale={{ emptyText: searchText ? '無符合條件的成員' : '尚無成員，點擊「新增成員」指派第一位成員' }}
                 />
@@ -288,6 +317,32 @@ export default function WorkspaceDetailPage() {
             initialValue="viewer"
           >
             <Select
+              options={[
+                { value: 'viewer', label: 'viewer — 唯讀' },
+                { value: 'editor', label: 'editor — 可讀寫' },
+                { value: 'admin', label: 'admin — 管理員' },
+              ]}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="批次更新角色"
+        open={batchRoleUpdateOpen}
+        onOk={handleBatchUpdateRole}
+        confirmLoading={submitting}
+        onCancel={() => { setBatchRoleUpdateOpen(false); setSelectedRowKeys([]) }}
+        okText="更新"
+      >
+        <p style={{ marginBottom: 16 }}>
+          將更新 <b>{selectedRowKeys.length}</b> 位成員的角色：
+        </p>
+        <Form layout="vertical">
+          <Form.Item label="新角色">
+            <Select
+              value={batchRole}
+              onChange={setBatchRole}
               options={[
                 { value: 'viewer', label: 'viewer — 唯讀' },
                 { value: 'editor', label: 'editor — 可讀寫' },
