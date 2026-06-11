@@ -84,36 +84,55 @@ db-backup:
 	@echo "Backup saved to backups/"
 
 # ── Kubernetes Deployment ─────────────────────────────────────────────────────
-.PHONY: k8s-apply k8s-delete k8s-status k8s-logs k8s-port-forward
+.PHONY: k8s-apply k8s-dev-apply k8s-prod-apply k8s-delete k8s-diff k8s-status k8s-logs k8s-port-forward
 
-# Apply all k8s manifests (requires kubectl + running cluster)
+# Apply all k8s manifests via kustomize (requires kubectl + running cluster)
 k8s-apply:
-	@echo "Applying k8s manifests..." && \
-	kubectl apply -f k8s/namespace.yaml && \
-	kubectl apply -f k8s/config.yaml && \
-	kubectl apply -f k8s/postgres.yaml && \
-	kubectl apply -f k8s/postgres-svc.yaml && \
-	kubectl apply -f k8s/redis.yaml && \
-	kubectl apply -f k8s/redis-svc.yaml && \
-	kubectl apply -f k8s/admin-api.yaml && \
-	kubectl apply -f k8s/frontend.yaml && \
-	kubectl apply -f k8s/proxy.yaml && \
+	@echo "Applying k8s/base via kustomize..." && \
+	kubectl apply -k k8s/base && \
 	kubectl rollout status deployment/cont-admin-api -n cont --timeout=120s || true && \
 	kubectl get pods -n cont
 
-# Delete all k8s resources
+# Apply dev overlay (minikube/kind friendly)
+k8s-dev-apply:
+	@echo "Applying k8s/overlays/dev via kustomize..." && \
+	kubectl apply -k k8s/overlays/dev && \
+	kubectl rollout status deployment/cont-admin-api -n cont --timeout=120s || true && \
+	kubectl get pods -n cont
+
+# Apply prod overlay (HA, resource limits, no hardcoded secrets)
+# Required env: CONT_ADMIN_API_IMAGE, CONT_FRONTEND_IMAGE, CONT_PROXY_IMAGE, VERSION
+k8s-prod-apply:
+	@echo "Applying k8s/overlays/prod via kustomize..." && \
+	kubectl apply -k k8s/overlays/prod && \
+	kubectl rollout status deployment/cont-admin-api -n cont --timeout=120s && \
+	kubectl rollout status deployment/cont-proxy -n cont --timeout=120s && \
+	kubectl get pods -n cont
+
+# Diff (dry-run) for any overlay
+k8s-diff:
+	@kubectl diff -k k8s/base
+
+k8s-dev-diff:
+	@kubectl diff -k k8s/overlays/dev
+
+k8s-prod-diff:
+	@kubectl diff -k k8s/overlays/prod
+
+# Delete all k8s resources (use kustomize for cleanup)
 k8s-delete:
-	@kubectl delete -f k8s/ --ignore-not-found && \
+	@kubectl delete -k k8s/base --ignore-not-found && \
 	echo "All cont k8s resources deleted."
 
-# Show pod status
+# Show pod/service status
 k8s-status:
-	@kubectl get pods,svc -n cont -o wide
+	@kubectl get pods,svc,configmap,secret -n cont -o wide
 
 # Tail logs from all pods
 k8s-logs:
 	@kubectl logs -n cont -l app=cont-admin-api --tail=50 -f &
 	@kubectl logs -n cont -l app=cont-proxy --tail=50 -f &
+	@kubectl logs -n cont -l app=cont-frontend --tail=50 -f &
 	@wait
 
 # Port-forward for local dev access to k8s-deployed cont

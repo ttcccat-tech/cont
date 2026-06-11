@@ -1,0 +1,38 @@
+# k8s/base/kustomization.yaml
+# Base Cont configuration — shared across all environments
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cont
+
+resources:
+  - namespace.yaml
+  - config.yaml
+  - postgres-svc.yaml
+  - postgres.yaml
+  - redis-svc.yaml
+  - redis.yaml
+  - admin-api.yaml
+  - frontend.yaml
+  - proxy.yaml
+
+commonLabels:
+  app.kubernetes.io/name: cont
+  app.kubernetes.io/part-of: cont
+
+configMapGenerator:
+  - name: cont-config
+    behavior: replace
+    literals:
+      - ADMIN_PORT=8001
+      - API_PORT=8001
+      - PROXY_PORT=8000
+      - LOG_LEVEL=info
+      - ENVIRONMENT=base
+
+secretGenerator:
+  - name: cont-secrets
+    type: Opaque
+    literals:
+      - JWT_SECRET=REPLACE_WITH_REAL_SECRET
+      - POSTGRES_PASSWORD=kongpass

@@ -1,0 +1,75 @@
+# k8s/overlays/dev/kustomization.yaml
+# Development overlay — local minikube/kind usage
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cont
+
+resources:
+  - ../../base
+
+patches:
+  # Dev replicas: 1 for all Deployments
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+
+  # Dev image pull policy (always for local builds)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+    target:
+      kind: Deployment
+
+  # Admin API resources (dev: minimal)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 256Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 500m
+    target:
+      kind: Deployment
+      name: cont-admin-api
+
+  # Proxy resources (dev: minimal)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 128Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 250m
+    target:
+      kind: Deployment
+      name: cont-proxy
+
+  # Frontend resources (dev: minimal)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 64Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 100m
+    target:
+      kind: Deployment
+      name: cont-frontend
+
+configMapGenerator:
+  - name: cont-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=debug
+
+secretGenerator:
+  - name: cont-secrets
+    behavior: merge
+    literals:
+      - JWT_SECRET=dev-jwt-secret-change-in-production

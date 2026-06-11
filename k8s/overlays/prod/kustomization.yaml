@@ -1,0 +1,143 @@
+# k8s/overlays/prod/kustomization.yaml
+# Production overlay — high availability, resource limits, security
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cont
+
+resources:
+  - ../../base
+
+replicas:
+  - name: cont-admin-api
+    count: 3
+  - name: cont-proxy
+    count: 3
+  - name: cont-frontend
+    count: 2
+
+images:
+  # Image digests should be pinned in production via build pipeline
+  # Set CONT_ADMIN_API_IMAGE, CONT_FRONTEND_IMAGE, CONT_PROXY_IMAGE env vars
+  - name: cont-admin-api
+    newName: ${CONT_ADMIN_API_IMAGE:-cont-admin-api}
+    newTag: ${VERSION:-latest}
+  - name: cont-frontend
+    newName: ${CONT_FRONTEND_IMAGE:-cont-frontend}
+    newTag: ${VERSION:-latest}
+  - name: cont-proxy
+    newName: ${CONT_PROXY_IMAGE:-cont-proxy}
+    newTag: ${VERSION:-latest}
+
+patches:
+  # Production image pull policy
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+    target:
+      kind: Deployment
+
+  # Admin API resources (prod: guaranteed)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 256Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 250m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 2000m
+    target:
+      kind: Deployment
+      name: cont-admin-api
+
+  # Proxy resources (prod: high throughput)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 128Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 100m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+    target:
+      kind: Deployment
+      name: cont-proxy
+
+  # Frontend resources (prod: moderate)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 64Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 50m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 256Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 500m
+    target:
+      kind: Deployment
+      name: cont-frontend
+
+  # Postgres resources (prod: guaranteed)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 256Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 100m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 2Gi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+    target:
+      kind: Deployment
+      name: cont-postgres
+
+  # Pod disruption budget for admin-api
+  - patch: |-
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: cont-admin-api-pdb
+        namespace: cont
+      spec:
+        minAvailable: 2
+        selector:
+          matchLabels:
+            app: cont-admin-api
+    target:
+      kind: Deployment
+      name: cont-admin-api
+
+configMapGenerator:
+  - name: cont-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=warn
+
+secretGenerator:
+  - name: cont-secrets
+    behavior: merge
+    # JWT_SECRET and POSTGRES_PASSWORD must be set via env or sealed-secrets
+    # DO NOT commit real secrets to source control
+    literals:
+      - JWT_SECRET=CHANGEME_USE_SEALED_SECRETS
+      - POSTGRES_PASSWORD=CHANGEME_USE_SEALED_SECRETS
