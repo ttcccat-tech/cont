@@ -6,10 +6,18 @@
 
 ## 🟡 預計優化
 
-- Cont 使用者管理精細化（AuthGroups 群組管理、API Key 審批流程、Audit Log 查詢介面）
+- Cont 使用者管理精細化（API Key 審批 workflow 狀態通知、AuthGroups 群組管理 UI 優化）
 
 ## ✅ 已完成
 
+- [x] **Audit Log ActorUserID 修補（8 個 audit log blocks）** — commit `740a925d`
+  - 修補 User/AuthGroup/APIKeyRequest 全部 8 個 audit log blocks：新增 `ActorUserID` 欄位、修正 `TargetID` 從 string id 而非 int
+  - 修補：CreateUser、UpdateUser、DeleteUser、CreateAuthGroup、UpdateAuthGroup、DeleteAuthGroup、ApproveAPIKey、RejectAPIKey、DeleteAPIKeyRequest
+- [x] **Cont 使用者管理精細化（AuthGroups 群組管理、API Key 審批流程、Audit Log 查詢介面）** — commit `633746a1` + `e6d90ccf`
+  - AuthGroups: GET/POST/PUT/PATCH/DELETE 全部可用
+  - API Keys: GET/POST/PUT/PATCH/DELETE 全部可用（CreateAPIKeyRequest 使用 int64 id、GetAPIKeyRequest NULL scan 修復）
+  - Audit Log: Backend `/audit` endpoint + Frontend `AuditLog.tsx` 查詢介面（過濾/排序/分頁）
+  - Backend `ListAuditLogs()` + 前端 `getAuditLogs()` API 已完整串接
 - [x] **Cont 自動化部署腳本增強（Kustomize base/overlays 結構）** — commit `9f2d8c3a`
   - k8s/base/kustomization.yaml：base 資源重構為 Kustomize 格式，namespace/commonLabels/configMapGenerator/secretGenerator
   - k8s/overlays/dev/kustomization.yaml：dev overlay（replicas=1、debug log、local image pull）
