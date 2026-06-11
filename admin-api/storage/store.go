@@ -1630,13 +1630,14 @@ func (s *Store) GetAPIKeyRequest(id string) (*APIKeyRequest, error) {
 	var consumerName, desc, reviewedBy, reviewedAt sql.NullString
 	var createdAt, updatedAt sql.NullString
 	var applicantUserID, applicantUsername sql.NullString
-	var generatedKey sql.NullString
+	var generatedKey, reason, scopes, expiresAt, keyValue sql.NullString
 	err = s.db.QueryRow(
-		`SELECT id, key_name, consumer_name, description, status, applicant_user_id, applicant_username,
-		        reviewed_by, reviewed_at, generated_key, created_at, updated_at
+		`SELECT id, key_name, consumer_name, description, reason, scopes, expires_at, status,
+		        applicant_user_id, applicant_username, reviewed_by, reviewed_at,
+		        generated_key, key_value, created_at, updated_at
 		 FROM api_key_requests WHERE id=$1`, intID,
-	).Scan(&r.ID, &r.KeyName, &consumerName, &desc, &r.Status,
-		&applicantUserID, &applicantUsername, &reviewedBy, &reviewedAt, &generatedKey, &createdAt, &updatedAt)
+	).Scan(&r.ID, &r.KeyName, &consumerName, &desc, &reason, &scopes, &expiresAt, &r.Status,
+		&applicantUserID, &applicantUsername, &reviewedBy, &reviewedAt, &generatedKey, &keyValue, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -1660,6 +1661,9 @@ func (s *Store) GetAPIKeyRequest(id string) (*APIKeyRequest, error) {
 	}
 	if generatedKey.Valid {
 		r.GeneratedKey = generatedKey.String
+	}
+	if keyValue.Valid {
+		r.KeyValue = keyValue.String
 	}
 	if createdAt.Valid {
 		r.CreatedAt = createdAt.String
