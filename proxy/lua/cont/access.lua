@@ -1,7 +1,82 @@
 -- cont.access
 -- Route matching + plugin access() chain
 
+local http = require("resty.http")
 local cont = require("cont.init")
+
+-- Validate consumer credentials (key-auth / basic-auth / hmac-auth)
+-- Called when route/service has a consumer-auth plugin configured
+local function validate_consumer_auth(credential_type)
+    local key = nil
+    local secret = nil
+
+    if credential_type == "key-auth" then
+        key = ngx.var.http_x_api_key or ngx.var.arg_apikey
+        if not key or key == "" then
+            ngx.header["WWW-Authenticate"] = 'Key realm="API"'
+            ngx.status = 401
+            ngx.say('{"message":"No API key provided","error":"Unauthorized","statusCode":401}')
+            return false
+        end
+    elseif credential_type == "basic-auth" then
+        local auth_hdr = ngx.var.http_authorization or ""
+        if auth_hdr:sub(1, 6) ~= "Basic " then
+            ngx.header["WWW-Authenticate"] = 'Basic realm="API"'
+            ngx.status = 401
+            ngx.say('{"message":"No basic auth credentials provided","error":"Unauthorized","statusCode":401}')
+            return false
+        end
+        local b64 = auth_hdr:sub(7)
+        local decoded = ngx.decode_base64(b64)
+        if not decoded or decoded == "" then
+            ngx.status = 401
+            ngx.say('{"message":"Invalid basic auth encoding","error":"Unauthorized","statusCode":401}')
+            return false
+        end
+        local colon_pos = decoded:find(":")
+        if not colon_pos then
+            ngx.status = 401
+            ngx.say('{"message":"Invalid basic auth format (expected username:password)","error":"Unauthorized","statusCode":401}')
+            return false
+        end
+        key = decoded:sub(1, colon_pos - 1)
+        secret = decoded:sub(colon_pos + 1)
+    end
+
+    -- Call Admin API to validate credential
+    local api_host = os.getenv("CONT_ADMIN_API") or "127.0.0.1:8001"
+    local uri = "http://" .. api_host .. "/internal/validate-cred/" .. credential_type .. "/" .. ngx.escape_uri(key)
+    local httpc = http.new()
+    httpc:set_timeout(1000)
+    local resp, err = httpc.request_uri(uri)
+    if not resp or resp.status ~= 200 then
+        ngx.status = 401
+        ngx.say('{"message":"Invalid credentials","error":"Unauthorized","statusCode":401}')
+        return false
+    end
+
+    -- Store authenticated consumer_id in context for plugins/audit
+    local ok, res = pcall(require, "cjson")
+    if ok then
+        local data = res.decode(resp.body)
+        if data and data.consumer_id then
+            ngx.ctx.authenticated_consumer_id = data.consumer_id
+        end
+    end
+    return true
+end
+
+-- Check if route/service has consumer auth plugin
+local function has_consumer_auth(route, service_id)
+    for _, p in ipairs(cont.plugins) do
+        if p.name == "key-auth" or p.name == "basic-auth" or p.name == "hmac-auth" then
+            if p.route_id == route.id or p.service_id == service_id then
+                return p.name  -- return credential type
+            end
+        end
+    end
+    return nil
+end
 
 -- Match request to a route
 local function match_route()
@@ -156,6 +231,14 @@ end
 -- Store matched route in context for later phases
 ngx.ctx.matched_route = route
 ngx.ctx.route_id = route.id
+
+-- Consumer auth check
+local cred_type = has_consumer_auth(route, service_id)
+if cred_type then
+    if not validate_consumer_auth(cred_type) then
+        return  -- 401 already sent
+    end
+end
 
 -- Get service for this route
 local service_id = route.service_id

@@ -614,6 +614,92 @@ func (s *Store) DeleteConsumer(id string) error {
 	return err
 }
 
+// ── Consumer Credentials ───────────────────────────────────────────────────
+
+// ListConsumerCredentials returns all credentials for a consumer of a given type
+func (s *Store) ListConsumerCredentials(consumerID, credentialType string) ([]ConsumerCredential, error) {
+	rows, err := s.db.Query(`
+		SELECT id, consumer_id, credential_type, key, secret, enabled, created_at
+		FROM consumer_credentials
+		WHERE consumer_id=$1 AND credential_type=$2
+		ORDER BY created_at DESC`,
+		consumerID, credentialType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ConsumerCredential
+	for rows.Next() {
+		var c ConsumerCredential
+		var secret sql.NullString
+		var created sql.NullString
+		if err := rows.Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &created); err != nil {
+			return nil, err
+		}
+		if secret.Valid {
+			c.Secret = secret.String
+		}
+		if created.Valid {
+			c.CreatedAt = created.String
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
+// CreateConsumerCredential creates a new credential for a consumer
+func (s *Store) CreateConsumerCredential(c *ConsumerCredential) (*ConsumerCredential, error) {
+	err := s.db.QueryRow(`
+		INSERT INTO consumer_credentials (consumer_id, credential_type, key, secret, enabled)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, created_at`,
+		c.ConsumerID, c.CredentialType, c.Key, c.Secret, orBool(c.Enabled, true),
+	).Scan(&c.ID, &c.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// GetConsumerCredentialByKey looks up a credential by type and key (for auth middleware)
+func (s *Store) GetConsumerCredentialByKey(credentialType, key string) (*ConsumerCredential, error) {
+	var c ConsumerCredential
+	var secret sql.NullString
+	var created sql.NullString
+	err := s.db.QueryRow(`
+		SELECT id, consumer_id, credential_type, key, secret, enabled, created_at
+		FROM consumer_credentials
+		WHERE credential_type=$1 AND key=$2 AND enabled=true`,
+		credentialType, key,
+	).Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &created)
+	if err != nil {
+		return nil, err
+	}
+	if secret.Valid {
+		c.Secret = secret.String
+	}
+	if created.Valid {
+		c.CreatedAt = created.String
+	}
+	return &c, nil
+}
+
+// DeleteConsumerCredential deletes a specific credential
+func (s *Store) DeleteConsumerCredential(consumerID, credentialType, credentialID string) error {
+	result, err := s.db.Exec(
+		`DELETE FROM consumer_credentials WHERE id=$1 AND consumer_id=$2 AND credential_type=$3`,
+		credentialID, consumerID, credentialType,
+	)
+	if err != nil {
+		return err
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // ── Plugins ────────────────────────────────────────────────────────────────
 
 func (s *Store) ListPlugins(limit, offset int) ([]Plugin, error) {

@@ -279,6 +279,22 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_subject)`,
 		// Allow NULL password_hash for OAuth-only users
 		`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`,
+
+		// Consumer credentials (key-auth, basic-auth, hmac-auth)
+		`CREATE TABLE IF NOT EXISTS consumer_credentials (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			consumer_id UUID NOT NULL REFERENCES consumers(id) ON DELETE CASCADE,
+			credential_type TEXT NOT NULL CHECK (credential_type IN ('key-auth', 'basic-auth', 'hmac-auth')),
+			-- key-auth: key = API key, secret = NULL
+			-- basic-auth: key = username, secret = bcrypt(password)
+			-- hmac-auth: key = consumer_id, secret = HMAC secret
+			key TEXT NOT NULL,
+			secret TEXT,
+			enabled BOOLEAN DEFAULT true,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_consumer_cred_key_type ON consumer_credentials(credential_type, key)`,
+		`CREATE INDEX IF NOT EXISTS idx_consumer_cred_consumer ON consumer_credentials(consumer_id)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

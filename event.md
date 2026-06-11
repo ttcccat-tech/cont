@@ -6,7 +6,18 @@
 
 ## 🟡 預計優化
 
-- （暂无）
+- [ ] **Consumer Credentials 管理（KeyAuth / BasicAuth / HMACAuth）** — 讓 Consumer 能建立/管理自己的 API credentials
+  - Backend: `consumer_credentials` table（type, consumer_id, key, secret, enabled, created_at）
+  - API: GET/POST /consumers/:id/:credential_type（key-auth, basic-auth, hmac-auth）/credentials
+  - Backend credential validation middleware in proxy access.lua
+  - Frontend: Consumer 頁面新增 Credentials tab（列出/建立/刪除 credentials）
+  - KeyAuth: key in header (`X-API-Key: <key>`) or query string (`?apikey=<key>`)
+  - BasicAuth: Authorization header (`Basic <base64(username:password)>`)
+- [ ] **Workspace 多租戶隔離（RBAC + 資料隔離）** — 將 AuthGroups 與 Workspaces 綁定，實現 workspace 級權限隔離
+  - `workspace_auth_groups` table（workspace_id, auth_group_id, role）
+  - `GET /workspaces/:id` 時過濾只看自己有權限的 workspace
+  - 前端 Workspace switcher 根據登入使用者的 workspace 權限過濾可切換清單
+  - Middleware: RequireWorkspacePermission(entity, workspace_id)
 
 ## ✅ 已完成
 

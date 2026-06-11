@@ -71,6 +71,9 @@ func main() {
 		auth.GET("/:provider/callback", routes.HandleOAuthCallback(store, jwtSecret))
 	}
 
+	// Internal endpoint for proxy auth validation (public, no auth)
+	r.GET("/internal/validate-cred/:type/:key", routes.ValidateCredential(store))
+
 	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")
 	admin.Use(routes.AuthRequired(jwtSecret))
@@ -118,6 +121,17 @@ func main() {
 			cons.PUT("/:id", routes.RequirePermission("consumers", true), routes.UpdateConsumer(store))
 			cons.PATCH("/:id", routes.RequirePermission("consumers", true), routes.UpdateConsumer(store))
 			cons.DELETE("/:id", routes.RequirePermission("consumers", true), routes.DeleteConsumer(store))
+			// Consumer credentials: /consumers/:id/key-auth/credentials, etc.
+			cred := cons.Group("/:id")
+			cred.GET("/key-auth/credentials", routes.RequirePermission("consumers", false), routes.ListCredentials(store, "key-auth"))
+			cred.POST("/key-auth/credentials", routes.RequirePermission("consumers", true), routes.CreateCredential(store, "key-auth"))
+			cred.DELETE("/key-auth/credentials/:credId", routes.RequirePermission("consumers", true), routes.DeleteCredential(store, "key-auth"))
+			cred.GET("/basic-auth/credentials", routes.RequirePermission("consumers", false), routes.ListCredentials(store, "basic-auth"))
+			cred.POST("/basic-auth/credentials", routes.RequirePermission("consumers", true), routes.CreateCredential(store, "basic-auth"))
+			cred.DELETE("/basic-auth/credentials/:credId", routes.RequirePermission("consumers", true), routes.DeleteCredential(store, "basic-auth"))
+			cred.GET("/hmac-auth/credentials", routes.RequirePermission("consumers", false), routes.ListCredentials(store, "hmac-auth"))
+			cred.POST("/hmac-auth/credentials", routes.RequirePermission("consumers", true), routes.CreateCredential(store, "hmac-auth"))
+			cred.DELETE("/hmac-auth/credentials/:credId", routes.RequirePermission("consumers", true), routes.DeleteCredential(store, "hmac-auth"))
 		}
 
 		plugs := admin.Group("/plugins")

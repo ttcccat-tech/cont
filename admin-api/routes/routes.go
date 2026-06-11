@@ -545,6 +545,112 @@ func DeleteConsumer(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// ── Consumer Credentials ──────────────────────────────────────────────────
+
+func ListCredentials(store *storage.Store, credentialType string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		consumerID := c.Param("id")
+		// Verify consumer exists
+		if _, err := store.GetConsumer(consumerID); err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(404, gin.H{"message": "consumer not found"})
+				return
+			}
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		rows, err := store.ListConsumerCredentials(consumerID, credentialType)
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		// Return API-safe responses (no secrets)
+		resp := make([]storage.CredentialResponse, len(rows))
+		for i, r := range rows {
+			resp[i] = r.ToResponse()
+		}
+		c.JSON(200, gin.H{"data": resp})
+	}
+}
+
+func CreateCredential(store *storage.Store, credentialType string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		consumerID := c.Param("id")
+		// Verify consumer exists
+		if _, err := store.GetConsumer(consumerID); err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(404, gin.H{"message": "consumer not found"})
+				return
+			}
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		var req struct {
+			Key    string `json:"key" binding:"required"`
+			Secret string `json:"secret,omitempty"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			badRequest(c, err)
+			return
+		}
+		if req.Key == "" {
+			c.JSON(400, gin.H{"message": "key is required"})
+			return
+		}
+		cred := &storage.ConsumerCredential{
+			ConsumerID:     consumerID,
+			CredentialType: credentialType,
+			Key:            req.Key,
+			Secret:         req.Secret,
+			Enabled:        true,
+		}
+		result, err := store.CreateConsumerCredential(cred)
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.JSON(201, result.ToResponse())
+	}
+}
+
+func DeleteCredential(store *storage.Store, credentialType string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		consumerID := c.Param("id")
+		credID := c.Param("credId")
+		if err := store.DeleteConsumerCredential(consumerID, credentialType, credID); err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(404, gin.H{"message": "credential not found"})
+				return
+			}
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
+// ValidateCredential is an internal endpoint for proxy auth validation
+func ValidateCredential(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		credType := c.Param("type")
+		key := c.Param("key")
+		if key == "" {
+			c.JSON(401, gin.H{"message": "missing key"})
+			return
+		}
+		cred, err := store.GetConsumerCredentialByKey(credType, key)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(401, gin.H{"message": "invalid credentials"})
+				return
+			}
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"consumer_id": cred.ConsumerID})
+	}
+}
+
 // ── Plugins ────────────────────────────────────────────────────────────────
 
 func ListPlugins(store *storage.Store) gin.HandlerFunc {

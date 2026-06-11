@@ -209,6 +209,39 @@ type Consumer struct {
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
+// ConsumerCredential represents a consumer authentication credential
+type ConsumerCredential struct {
+	ID             string `json:"id"`
+	ConsumerID     string `json:"consumer_id"`
+	CredentialType string `json:"credential_type" binding:"required,oneof=key-auth basic-auth hmac-auth"`
+	Key            string `json:"key"` // API key for key-auth, username for basic-auth, consumer key for hmac-auth
+	Secret         string `json:"secret,omitempty"` // bcrypt hash for basic-auth, HMAC secret for hmac-auth (never returned)
+	Enabled        bool   `json:"enabled"`
+	CreatedAt      string `json:"created_at,omitempty"`
+}
+
+// CredentialResponse hides secret when returning to clients
+type CredentialResponse struct {
+	ID             string `json:"id"`
+	ConsumerID     string `json:"consumer_id"`
+	CredentialType string `json:"credential_type"`
+	Key            string `json:"key"`
+	Enabled        bool   `json:"enabled"`
+	CreatedAt      string `json:"created_at,omitempty"`
+}
+
+// ToResponse converts a credential to an API-safe response (hides secret)
+func (c *ConsumerCredential) ToResponse() CredentialResponse {
+	return CredentialResponse{
+		ID:             c.ID,
+		ConsumerID:     c.ConsumerID,
+		CredentialType: c.CredentialType,
+		Key:            c.Key,
+		Enabled:        c.Enabled,
+		CreatedAt:      c.CreatedAt,
+	}
+}
+
 // PluginScope holds the id of the entity this plugin is attached to
 type PluginScope struct {
 	ID string `json:"id"`
