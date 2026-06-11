@@ -18,6 +18,15 @@ curl http://localhost:8000/metrics
 curl http://localhost:8001/services
 ```
 
+## Default Credentials
+
+| User | Password | Role |
+|------|----------|------|
+| admin | admin123 | admin |
+| user | (set at creation) | editor |
+
+> **Note:** Admin password is set via `bcrypt` hash in the database. Default password `admin123` is used for initial setup. Change it after first login.
+
 ## Architecture
 
 ```
