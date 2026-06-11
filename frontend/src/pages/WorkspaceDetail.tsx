@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, Table, Button, Space, Tag, message, Modal, Form, Input, Select, Popconfirm, Tabs, Divider, Row, Col, Descriptions } from 'antd'
-import { PlusOutlined, DeleteOutlined, ReloadOutlined, ArrowLeftOutlined, UserOutlined, EditOutlined } from '@ant-design/icons'
+import { Card, Table, Button, Space, Tag, message, Modal, Form, Input, Select, Popconfirm, Tabs, Descriptions, InputRef } from 'antd'
+import { PlusOutlined, DeleteOutlined, ReloadOutlined, ArrowLeftOutlined, UserOutlined, EditOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { getWorkspaceUsers, setWorkspaceUser, removeWorkspaceUser, getUsers, updateWorkspace, Workspace, WorkspaceUserAssignment, getGroups } from '../api/kong'
+import { getWorkspaceUsers, setWorkspaceUser, removeWorkspaceUser, getUsers, Workspace, WorkspaceUserAssignment } from '../api/kong'
 import { useWorkspace } from '../context/WorkspaceContext'
 
 export default function WorkspaceDetailPage() {
@@ -14,7 +14,6 @@ export default function WorkspaceDetailPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [members, setMembers] = useState<WorkspaceUserAssignment[]>([])
   const [allUsers, setAllUsers] = useState<{id: string; username: string; display_name?: string; email?: string; role: string}[]>([])
-  const [loading, setLoading] = useState(false)
   const [membersLoading, setMembersLoading] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<WorkspaceUserAssignment | null>(null)
@@ -22,6 +21,7 @@ export default function WorkspaceDetailPage() {
   const [submitting, setSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState('members')
   const [form] = Form.useForm()
+  const [searchText, setSearchText] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -51,13 +51,8 @@ export default function WorkspaceDetailPage() {
     }).catch(() => {})
   }
 
-  useEffect(() => {
-    if (id) fetchMembers()
-  }, [id])
-
-  useEffect(() => {
-    if (addModalOpen) loadAllUsers()
-  }, [addModalOpen])
+  useEffect(() => { if (id) fetchMembers() }, [id])
+  useEffect(() => { if (addModalOpen) loadAllUsers() }, [addModalOpen])
 
   const handleAddMember = async () => {
     try {
@@ -104,6 +99,14 @@ export default function WorkspaceDetailPage() {
       message.error('移除失敗: ' + (e?.message || ''))
     }
   }
+
+  // Filtered members by search
+  const filteredMembers = members.filter(m =>
+    !searchText ||
+    m.username.toLowerCase().includes(searchText.toLowerCase()) ||
+    (m.email && m.email.toLowerCase().includes(searchText.toLowerCase())) ||
+    (m.display_name && m.display_name.toLowerCase().includes(searchText.toLowerCase()))
+  )
 
   const memberColumns: ColumnsType<WorkspaceUserAssignment> = [
     {
@@ -182,7 +185,6 @@ export default function WorkspaceDetailPage() {
     },
   ]
 
-  // Available users not yet in this workspace
   const availableUsers = allUsers.filter(u => !members.find(m => m.user_id === u.id))
 
   return (
@@ -206,22 +208,32 @@ export default function WorkspaceDetailPage() {
             label: '成員管理',
             children: (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
                   <span style={{ color: 'var(--muted)' }}>
-                    已指派 <b>{members.length}</b> 位成員至此 Workspace
+                    已指派 <b>{members.length}</b> 位成員（顯示 {filteredMembers.length} 位）
                   </span>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
-                    新增成員
-                  </Button>
+                  <Space>
+                    <Input
+                      prefix={<SearchOutlined style={{ color: 'var(--muted)' }} />}
+                      placeholder="搜尋成員..."
+                      value={searchText}
+                      onChange={e => setSearchText(e.target.value)}
+                      style={{ width: 200 }}
+                      allowClear
+                    />
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
+                      新增成員
+                    </Button>
+                  </Space>
                 </div>
 
                 <Table
                   columns={memberColumns}
-                  dataSource={members}
+                  dataSource={filteredMembers}
                   rowKey="user_id"
                   loading={membersLoading}
                   pagination={{ pageSize: 10 }}
-                  locale={{ emptyText: '尚無成員，點擊「新增成員」指派第一位成員' }}
+                  locale={{ emptyText: searchText ? '無符合條件的成員' : '尚無成員，點擊「新增成員」指派第一位成員' }}
                 />
               </div>
             ),
@@ -262,7 +274,7 @@ export default function WorkspaceDetailPage() {
               placeholder="搜尋使用者..."
               options={availableUsers.map(u => ({
                 value: u.id,
-                label: `${u.username}${u.display_name ? ` (${u.display_name})` : ''}${u.email ? ` - ${u.email}` : ''}`,
+                label: `${u.username}${u.display_name ? ` (${u.display_name})` : ''}${u.email ? ` — ${u.email}` : ''}`,
               }))}
               filterOption={(input, option) =>
                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
