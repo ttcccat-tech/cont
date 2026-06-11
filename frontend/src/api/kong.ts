@@ -1,18 +1,14 @@
 import axios from 'axios'
 
-const KONG_BASE = import.meta.env.VITE_KONG_BASE || ''
-const ADMIN_TOKEN = import.meta.env.VITE_KONG_ADMIN_TOKEN || ''
-
-export const kongClient = axios.create({
-  baseURL: KONG_BASE,
-  headers: ADMIN_TOKEN ? { 'Kong-Admin-Token': ADMIN_TOKEN } : {},
-})
-
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 export const analyticsClient = axios.create({ baseURL: API_BASE })
 
+// ── Legacy alias (for code that imports 'api' from kong.ts) ──
+// Points to same /api base — routes through nginx to Cont backend.
+export const kongClient = analyticsClient
+
 // ── Storage keys ──────────────────────────────────────────
-const WS_KEY = 'kgo_ws'
+const WS_KEY = 'cont_ws'
 const TOKEN_KEY = 'cont_token'
 const PERMS_KEY = 'cont_perms'
 
@@ -23,7 +19,7 @@ export function getKongWorkspace(): string {
 export function setKongWorkspace(ws: string) {
   sessionStorage.setItem(WS_KEY, ws)
 }
-// No-op: cont Admin API is single-workspace, no ?workspace= query param injection needed
+// Cont Admin API is single-workspace, no ?workspace= query param injection needed
 const wsPrefix = (path: string) => path
 
 // ── Token helpers ──────────────────────────────────────────
@@ -42,27 +38,6 @@ export function getUserPerms(): Record<string, unknown> {
 export function setUserPerms(perms: Record<string, unknown>): void {
   localStorage.setItem(PERMS_KEY, JSON.stringify(perms))
 }
-
-// ── Kong Admin interceptor ─────────────────────────────────
-// NOTE: Kong Admin API does NOT accept ?workspace= query param.
-// Workspace-scoped requests use path format: /workspaces/{ws}/routes, etc.
-// cont system is single-workspace (default), so we use direct paths.
-const isWorkspaceRequest = (url: string) => url.startsWith('/workspaces/')
-
-kongClient.interceptors.request.use(config => {
-  // Only add workspace query param for Kong Manager endpoints, not Admin API
-  // Admin API uses path-based workspace scoping: /workspaces/{name}/...
-  const ws = getKongWorkspace()
-  if (ws && !isWorkspaceRequest(config.url || '')) {
-    // For Admin API (services, routes, plugins, consumers...), no workspace query param needed
-    // Kong Admin API v1 uses: /routes, /services, /plugins (not workspace-scoped by default)
-  }
-  return config
-})
-kongClient.interceptors.response.use(r => r, err => {
-  if (err.response?.status === 401) { clearAuth(); window.location.href = '/login' }
-  return Promise.reject(err)
-})
 
 // ── Analytics interceptor ─────────────────────────────────
 analyticsClient.interceptors.request.use(config => {
@@ -180,16 +155,6 @@ export const createAlertRule = (payload: Record<string, unknown>) => analyticsCl
 export const updateAlertRule = (id: string, payload: Record<string, unknown>) => analyticsClient.patch(`/alerts/rules/${id}`, payload).then(r => r.data)
 export const deleteAlertRule = (id: string) => analyticsClient.delete(`/alerts/rules/${id}`)
 
-export const getApiKeyRequests = () => analyticsClient.get('/apikeys/requests').then(r => r.data)
-export const approveApiKeyRequest = (id: string, expiresAt?: string) =>
-  analyticsClient.post(`/apikeys/approve/${id}`, expiresAt ? { expires_at: expiresAt } : {}).then(r => r.data)
-export const rejectApiKeyRequest = (id: string) => analyticsClient.post(`/apikeys/reject/${id}`).then(r => r.data)
-
-export const getHealthServices = () => analyticsClient.get('/health/services').then(r => r.data)
-export const triggerHealthCheck = () => analyticsClient.post('/health/check', {}).then(r => r.data)
-
-export const getStatsOverview = () => analyticsClient.get('/stats/overview').then(r => r.data)
-
 export const getUsers = () => analyticsClient.get('/users').then(r => r.data)
 export const createUser = (payload: Record<string, unknown>) => analyticsClient.post('/users', payload).then(r => r.data)
 export const inviteUser = (email: string, groupId: string) =>
@@ -218,44 +183,46 @@ export const getMetrics = () => kongClient.get(wsPrefix('/metrics'), { transform
   return parsePromMetrics(text)
 })
 
-// ── Kong Admin API ────────────────────────────────────────
+// ── Cont Admin API ────────────────────────────────────────
+// All entities use analyticsClient (which goes through nginx /api/* to Cont backend).
+// JWT token injected automatically by analyticsClient interceptor.
 export const api = {
-  listServices: () => kongClient.get<{ data: KongService[] }>(wsPrefix('/services')).then(r => r.data),
-  getService: (id: string) => kongClient.get<KongService>(wsPrefix(`/services/${id}`)).then(r => r.data),
-  createService: (data: Partial<KongService>) => kongClient.post<KongService>(wsPrefix('/services'), data).then(r => r.data),
-  updateService: (id: string, data: Partial<KongService>) => kongClient.patch<KongService>(wsPrefix(`/services/${id}`), data).then(r => r.data),
-  deleteService: (id: string) => kongClient.delete(wsPrefix(`/services/${id}`)),
+  listServices: () => analyticsClient.get<KongService[]>(wsPrefix('/services')).then(r => r.data?.data ?? []),
+  getService: (id: string) => analyticsClient.get<KongService>(wsPrefix(`/services/${id}`)).then(r => r.data),
+  createService: (data: Partial<KongService>) => analyticsClient.post<KongService>(wsPrefix('/services'), data).then(r => r.data),
+  updateService: (id: string, data: Partial<KongService>) => analyticsClient.patch<KongService>(wsPrefix(`/services/${id}`), data).then(r => r.data),
+  deleteService: (id: string) => analyticsClient.delete(wsPrefix(`/services/${id}`)),
 
-  listRoutes: () => kongClient.get<{ data: KongRoute[] }>(wsPrefix('/routes')).then(r => r.data),
-  getRoute: (id: string) => kongClient.get<KongRoute>(wsPrefix(`/routes/${id}`)).then(r => r.data),
-  createRoute: (data: Partial<KongRoute>) => kongClient.post<KongRoute>(wsPrefix('/routes'), data).then(r => r.data),
-  updateRoute: (id: string, data: Partial<KongRoute>) => kongClient.patch<KongRoute>(wsPrefix(`/routes/${id}`), data).then(r => r.data),
-  deleteRoute: (id: string) => kongClient.delete(wsPrefix(`/routes/${id}`)),
+  listRoutes: () => analyticsClient.get<KongRoute[]>(wsPrefix('/routes')).then(r => r.data?.data ?? []),
+  getRoute: (id: string) => analyticsClient.get<KongRoute>(wsPrefix(`/routes/${id}`)).then(r => r.data),
+  createRoute: (data: Partial<KongRoute>) => analyticsClient.post<KongRoute>(wsPrefix('/routes'), data).then(r => r.data),
+  updateRoute: (id: string, data: Partial<KongRoute>) => analyticsClient.patch<KongRoute>(wsPrefix(`/routes/${id}`), data).then(r => r.data),
+  deleteRoute: (id: string) => analyticsClient.delete(wsPrefix(`/routes/${id}`)),
 
-  listPlugins: () => kongClient.get<{ data: KongPlugin[] }>(wsPrefix('/plugins')).then(r => r.data),
-  getPlugin: (id: string) => kongClient.get<KongPlugin>(wsPrefix(`/plugins/${id}`)).then(r => r.data),
-  createPlugin: (data: Partial<KongPlugin>) => kongClient.post<KongPlugin>(wsPrefix('/plugins'), data).then(r => r.data),
-  updatePlugin: (id: string, data: Partial<KongPlugin>) => kongClient.patch<KongPlugin>(wsPrefix(`/plugins/${id}`), data).then(r => r.data),
-  deletePlugin: (id: string) => kongClient.delete(wsPrefix(`/plugins/${id}`)),
+  listPlugins: () => analyticsClient.get<KongPlugin[]>(wsPrefix('/plugins')).then(r => r.data?.data ?? []),
+  getPlugin: (id: string) => analyticsClient.get<KongPlugin>(wsPrefix(`/plugins/${id}`)).then(r => r.data),
+  createPlugin: (data: Partial<KongPlugin>) => analyticsClient.post<KongPlugin>(wsPrefix('/plugins'), data).then(r => r.data),
+  updatePlugin: (id: string, data: Partial<KongPlugin>) => analyticsClient.patch<KongPlugin>(wsPrefix(`/plugins/${id}`), data).then(r => r.data),
+  deletePlugin: (id: string) => analyticsClient.delete(wsPrefix(`/plugins/${id}`)),
 
-  listConsumers: () => kongClient.get<{ data: KongConsumer[] }>(wsPrefix('/consumers')).then(r => r.data),
-  createConsumer: (data: Partial<KongConsumer>) => kongClient.post<KongConsumer>(wsPrefix('/consumers'), data).then(r => r.data),
-  updateConsumer: (id: string, data: Partial<KongConsumer>) => kongClient.patch<KongConsumer>(wsPrefix(`/consumers/${id}`), data).then(r => r.data),
-  deleteConsumer: (id: string) => kongClient.delete(wsPrefix(`/consumers/${id}`)),
+  listConsumers: () => analyticsClient.get<KongConsumer[]>(wsPrefix('/consumers')).then(r => r.data?.data ?? []),
+  createConsumer: (data: Partial<KongConsumer>) => analyticsClient.post<KongConsumer>(wsPrefix('/consumers'), data).then(r => r.data),
+  updateConsumer: (id: string, data: Partial<KongConsumer>) => analyticsClient.patch<KongConsumer>(wsPrefix(`/consumers/${id}`), data).then(r => r.data),
+  deleteConsumer: (id: string) => analyticsClient.delete(wsPrefix(`/consumers/${id}`)),
 
   listJWTCredentials: (consumerId: string) =>
-    kongClient.get<{ data: unknown[] }>(wsPrefix(`/consumers/${consumerId}/jwt`)).then(r => r.data),
+    analyticsClient.get<unknown[]>(wsPrefix(`/consumers/${consumerId}/jwt`)).then(r => r.data?.data ?? []),
   createJWTCredential: (consumerId: string, data: unknown) =>
-    kongClient.post(wsPrefix(`/consumers/${consumerId}/jwt`), data).then(r => r.data),
+    analyticsClient.post(wsPrefix(`/consumers/${consumerId}/jwt`), data).then(r => r.data),
   deleteJWTCredential: (consumerId: string, credentialId: string) =>
-    kongClient.delete(wsPrefix(`/consumers/${consumerId}/jwt/${credentialId}`)),
+    analyticsClient.delete(wsPrefix(`/consumers/${consumerId}/jwt/${credentialId}`)),
 
   listKeyAuthCredentials: (consumerId: string) =>
-    kongClient.get<{ data: unknown[] }>(wsPrefix(`/consumers/${consumerId}/key-auth`)).then(r => r.data),
+    analyticsClient.get<unknown[]>(wsPrefix(`/consumers/${consumerId}/key-auth`)).then(r => r.data?.data ?? []),
   createKeyAuthCredential: (consumerId: string, data?: unknown) =>
-    kongClient.post(wsPrefix(`/consumers/${consumerId}/key-auth`), data || {}).then(r => r.data),
+    analyticsClient.post(wsPrefix(`/consumers/${consumerId}/key-auth`), data || {}).then(r => r.data),
   deleteKeyAuthCredential: (consumerId: string, credentialId: string) =>
-    kongClient.delete(wsPrefix(`/consumers/${consumerId}/key-auth/${credentialId}`)),
+    analyticsClient.delete(wsPrefix(`/consumers/${consumerId}/key-auth/${credentialId}`)),
 }
 
 export default api

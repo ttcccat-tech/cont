@@ -19,7 +19,7 @@ export default function Services() {
   const fetchServices = () => {
     setLoading(true)
     api.listServices()
-      .then(data => setServices(data.data || []))
+      .then(data => setServices(data))
       .catch(() => message.error('無法連接 Kong Admin API'))
       .finally(() => setLoading(false))
   }

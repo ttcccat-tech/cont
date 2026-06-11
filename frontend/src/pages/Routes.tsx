@@ -18,9 +18,9 @@ export default function RoutesPage() {
   const fetchAll = () => {
     setLoading(true)
     Promise.all([api.listRoutes(), api.listServices()])
-      .then(([routesData, servicesData]) => {
-        setRoutes(Array.isArray(routesData) ? routesData : (routesData?.data || []))
-        setServices(Array.isArray(servicesData) ? servicesData : (servicesData?.data || []))
+      .then(([routes, services]) => {
+        setRoutes(routes)
+        setServices(services)
       })
       .catch(() => message.error('無法連接 Kong Admin API'))
       .finally(() => setLoading(false))

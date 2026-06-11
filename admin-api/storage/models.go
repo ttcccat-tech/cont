@@ -265,6 +265,16 @@ type Workspace struct {
 	CreatedAt string `json:"created_at,omitempty"`
 }
 
+// WorkspaceUserAssignment represents a user's assignment to a workspace
+type WorkspaceUserAssignment struct {
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	DisplayName string `json:"display_name,omitempty"`
+	Email     string `json:"email,omitempty"`
+	Role      string `json:"role"`
+	AssignedAt string `json:"assigned_at,omitempty"`
+}
+
 type User struct {
 	ID          string `json:"id"`
 	Username    string `json:"username" binding:"required,max=255"`

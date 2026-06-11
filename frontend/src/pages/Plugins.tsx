@@ -233,11 +233,11 @@ export default function PluginsPage() {
   const fetchAll = () => {
     setLoading(true)
     Promise.all([api.listPlugins(), api.listServices(), api.listRoutes(), api.listConsumers()])
-      .then(([p, s, r, c]) => {
-        setPlugins(p.data || [])
-        setServices(s.data || [])
-        setRoutes(r.data || [])
-        setConsumers(c.data || [])
+      .then(([plugins, services, routes, consumers]) => {
+        setPlugins(plugins)
+        setServices(services)
+        setRoutes(routes)
+        setConsumers(consumers)
       })
       .catch(() => message.error('無法連接 Kong Admin API'))
       .finally(() => setLoading(false))
