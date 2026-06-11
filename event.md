@@ -24,10 +24,13 @@
   - body_filter.lua：實作 response body 轉換（JSON pretty、error wrapping）
   - log.lua：實作 access log + metrics 寫入
 
-- [ ] **Upstreams 健康檢查 UI** — HealthPortal 頁面現在是 no-op，需串接 Cont Proxy 的 healthcheck.lua
-  - 前端：顯示每個 upstream 的 target 健康狀態
-  - 後端：GET /upstreams/:id/health（從 healthcheck.lua 讀取狀態）
-  - 或透過 Cont Proxy 的 /status 端點讀取 upstream 狀態
+- [x] **Upstreams 健康檢查 UI** — commit `177ed99b`
+  - Backend: GET /upstreams/:id/health endpoint reading from Redis health keys (cont:health:{upstream}:*)
+  - storage/redis.go: GetTargetHealthStatuses() + Redis() accessor
+  - routes/routes.go: GetUpstreamHealth handler (returns upstream + targets with healthy flag)
+  - Frontend: HealthPortal.tsx complete rewrite — upstream cards grid, summary stats, target health table, detail modal with live refresh
+  - kong.ts: KongUpstream/TargetHealth/UpstreamHealth types + listUpstreams/getUpstream/getUpstreamHealth API
+  - Users.tsx: fix WorkspaceOutlined → TeamOutlined (icon doesn't exist in antd)
 
 - [ ] **Metrics Dashboard** — Cont 已支援 Prometheus metrics，需串接 Grafana
   - 確認 /metrics 端點格式（Prometheus client_golang）
