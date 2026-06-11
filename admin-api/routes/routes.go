@@ -889,6 +889,19 @@ func GetUserWorkspaces(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// ListWorkspaceUsers returns all users assigned to a workspace
+func ListWorkspaceUsers(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		wsID := c.Param("id")
+		users, err := store.ListWorkspaceUsers(wsID)
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"data": users})
+	}
+}
+
 // RequireWorkspacePermission middleware checks if user has access to a specific workspace
 // entity: the resource entity being accessed (services, routes, consumers, plugins, upstreams, targets)
 // write: whether this is a write operation

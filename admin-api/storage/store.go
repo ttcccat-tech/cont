@@ -972,6 +972,36 @@ func (s *Store) RemoveUserWorkspace(userID, workspaceID string) error {
 	return err
 }
 
+// ListWorkspaceUsers returns all users assigned to a workspace with their roles
+func (s *Store) ListWorkspaceUsers(workspaceID string) ([]WorkspaceUserAssignment, error) {
+	rows, err := s.db.Query(`
+		SELECT u.id, u.username, u.display_name, u.email, uw.role, uw.created_at
+		FROM user_workspaces uw
+		JOIN users u ON u.id = uw.user_id
+		WHERE uw.workspace_id = $1
+		ORDER BY u.username`, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []WorkspaceUserAssignment
+	for rows.Next() {
+		var a WorkspaceUserAssignment
+		var displayName, email sql.NullString
+		var createdAt sql.NullString
+		if err := rows.Scan(&a.UserID, &a.Username, &displayName, &email, &a.Role, &createdAt); err != nil {
+			return nil, err
+		}
+		a.DisplayName = displayName.String
+		a.Email = email.String
+		if createdAt.Valid {
+			a.AssignedAt = createdAt.String
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 func jsonScanSlice(out *[]string, data []byte) {
