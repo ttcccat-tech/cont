@@ -6,7 +6,8 @@
 
 ## 🟡 預計優化
 
-- （暂无）
+- Cont 使用者-群組指派 UI（Users頁面新增「指派群組」功能，支援將使用者加入/移出 AuthGroups）
+- Cont Consumer 管理頁面（新增 Consumers.tsx，Kong Consumer CRUD介面）
 
 ## ✅ 已完成
 

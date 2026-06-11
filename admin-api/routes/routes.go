@@ -1325,10 +1325,27 @@ type GroupMembersRequest struct {
 	UserIDs []string `json:"user_ids"`
 }
 
+// resolveGroupID resolves a group id that could be a UUID or a name.
+// Returns the UUID on success, or the original string if not found.
+func resolveGroupID(store *storage.Store, id string) string {
+	// Try as UUID first
+	g, err := store.GetAuthGroup(id)
+	if err == nil && g != nil {
+		return g.ID
+	}
+	// Fall back to name lookup
+	g2, err := store.GetAuthGroupByName(id)
+	if err == nil && g2 != nil {
+		return g2.ID
+	}
+	return id
+}
+
 func GetGroupMembers(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		ids, err := store.ListGroupMembers(id)
+		groupID := resolveGroupID(store, id)
+		ids, err := store.ListGroupMembers(groupID)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
@@ -1360,12 +1377,13 @@ func GetGroupMembers(store *storage.Store) gin.HandlerFunc {
 func SetGroupMembers(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+		groupID := resolveGroupID(store, id)
 		var req GroupMembersRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(400, gin.H{"error": "invalid request"})
 			return
 		}
-		if err := store.SetGroupMembers(id, req.UserIDs); err != nil {
+		if err := store.SetGroupMembers(groupID, req.UserIDs); err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}

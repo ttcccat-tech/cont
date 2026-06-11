@@ -1085,6 +1085,36 @@ func (s *Store) DeleteAuthGroup(id string) error {
 	return err
 }
 
+func (s *Store) GetAuthGroupByName(name string) (*AuthGroup, error) {
+	var g AuthGroup
+	var label, desc sql.NullString
+	var perms []byte
+	var createdAt, updatedAt sql.NullString
+	err := s.db.QueryRow(
+		`SELECT id, name, label, description, permissions, created_at, updated_at FROM auth_groups WHERE name=$1`,
+		name,
+	).Scan(&g.ID, &g.Name, &label, &desc, &perms, &createdAt, &updatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if label.Valid {
+		g.Label = label.String
+	}
+	if desc.Valid {
+		g.Description = desc.String
+	}
+	if perms != nil {
+		json.Unmarshal(perms, &g.Permissions)
+	}
+	if createdAt.Valid {
+		g.CreatedAt = createdAt.String
+	}
+	if updatedAt.Valid {
+		g.UpdatedAt = updatedAt.String
+	}
+	return &g, nil
+}
+
 // ── Auth Group Members ───────────────────────────────────────────────────────
 
 // ListGroupMembers returns all user IDs in an auth group
