@@ -6,6 +6,14 @@
 
 ## 🟡 預計優化
 
+- [ ] **Cont Resource-level RBAC 權限指派** — 待實作
+  - 現有 RBAC 僅支援 workspace-level roles（viewer/editor/admin），無法對特定 resource 做精細控制
+  - 提議：新增 `resource_permissions` table（user_id, auth_group_id, resource_type, resource_id, permission）
+  - 支援針對特定 service/route/upstream 的 viewer/editor/admin權限
+  - Backend: RequirePermission 升級，檢查 resource-level override > workspace-level default
+  - Frontend: 為 AuthGroups 頁面新增「Resource Permissions」tab，支援對特定資源指派權限
+  - QA: editor 對特定 service降為 viewer →該 service GET 可讀，其他 service 維持 editor權限
+
 - [x] **使用者管理精細化（RBAC 增強）** — commit `673fc680` + `a3a6bd82` + `495c3455` + `846c8d1a`
   - kong.ts: 新增 `getUserWorkspaces()` 對應 GET /workspaces/users/:userId
   - Users.tsx: 新增「指派工作區」按鈕 + Drawer（Checkbox + 角色選擇 viewer/editor/admin）
