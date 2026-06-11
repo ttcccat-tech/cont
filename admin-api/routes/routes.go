@@ -3,7 +3,9 @@ package routes
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -1992,8 +1994,58 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 			c.JSON(404, gin.H{"message": "API key request not found"})
 			return
 		}
+		if existing.Status != "pending" {
+			c.JSON(400, gin.H{"message": "API key request is not pending"})
+			return
+		}
+
+		// Generate a secure random API key
+		generatedKey := generateSecureKey(32)
+
+		// Get or create consumer by consumer_name
+		consumerName := existing.ConsumerName
+		if consumerName == "" {
+			consumerName = existing.KeyName + "-consumer"
+		}
+		var consumerID string
+		consumers, _ := store.ListConsumers(100, 0)
+		for _, con := range consumers {
+			if con.Username == consumerName {
+				consumerID = con.ID
+				break
+			}
+		}
+		if consumerID == "" {
+			// Create new consumer
+			newCon := &storage.Consumer{Username: consumerName}
+			createdCon, err := store.CreateConsumer(newCon)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "failed to create consumer: " + err.Error()})
+				return
+			}
+			consumerID = createdCon.ID
+		}
+
+		// Create key-auth credential for the consumer
+		cred := &storage.ConsumerCredential{
+			ConsumerID:     consumerID,
+			CredentialType: "key-auth",
+			Key:            generatedKey,
+			Secret:         "",
+			Enabled:        true,
+		}
+		_, err = store.CreateConsumerCredential(cred)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to create credential: " + err.Error()})
+			return
+		}
+
+		// Update request status and store the generated key
 		existing.Status = "approved"
 		existing.ReviewedBy = reviewerStr
+		existing.GeneratedKey = generatedKey
+		// Store the actual key in key_value for display to user (only after approval)
+		existing.KeyValue = generatedKey
 		updated, err := store.UpdateAPIKeyRequest(id, existing)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
@@ -2001,12 +2053,12 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 		}
 		// Write audit log
 		store.CreateAuditLog(&storage.AuditLog{
-			AuditType:    "update",
-			TargetType:   "APIKeyRequest",
-			TargetID:     id,
-			ActorUserID:  reviewerIDStr,
+			AuditType:     "update",
+			TargetType:    "APIKeyRequest",
+			TargetID:      id,
+			ActorUserID:   reviewerIDStr,
 			ActorUsername: reviewerStr,
-			Description:  "Approved API key request: " + existing.KeyName,
+			Description:   "Approved API key request: " + existing.KeyName + " (key generated for consumer: " + consumerName + ")",
 		})
 		// Send notification (non-blocking)
 		go SendAPIKeyApprovalNotification(store, existing, reviewerStr, "approved")
@@ -2107,6 +2159,13 @@ func CreateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 		}
 		if r.Status == "" {
 			r.Status = "pending"
+		}
+		// Set applicant from auth context
+		if uid, ok := c.Get("user_id"); ok {
+			r.ApplicantUserID = uid.(string)
+		}
+		if uname, ok := c.Get("username"); ok {
+			r.ApplicantUsername = uname.(string)
 		}
 		created, err := store.CreateAPIKeyRequest(&r)
 		if err != nil {
@@ -2293,6 +2352,13 @@ func ConfigCheck() gin.HandlerFunc {
 
 // notifyWebhook sends a POST request to a webhook URL with the given payload.
 // Returns silently if the URL is empty or the request fails (non-blocking).
+// generateSecureKey generates a cryptographically secure random key
+func generateSecureKey(length int) string {
+	bytes := make([]byte, length)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
+}
+
 func notifyWebhook(webhookURL string, payload map[string]interface{}) {
 	if webhookURL == "" {
 		return
@@ -2315,16 +2381,29 @@ func SendAPIKeyApprovalNotification(store *storage.Store, keyReq *storage.APIKey
 	}
 
 	// Build Slack message
-	slackPayload := map[string]interface{}{
-		"text": fmt.Sprintf("🔑 API Key Request %s: *%s*\n• Key Name: %s\n• Consumer: %s\n• Status: %s\n• Reviewed by: %s",
-			strings.ToUpper(status), keyReq.KeyName, keyReq.KeyName, keyReq.ConsumerName, status, approvedBy),
+	slackText := fmt.Sprintf("🔑 API Key Request %s: *%s*\n• Key Name: %s\n• Consumer: %s\n• Status: %s\n• Reviewed by: %s",
+		strings.ToUpper(status), keyReq.KeyName, keyReq.KeyName, keyReq.ConsumerName, status, approvedBy)
+	if status == "approved" && keyReq.KeyValue != "" {
+		slackText += fmt.Sprintf("\n• Your API Key: `%s`", keyReq.KeyValue)
 	}
+	if keyReq.Reason != "" {
+		slackText += fmt.Sprintf("\n• Reason: %s", keyReq.Reason)
+	}
+	slackPayload := map[string]interface{}{"text": slackText}
 
 	// Build email payload (generic JSON — can be consumed by any email automation service)
+	emailBody := fmt.Sprintf("Your API key request '%s' for consumer '%s' has been %s by %s.",
+		keyReq.KeyName, keyReq.ConsumerName, status, approvedBy)
+	if status == "approved" && keyReq.KeyValue != "" {
+		emailBody += fmt.Sprintf("\n\nYour API Key:\n%s\n\nPlease keep this key secure and do not share it.", keyReq.KeyValue)
+	}
+	if keyReq.Reason != "" {
+		emailBody += fmt.Sprintf("\n\nRequested Reason: %s", keyReq.Reason)
+	}
 	emailPayload := map[string]interface{}{
 		"subject": fmt.Sprintf("API Key Request [%s] %s", strings.ToUpper(status), keyReq.KeyName),
 		"to":      applicantEmail,
-		"body":    fmt.Sprintf("Your API key request '%s' for consumer '%s' has been %s by %s.", keyReq.KeyName, keyReq.ConsumerName, status, approvedBy),
+		"body":    emailBody,
 	}
 
 	// Try to send via configured webhook URLs (from alert rules settings or env)

@@ -1556,7 +1556,7 @@ func (s *Store) DeleteAlertRule(id string) error {
 func (s *Store) ListAPIKeyRequests() ([]APIKeyRequest, error) {
 	rows, err := s.db.Query(
 		`SELECT id, key_name, consumer_name, description, status, applicant_user_id, applicant_username,
-		        reviewed_by, reviewed_at, created_at, updated_at
+		        reviewed_by, reviewed_at, generated_key, created_at, updated_at
 		 FROM api_key_requests ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -1568,8 +1568,9 @@ func (s *Store) ListAPIKeyRequests() ([]APIKeyRequest, error) {
 		var consumerName, desc, reviewedBy, reviewedAt sql.NullString
 		var createdAt, updatedAt sql.NullString
 		var applicantUserID, applicantUsername sql.NullString
+		var generatedKey sql.NullString
 		if err := rows.Scan(&r.ID, &r.KeyName, &consumerName, &desc, &r.Status,
-			&applicantUserID, &applicantUsername, &reviewedBy, &reviewedAt, &createdAt, &updatedAt); err != nil {
+			&applicantUserID, &applicantUsername, &reviewedBy, &reviewedAt, &generatedKey, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
 		if applicantUserID.Valid {
@@ -1590,6 +1591,9 @@ func (s *Store) ListAPIKeyRequests() ([]APIKeyRequest, error) {
 		if reviewedAt.Valid {
 			r.ReviewedAt = reviewedAt.String
 		}
+		if generatedKey.Valid {
+			r.GeneratedKey = generatedKey.String
+		}
 		if createdAt.Valid {
 			r.CreatedAt = createdAt.String
 		}
@@ -1604,9 +1608,10 @@ func (s *Store) ListAPIKeyRequests() ([]APIKeyRequest, error) {
 func (s *Store) CreateAPIKeyRequest(r *APIKeyRequest) (*APIKeyRequest, error) {
 	var outID int64
 	err := s.db.QueryRow(
-		`INSERT INTO api_key_requests (key_name, consumer_name, description, status, applicant_user_id, applicant_username)
-		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at, updated_at`,
-		r.KeyName, nullString(r.ConsumerName), nullString(r.Description), r.Status,
+		`INSERT INTO api_key_requests (key_name, consumer_name, description, reason, scopes, expires_at, status, applicant_user_id, applicant_username)
+		 VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8) RETURNING id, created_at, updated_at`,
+		r.KeyName, nullString(r.ConsumerName), nullString(r.Description),
+		nullString(r.Reason), nullString(r.Scopes), nullString(r.ExpiresAt),
 		nullString(r.ApplicantUserID), nullString(r.ApplicantUsername),
 	).Scan(&outID, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
@@ -1625,12 +1630,13 @@ func (s *Store) GetAPIKeyRequest(id string) (*APIKeyRequest, error) {
 	var consumerName, desc, reviewedBy, reviewedAt sql.NullString
 	var createdAt, updatedAt sql.NullString
 	var applicantUserID, applicantUsername sql.NullString
+	var generatedKey sql.NullString
 	err = s.db.QueryRow(
 		`SELECT id, key_name, consumer_name, description, status, applicant_user_id, applicant_username,
-		        reviewed_by, reviewed_at, created_at, updated_at
+		        reviewed_by, reviewed_at, generated_key, created_at, updated_at
 		 FROM api_key_requests WHERE id=$1`, intID,
 	).Scan(&r.ID, &r.KeyName, &consumerName, &desc, &r.Status,
-		&applicantUserID, &applicantUsername, &reviewedBy, &reviewedAt, &createdAt, &updatedAt)
+		&applicantUserID, &applicantUsername, &reviewedBy, &reviewedAt, &generatedKey, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -1652,6 +1658,9 @@ func (s *Store) GetAPIKeyRequest(id string) (*APIKeyRequest, error) {
 	if reviewedAt.Valid {
 		r.ReviewedAt = reviewedAt.String
 	}
+	if generatedKey.Valid {
+		r.GeneratedKey = generatedKey.String
+	}
 	if createdAt.Valid {
 		r.CreatedAt = createdAt.String
 	}
@@ -1668,8 +1677,11 @@ func (s *Store) UpdateAPIKeyRequest(id string, r *APIKeyRequest) (*APIKeyRequest
 	}
 	_, err = s.db.Exec(
 		`UPDATE api_key_requests SET key_name=$2, consumer_name=$3, description=$4, status=$5,
-		 reviewed_by=$6, reviewed_at=NOW(), updated_at=NOW() WHERE id=$1`,
-		intID, r.KeyName, nullString(r.ConsumerName), nullString(r.Description), r.Status, nullString(r.ReviewedBy),
+		 reviewed_by=$6, reviewed_at=NOW(), generated_key=$7, updated_at=NOW(),
+		 reason=$8, scopes=$9, expires_at=$10, key_value=$11 WHERE id=$1`,
+		intID, r.KeyName, nullString(r.ConsumerName), nullString(r.Description), r.Status,
+		nullString(r.ReviewedBy), nullString(r.GeneratedKey),
+		nullString(r.Reason), nullString(r.Scopes), nullString(r.ExpiresAt), nullString(r.KeyValue),
 	)
 	if err != nil {
 		return nil, err

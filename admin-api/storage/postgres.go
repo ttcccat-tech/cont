@@ -229,6 +229,7 @@ func RunMigrations(db *sql.DB) error {
 			applicant_username TEXT,
 			reviewed_by TEXT,
 			reviewed_at TIMESTAMPTZ,
+			generated_key TEXT,
 			created_at TIMESTAMPTZ DEFAULT NOW(),
 			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
@@ -322,6 +323,12 @@ func RunMigrations(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_uw_user ON user_workspaces(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_uw_workspace ON user_workspaces(workspace_id)`,
+
+		// API Key Request enhanced fields
+		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS reason TEXT`,
+		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS scopes TEXT`,
+		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`,
+		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS key_value TEXT`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

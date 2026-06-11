@@ -72,11 +72,17 @@ type APIKeyRequest struct {
 	KeyName            string `json:"key_name" binding:"required,max=255"`
 	ConsumerName       string `json:"consumer_name"`
 	Description        string `json:"description,omitempty"`
+	Reason             string `json:"reason,omitempty"`
+	Scopes             string `json:"scopes,omitempty"`
+	ExpiresAt          string `json:"expires_at,omitempty"`
 	Status             string `json:"status" binding:"omitempty,oneof=pending approved rejected"`
 	ApplicantUserID    string `json:"applicant_user_id"`
 	ApplicantUsername  string `json:"applicant_username"`
 	ReviewedBy         string `json:"reviewed_by,omitempty"`
 	ReviewedAt         string `json:"reviewed_at,omitempty"`
+	GeneratedKey       string `json:"generated_key,omitempty"`
+	// KeyValue is the actual API key shown to user ONLY after approval
+	KeyValue           string `json:"key_value,omitempty"`
 	CreatedAt          string `json:"created_at,omitempty"`
 	UpdatedAt          string `json:"updated_at,omitempty"`
 }
