@@ -6,13 +6,20 @@
 
 ## 🟡 預計優化
 
-- [ ] **Workspace 多租戶隔離（RBAC + 資料隔離）** — 將 AuthGroups 與 Workspaces 綁定，實現 workspace 級權限隔離
-  - `workspace_auth_groups` table（workspace_id, auth_group_id, role）
-  - `GET /workspaces/:id` 時過濾只看自己有權限的 workspace
-  - 前端 Workspace switcher 根據登入使用者的 workspace 權限過濾可切換清單
-  - Middleware: RequireWorkspacePermission(entity, workspace_id)
+- （暂无）
 
 ## ✅ 已完成
+
+- [x] **Workspace 多租戶隔離（RBAC + 資料隔離）** — commit `3c80a047` + `82ab87ca`
+  - `workspace_auth_groups` table（workspace_id, auth_group_id, role）
+  - `user_workspaces` table（user_id, workspace_id, role）
+  - Backend: `RequireWorkspacePermission` middleware (admin bypass, workspace role → level 1/2/3)
+  - Backend: `SetUserWorkspace`/`RemoveUserWorkspace`/`GetUserWorkspaces` handlers
+  - `GET /workspaces/:id` 檢查 user-workspace 存取（admin bypass），未授權 → 404
+  - `GET /workspaces/mine` — admin 看到所有，非admin只看已指派workspace
+  - 前端: Sidebar workspace switcher 修正 `w.label → w.name`
+  - Frontend: `kong.ts` WS_KEY 統一 `cont_ws → kgo_ws`（與WorkspaceContext一致）
+  - QA: admin所有workspace ✅, editor只看已指派 ✅, editor取未指派→404 ✅, PUT/DELETE/GET user assignment ✅
 
 - [x] **Consumer Credentials 管理（KeyAuth / BasicAuth / HMACAuth）** — commit `ea2053af`
   - Backend: `consumer_credentials` table（type, consumer_id, key, secret, enabled, created_at）
