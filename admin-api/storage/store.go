@@ -985,6 +985,9 @@ func (s *Store) ListWorkspaceUsers(workspaceID string) ([]WorkspaceUserAssignmen
 	}
 	defer rows.Close()
 	var out []WorkspaceUserAssignment
+	if out == nil {
+		out = []WorkspaceUserAssignment{}
+	}
 	for rows.Next() {
 		var a WorkspaceUserAssignment
 		var displayName, email sql.NullString
