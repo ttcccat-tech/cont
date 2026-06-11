@@ -2,11 +2,37 @@
 
 ## 🔴 未完成（進行中）
 
-- （暂无）
+- 🔴 **Settings 頁面：Kong 版本資訊不應該存在** — Cont 不再基於 Kong，但 Settings.tsx還顯示「Kong 版本資訊」Card（版本 3.4.2、PostgreSQL 15、Admin Token changeme）。應移除整個 Kong Info Card，或改為 Cont系統資訊。
+ -檔案：`frontend/src/pages/Settings.tsx` 第 164-195 行
+  - 修復：移除「Kong 版本資訊」Card，相關 Proxy/Admin 設定若有參考 Kong 的內容也需移除或改為 Cont 對應描述
+
+- 🔴 **前端多個頁面 `.map is not a function`** — Kong Admin API 回傳 `{data: [...], next: ...}` 格式，前端卻用 `.map()` 期待陣列。問題發生在 Consumers、Services、Routes、Plugins、Upstreams、HealthPortal 等頁面。
+  - 根因：`kong.ts` 的 `kongClient`（baseURL `/kong`）是 Kong gateway proxy 而非 Cont backend，`/consumers` → Kong Admin API 回 `{data: [...]}` 不是 array
+  - 驗證：`curl http://localhost:18082/api/consumers` → `dict{data,next}` 而非 `list`
+  - 修復方向：確認 Cont是否有 `/consumers` 等端點，或前端需用 Cont backend（port 18081）而非 Kong proxy（port 18082）
+
+- 🔴 **後端多個端點 404（API path 不匹配）** — 前端 call 的路徑與後端註冊不符：
+  - `/api/apikeys/requests` → 後端在 `/api-keys`（不是 `/api/apikeys/requests`）
+  - `/api/health/services` → 後端無此端點（只有 `/health-check`）
+  - `/api/stats/overview` → 後端根本沒有 stats端點
+  - 修復：對齊前端 `kong.ts` 的 API call path與後端 `main.go`註冊的 route
+
+- 🔴 **使用者頁面 `d.map is not a function`** — 已知問題，`/api/users` 回 `list[3]` 正常，但其他頁面（WorkspaceContext 等）可能有類似問題
+  - 驗證：瀏覽器 console `TypeError: d.map is not a function` at Users.tsx 或其依賴的元件
+
+- 🔴 **前端 `kong.ts`殘留 Kong gateway proxy client** — `kongClient` baseURL `/kong` 指向 Cont 的 Kong proxy（非 Cont backend），導致使用它的頁面全部失敗
+  - `kongClient` 用於：Consumers、Services、Routes、Plugins、Upstreams、HealthPortal、Stats 等頁面
+  - Cont backend正確 baseURL 應為 `/api`（nginx proxy 到 `admin-api:8001`）
+  - 修復：將 `kongClient`改為指向 Cont backend，或廢除 `kongClient`統一用 `analyticsClient` +正確的 API path
 
 ## 🟡 預計優化
 
-- （暂无）
+- [ ] **Workspace 使用者管理 UI（Workspace 級 RBAC）** — 前端 Workspace 頁面新增「成員」tab，讓 admin 管理誰可以進哪些 workspace
+  - GET /workspaces/:id/users → 列出已指派的使用者（user_id, role）
+  - PUT /workspaces/:id/users → 指派/更新使用者 workspace 角色
+  - DELETE /workspaces/:id/users/:userId → 移除使用者 workspace 存取
+  - 前端 WorkspaceDetail.tsx 或 Settings.tsx 新增成員管理介面
+  - 每個成員可編輯角色（viewer/editor/admin），可移除
 
 ## ✅ 已完成
 
