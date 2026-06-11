@@ -160,6 +160,8 @@ export const getGroups = () => analyticsClient.get<AuthGroup[]>('/groups').then(
 export const createGroup = (data: Partial<AuthGroup>) => analyticsClient.post<AuthGroup>('/groups', data).then(r => r.data)
 export const updateGroup = (id: string, data: Partial<AuthGroup>) => analyticsClient.patch<AuthGroup>(`/groups/${id}`, data).then(r => r.data)
 export const deleteGroup = (id: string) => analyticsClient.delete(`/groups/${id}`)
+export const getGroupMembers = (id: string) => analyticsClient.get<{members: {id:string;username:string;display_name:string;email:string;role:string}[]}>(`/groups/${id}/members`).then(r => r.data)
+export const setGroupMembers = (id: string, userIds: string[]) => analyticsClient.put(`/groups/${id}/members`, {user_ids: userIds}).then(r => r.data)
 
 export const listWorkspaces = () => analyticsClient.get<Workspace[]>('/workspaces').then(r => r.data)
 export const listMyWorkspaces = () => analyticsClient.get<Workspace[]>('/workspaces/mine').then(r => r.data)

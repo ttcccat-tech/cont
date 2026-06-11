@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Checkbox } from 'antd'
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, LockOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Checkbox, Select, Tabs } from 'antd'
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, LockOutlined, UserOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { AuthGroup, Resource, PermissionEntry, PermissionMode, getGroups, listResources, createGroup, updateGroup, deleteGroup } from '../api/kong'
+import { AuthGroup, Resource, PermissionEntry, PermissionMode, getGroups, listResources, createGroup, updateGroup, deleteGroup, getGroupMembers, setGroupMembers, getUsers } from '../api/kong'
 
 // ===== Permission Matrix Component =====
 
@@ -95,6 +95,11 @@ export default function GroupsPage() {
   const [permissions, setPermissions] = useState<PermissionEntry[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [resourcesLoading, setResourcesLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('permissions')
+  const [members, setMembers] = useState<{id:string;username:string;display_name:string;email:string;role:string}[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [allUsers, setAllUsers] = useState<{id:string;username:string;display_name:string;email:string;role:string}[]>([])
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
 
   const fetchGroups = () => {
     setLoading(true)
@@ -126,13 +131,34 @@ export default function GroupsPage() {
         description: group.description,
       })
       setPermissions(group.permissions || [])
+      // Load current members
+      if (group.id) {
+        setMembersLoading(true)
+        getGroupMembers(group.id).then(r => {
+          setMembers(r.members || [])
+          setSelectedUserIds((r.members || []).map((m: any) => m.id))
+        }).catch(() => {}).finally(() => setMembersLoading(false))
+      }
     } else {
       setEditingGroup(null)
       form.resetFields()
       setPermissions([])
+      setMembers([])
+      setSelectedUserIds([])
     }
+    setActiveTab('permissions')
     setModalOpen(true)
   }
+
+  const loadAllUsers = () => {
+    getUsers().then(r => setAllUsers(Array.isArray(r) ? r : [])).catch(() => {})
+  }
+
+  useEffect(() => {
+    if (modalOpen && editingGroup) {
+      loadAllUsers()
+    }
+  }, [modalOpen])
 
   const handleSubmit = async () => {
     if (submitting) return
@@ -143,6 +169,8 @@ export default function GroupsPage() {
 
       if (editingGroup?.id) {
         await updateGroup(editingGroup.id, payload)
+        // Save members
+        await setGroupMembers(editingGroup.id, selectedUserIds)
         message.success('群組更新成功')
       } else {
         await createGroup(payload)
@@ -262,49 +290,99 @@ export default function GroupsPage() {
         width={860}
         styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
       >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Form.Item
-              name="name"
-              label="群組名稱"
-              rules={[{ required: true, message: '必填' }]}
-            >
-              <Input placeholder="admin" />
-            </Form.Item>
-            <Form.Item name="label" label="標籤">
-              <Input placeholder="系統管理員" />
-            </Form.Item>
-          </div>
-          <Form.Item name="description" label="說明">
-            <Input.TextArea placeholder="可選，描述此群組的用途..." rows={2} />
-          </Form.Item>
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          style={{ marginTop: 16 }}
+          items={[
+            {
+              key: 'permissions',
+              label: '權限配置',
+              children: (
+                <Form form={form} layout="vertical">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <Form.Item
+                      name="name"
+                      label="群組名稱"
+                      rules={[{ required: true, message: '必填' }]}
+                    >
+                      <Input placeholder="admin" disabled={!!editingGroup} />
+                    </Form.Item>
+                    <Form.Item name="label" label="標籤">
+                      <Input placeholder="系統管理員" />
+                    </Form.Item>
+                  </div>
+                  <Form.Item name="description" label="說明">
+                    <Input.TextArea placeholder="可選，描述此群組的用途..." rows={2} />
+                  </Form.Item>
 
-          <div style={{ marginTop: 8 }}>
-            <div style={{ marginBottom: 8, color: 'var(--muted)', fontSize: 13 }}>
-              權限矩陣：勾選資源與權限模式後，系統將自動套用相應的存取控制策略。
-            </div>
-            {resourcesLoading ? (
-              <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 20 }}>載入資源中...</div>
-            ) : resources.length === 0 ? (
-              <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 20 }}>
-                尚無可用資源，或後端未提供 /api/resources 端點。
-              </div>
-            ) : (
-              <PermissionMatrix
-                resources={resources}
-                value={permissions}
-                onChange={setPermissions}
-                disabled={submitting}
-              />
-            )}
-          </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ marginBottom: 8, color: 'var(--muted)', fontSize: 13 }}>
+                      權限矩陣：勾選資源與權限模式後，系統將自動套用相應的存取控制策略。
+                    </div>
+                    {resourcesLoading ? (
+                      <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 20 }}>載入資源中...</div>
+                    ) : resources.length === 0 ? (
+                      <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 20 }}>
+                        尚無可用資源，或後端未提供 /api/resources 端點。
+                      </div>
+                    ) : (
+                      <PermissionMatrix
+                        resources={resources}
+                        value={permissions}
+                        onChange={setPermissions}
+                        disabled={submitting}
+                      />
+                    )}
+                  </div>
 
-          {permissions.length > 0 && (
-            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>
-              已設定 {permissions.length} 項權限
-            </div>
-          )}
-        </Form>
+                  {permissions.length > 0 && (
+                    <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>
+                      已設定 {permissions.length} 項權限
+                    </div>
+                  )}
+                </Form>
+              ),
+            },
+            {
+              key: 'members',
+              label: '群組成員',
+              children: (
+                <div>
+                  <div style={{ marginBottom: 12, color: 'var(--muted)', fontSize: 13 }}>
+                    選擇此群組的成員（目前已有 {members.length} 位成員）：
+                  </div>
+                  <Select
+                    mode="multiple"
+                    style={{ width: '100%', marginBottom: 16 }}
+                    placeholder="選擇使用者..."
+                    value={selectedUserIds}
+                    onChange={setSelectedUserIds}
+                    loading={membersLoading}
+                    options={allUsers.map(u => ({
+                      value: u.id,
+                      label: `${u.username}${u.display_name ? ` (${u.display_name})` : ''}`,
+                    }))}
+                  />
+                  {members.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                        目前成員：
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {members.map(m => (
+                          <Tag key={m.id} color="cyan" icon={<UserOutlined />}>
+                            {m.username}{m.display_name ? ` (${m.display_name})` : ''}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+        />
       </Modal>
     </div>
   )
