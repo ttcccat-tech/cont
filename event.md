@@ -6,10 +6,19 @@
 
 ## 🟡 預計優化
 
-- （暂无）
+- **前端 RBAC 群組管理 UI（新增群組/編輯權限/指派成員完整流程）**
+  - 目前 Groups.tsx 僅成員管理，缺少 Create/Edit/Delete 群組 UI
+  - 需要：群組建立表單、權限矩陣編輯、群組刪除確認
 
 ## ✅ 已完成
 
+- [x] **Cont Auth OAuth2/OIDC SSO（Google provider）** — commit `a8a3c0f8`
+  - Backend: `oauth_providers` + `oauth_states` tables, `oauth_provider`/`oauth_subject` users columns
+  - `routes/oauth.go`: `ListOAuthProviders()`/`InitiateOAuth()`/`HandleOAuthCallback()` — 完整 authorization code flow
+  - State stored in DB (10min expiry), CSRF protection, auto-provisioning of OAuth users
+  - Frontend: `Login.tsx` OAuth2Service redirect flow, `handleOAuthCallback()` URL token parsing
+  - 動態 OAuth provider 按鈕（從 `/auth/oauth/providers` 讀取），自動檢測 URL token
+  - QA: GET /auth/oauth/providers → 200 ✅, GET /auth/google → 404 (no provider configured) ✅
 - [x] **使用者-群組指派 UI（群組 name 支援）** — commit `5c586bf6`
   - 修復：/groups/:id/members API 原本只接受 UUID，前端傳入 group name 導致 pq error
   - store.go: 新增 GetAuthGroupByName()，可依 name 查詢 auth group
