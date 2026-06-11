@@ -369,3 +369,4 @@ func TestStatus_ReturnsVersion(t *testing.T) {
 		t.Errorf("expected database.reachable = true")
 	}
 }
+
