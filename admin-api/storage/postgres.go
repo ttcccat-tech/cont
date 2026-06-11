@@ -13,6 +13,11 @@ type Store struct {
 	rdb *Redis
 }
 
+// DB returns the underlying sql.DB for use by routes packages
+func (s *Store) DB() *sql.DB {
+	return s.db
+}
+
 func NewPostgres(url string) (*sql.DB, error) {
 	if url == "" {
 		url = "postgres://kong:kongpass@localhost:5432/cont?sslmode=disable"
@@ -232,6 +237,37 @@ func RunMigrations(db *sql.DB) error {
 			actor_username TEXT,
 			created_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
+
+		// OAuth2 Providers
+		`CREATE TABLE IF NOT EXISTS oauth_providers (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			provider TEXT UNIQUE NOT NULL,
+			client_id TEXT NOT NULL,
+			client_secret TEXT NOT NULL,
+			issuer_url TEXT,
+			authorization_url TEXT,
+			token_url TEXT,
+			userinfo_url TEXT,
+			jwks_url TEXT,
+			scopes TEXT DEFAULT 'openid email profile',
+			enabled BOOLEAN DEFAULT true,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+
+		// OAuth state for CSRF protection (ephemeral)
+		`CREATE TABLE IF NOT EXISTS oauth_states (
+			state TEXT PRIMARY KEY,
+			provider TEXT NOT NULL,
+			redirect_uri TEXT,
+			expires_at TIMESTAMPTZ NOT NULL
+		)`,
+
+		// Add oauth fields to users
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_provider TEXT`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_subject TEXT`,
+		`CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_subject)`,
+		// Allow NULL password_hash for OAuth-only users
+		`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

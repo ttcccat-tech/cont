@@ -1,8 +1,11 @@
 package storage
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -1613,4 +1616,101 @@ func (s *Store) SeedDefaultUsers() error {
 		Role:        "user",
 	})
 	return err
+}
+
+// GetOrCreateOAuthUser finds an existing user by OAuth provider+subject or creates a new one
+func (s *Store) GetOrCreateOAuthUser(provider, subject, email, name string) (*User, error) {
+	// Try to find existing user
+	user, err := s.GetUserByOAuth(provider, subject)
+	if err == nil && user != nil {
+		return user, nil
+	}
+
+	// Create new user
+	username := sanitizeOAuthUsername(email, provider)
+	displayName := name
+	if displayName == "" {
+		displayName = username
+	}
+
+	newUser := &User{
+		Username:    username,
+		DisplayName: displayName,
+		Email:       email,
+		Role:        "viewer", // Default role for OAuth users
+		Enabled:     true,
+	}
+
+	// Try to create; if email/username collision, fetch existing
+	created, err := s.CreateUser(newUser)
+	if err != nil {
+		// Try to get by email as fallback
+		userByEmail, err2 := s.GetUserByEmail(email)
+		if err2 == nil && userByEmail != nil {
+			// Link OAuth to existing user
+			s.db.Exec(`UPDATE users SET oauth_provider=$1, oauth_subject=$2 WHERE id=$3`,
+				provider, subject, userByEmail.ID)
+			return userByEmail, nil
+		}
+		return nil, fmt.Errorf("user creation failed: %w", err)
+	}
+
+	// Link OAuth identity
+	s.db.Exec(`UPDATE users SET oauth_provider=$1, oauth_subject=$2 WHERE id=$3`,
+		provider, subject, created.ID)
+
+	return created, nil
+}
+
+// GetUserByOAuth retrieves a user by OAuth provider and subject ID
+func (s *Store) GetUserByOAuth(provider, subject string) (*User, error) {
+	var user User
+	var displayName, email sql.NullString
+	err := s.db.QueryRow(`
+		SELECT id, username, display_name, email, role, enabled, created_at, updated_at
+		FROM users WHERE oauth_provider = $1 AND oauth_subject = $2`,
+		provider, subject,
+	).Scan(&user.ID, &user.Username, &displayName, &email,
+		&user.Role, &user.Enabled, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	user.DisplayName = displayName.String
+	user.Email = email.String
+	groups, _ := s.GetUserGroups(user.ID)
+	user.Groups = groups
+	return &user, nil
+}
+
+// GetUserByEmail retrieves a user by email
+func (s *Store) GetUserByEmail(email string) (*User, error) {
+	var user User
+	var displayName, emailStr sql.NullString
+	err := s.db.QueryRow(`
+		SELECT id, username, display_name, email, role, enabled, created_at, updated_at
+		FROM users WHERE email = $1`, email,
+	).Scan(&user.ID, &user.Username, &displayName, &emailStr,
+		&user.Role, &user.Enabled, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	user.DisplayName = displayName.String
+	user.Email = emailStr.String
+	groups, _ := s.GetUserGroups(user.ID)
+	user.Groups = groups
+	return &user, nil
+}
+
+func sanitizeOAuthUsername(email, provider string) string {
+	if email != "" {
+		atIdx := strings.Index(email, "@")
+		if atIdx > 0 {
+			return provider + "_" + email[:atIdx]
+		}
+	}
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err == nil {
+		return provider + "_" + base64.URLEncoding.EncodeToString(b)
+	}
+	return provider + "_user"
 }

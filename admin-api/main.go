@@ -65,7 +65,10 @@ func main() {
 	{
 		auth.POST("/login", routes.Login(store, jwtSecret))
 		auth.GET("/me", routes.AuthRequired(jwtSecret), routes.GetMe(jwtSecret))
-		// SSO endpoints can be added here for OAuth2/OIDC providers
+		// OAuth2/OIDC SSO
+		auth.GET("/oauth/providers", routes.ListOAuthProviders(store))
+		auth.GET("/:provider", routes.InitiateOAuth(store))
+		auth.GET("/:provider/callback", routes.HandleOAuthCallback(store, jwtSecret))
 	}
 
 	// Admin API — Kong-compatible (auth protected)

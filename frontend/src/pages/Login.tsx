@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { Form, Input, Button, Alert, Divider, message } from 'antd'
-import { UserOutlined, LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Form, Input, Button, Alert, Divider, message, Spin } from 'antd'
+import { UserOutlined, LockOutlined, GoogleOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
@@ -12,7 +12,7 @@ interface LoginValues {
   password: string
 }
 
-// SSO Provider types (extensible interface for future LDAP/OAuth)
+// OAuth2/OIDC Provider type
 export type SSOProvider = 'mock' | 'ldap' | 'oauth2'
 
 export interface SSOLoginResponse {
@@ -28,13 +28,25 @@ export interface SSOLoginResponse {
   permissions: Record<string, { mode: string; level: number }>
 }
 
-// SSO Service interface — extend this for real LDAP/OAuth providers
+// OAuth2 Provider config from backend
+export interface OAuth2Provider {
+  provider: string
+  client_id: string
+  issuer_url: string
+  authorization_url: string
+  token_url: string
+  userinfo_url: string
+  scopes: string
+  enabled: boolean
+}
+
+// SSO Service interface
 export interface ISSOService {
   provider: SSOProvider
   login(): Promise<SSOLoginResponse>
 }
 
-// Mock SSO Service — calls /api/auth/sso/mock backend endpoint
+// Mock SSO Service
 class MockSSOService implements ISSOService {
   provider: SSOProvider = 'mock'
 
@@ -44,74 +56,118 @@ class MockSSOService implements ISSOService {
   }
 }
 
-// LDAP Service stub — placeholder for future LDAP integration
+// LDAP Service stub
 export class LDAPService implements ISSOService {
   provider: SSOProvider = 'ldap'
 
   async login(): Promise<SSOLoginResponse> {
-    // TODO: Implement real LDAP bind + user lookup
-    // 1. Connect to LDAP server
-    // 2. Bind with service account or user credentials
-    // 3. Search for user DN
-    // 4. Verify password via bind
-    // 5. Map LDAP groups to local permissions
-    // 6. Return SSOLoginResponse
     throw new Error('LDAP login not implemented — configure LDAP server settings first')
   }
 }
 
-// OAuth2 Service stub — placeholder for future OAuth2/OIDC integration
+// OAuth2 Service — real redirect-based OAuth2/OIDC flow
 export class OAuth2Service implements ISSOService {
   provider: SSOProvider = 'oauth2'
+  private providerName: string
+
+  constructor(providerName = 'google') {
+    this.providerName = providerName
+  }
 
   async login(): Promise<SSOLoginResponse> {
-    // TODO: Implement real OAuth2 flow
-    // 1. Redirect to IdP authorization endpoint
-    // 2. Handle callback with authorization code
-    // 3. Exchange code for access token
-    // 4. Fetch user info from IdP userinfo endpoint
-    // 5. Map OAuth groups/roles to local permissions
-    // 6. Return SSOLoginResponse
-    throw new Error('OAuth2 login not implemented — configure OAuth2 client settings first')
+    // Redirect to backend OAuth initiation endpoint
+    // The backend will redirect to the IdP, then back to /auth/:provider/callback
+    // which will redirect back here with ?token=<jwt>
+    const callbackURI = encodeURIComponent(window.location.origin + '/login')
+    window.location.href = `${API_BASE}/auth/${this.providerName}?redirect_uri=${callbackURI}`
+    // This function returns a promise that will be resolved by the OAuth callback handler
+    return new Promise((resolve, reject) => {
+      // Store resolver so the callback can resolve this promise
+      (window as any).__oauthResolver = { resolve, reject }
+    })
   }
 }
 
+// OAuth callback handler — called on page load if token is in URL
+export function handleOAuthCallback(): string | null {
+  const params = new URLSearchParams(window.location.search)
+  const token = params.get('token')
+  if (token) {
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname)
+    return token
+  }
+  return null
+}
+
 // Factory: get SSO service instance by provider type
-export function getSSOService(provider: SSOProvider): ISSOService {
+export function getSSOService(provider: SSOProvider, providerName?: string): ISSOService {
   switch (provider) {
     case 'mock':
       return new MockSSOService()
     case 'ldap':
       return new LDAPService()
     case 'oauth2':
-      return new OAuth2Service()
+      return new OAuth2Service(providerName || 'google')
     default:
       return new MockSSOService()
   }
 }
 
-// SSO button config — label + icon per provider
+// SSO button config
 export const SSO_PROVIDERS: Array<{
   provider: SSOProvider
   label: string
   icon: React.ReactNode
+  providerName?: string
 }> = [
   {
     provider: 'mock',
     label: 'SSO 登入 (Mock)',
     icon: <SafetyCertificateOutlined />
   }
-  // Future providers (commented out, ready to enable):
-  // { provider: 'ldap',   label: 'LDAP 登入',   icon: <KeyOutlined /> },
-  // { provider: 'oauth2', label: 'OAuth 2.0',  icon: <GoogleOutlined /> },
+  // OAuth2 buttons are dynamically added from /auth/oauth/providers
 ]
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [ssoLoading, setSsoLoading] = useState(false)
   const [ssoError, setSsoError] = useState<string>('')
+  const [oauthProviders, setOauthProviders] = useState<OAuth2Provider[]>([])
+  const [loadingProviders, setLoadingProviders] = useState(true)
+
+  // Fetch available OAuth providers on mount
+  useEffect(() => {
+    axios.get(`${API_BASE}/auth/oauth/providers`)
+      .then(res => {
+        setOauthProviders((res.data || []).filter((p: OAuth2Provider) => p.enabled))
+        setLoadingProviders(false)
+      })
+      .catch(() => setLoadingProviders(false))
+  }, [])
+
+  // Handle OAuth callback — if token in URL, store it and navigate
+  useEffect(() => {
+    const token = handleOAuthCallback()
+    if (token) {
+      setToken(token)
+      // Fetch permissions and user info
+      axios.get(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => {
+        setUserPerms(res.data.permissions || {})
+        message.success(`SSO 登入成功：${res.data.username}`)
+        navigate('/dashboard')
+      }).catch(() => {
+        // Token exists but /auth/me failed — still navigate
+        setUserPerms({})
+        navigate('/dashboard')
+      })
+    }
+  }, [location])
 
   const onFinish = async (values: LoginValues) => {
     setLoading(true)
@@ -133,11 +189,11 @@ export default function Login() {
     }
   }
 
-  const handleSSOLogin = async (provider: SSOProvider) => {
+  const handleSSOLogin = async (provider: SSOProvider, providerName?: string) => {
     setSsoLoading(true)
     setSsoError('')
     try {
-      const service = getSSOService(provider)
+      const service = getSSOService(provider, providerName)
       const result = await service.login()
       setToken(result.token)
       setUserPerms(result.permissions || {})
@@ -232,7 +288,6 @@ export default function Login() {
           </Form.Item>
         </Form>
 
-        {/* SSO Section */}
         <Divider style={{ margin: '24px 0 16px', color: 'var(--muted)', borderColor: 'var(--accent)' }}>
           <span style={{ fontSize: 12, padding: '0 8px' }}>or</span>
         </Divider>
@@ -258,6 +313,30 @@ export default function Login() {
               }}
             >
               {label}
+            </Button>
+          ))}
+
+          {/* Dynamically loaded OAuth2 providers */}
+          {loadingProviders ? (
+            <div style={{ textAlign: 'center', padding: '8px 0' }}>
+              <Spin size="small" />
+            </div>
+          ) : oauthProviders.map(p => (
+            <Button
+              key={p.provider}
+              size="large"
+              icon={<GoogleOutlined />}
+              loading={ssoLoading}
+              onClick={() => handleSSOLogin('oauth2', p.provider)}
+              block
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              {p.provider.charAt(0).toUpperCase() + p.provider.slice(1)} 登入
             </Button>
           ))}
         </div>
