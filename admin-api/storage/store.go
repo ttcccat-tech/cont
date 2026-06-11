@@ -927,6 +927,8 @@ func (s *Store) ListUsers() ([]User, error) {
 		}
 		u.DisplayName = displayName.String
 		u.Email = email.String
+		groups, _ := s.GetUserGroups(u.ID)
+		u.Groups = groups
 		out = append(out, u)
 	}
 	return out, rows.Err()
@@ -940,6 +942,8 @@ func (s *Store) GetUser(id string) (*User, error) {
 	} else if err != nil {
 		return nil, err
 	}
+	groups, _ := s.GetUserGroups(u.ID)
+	u.Groups = groups
 	return &u, nil
 }
 
@@ -952,6 +956,30 @@ func (s *Store) UpdateUser(id string, u *User) error {
 func (s *Store) DeleteUser(id string) error {
 	_, err := s.db.Exec(`DELETE FROM users WHERE id=$1`, id)
 	return err
+}
+
+// GetUserGroups returns the AuthGroups that a user belongs to
+func (s *Store) GetUserGroups(userID string) ([]UserGroupRef, error) {
+	rows, err := s.db.Query(`
+		SELECT ag.name, ag.label
+		FROM auth_groups ag
+		JOIN user_auth_groups uag ON uag.group_id = ag.id
+		WHERE uag.user_id = $1
+		ORDER BY ag.label
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var groups []UserGroupRef
+	for rows.Next() {
+		var g UserGroupRef
+		if err := rows.Scan(&g.Name, &g.Label); err != nil {
+			return nil, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
 }
 
 func (s *Store) UpdateUserPassword(id, passwordHash string) error {

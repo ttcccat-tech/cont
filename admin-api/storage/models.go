@@ -242,7 +242,14 @@ type User struct {
 	CreatedAt   string `json:"created_at,omitempty"`
 	UpdatedAt   string `json:"updated_at,omitempty"`
 	// PasswordHash is never returned via JSON
-	PasswordHash string `json:"-"`
+	PasswordHash string         `json:"-"`
+	Groups       []UserGroupRef `json:"groups,omitempty"`
+}
+
+// UserGroupRef is the group membership info returned with User
+type UserGroupRef struct {
+	Name  string `json:"name"`
+	Label string `json:"label,omitempty"`
 }
 
 // ── /status response ────────────────────────────────────────────────────────
