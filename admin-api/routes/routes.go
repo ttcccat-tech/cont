@@ -52,6 +52,9 @@ func AuthRequired(jwtSecret string) gin.HandlerFunc {
 		c.Set("user_id", claims["sub"])
 		c.Set("username", claims["username"])
 		c.Set("role", claims["role"])
+		if orgID, ok := claims["org_id"].(string); ok {
+			c.Set("org_id", orgID)
+		}
 		c.Next()
 	}
 }
@@ -90,6 +93,20 @@ func parseIntFmt(s string, v *int) (int, error) {
 	}
 	*v = n
 	return n, nil
+}
+
+// getOrgID extracts org_id from the request context.
+// Admin role bypasses org_id filtering (returns "" to see all orgs).
+func getOrgID(c *gin.Context) string {
+	if role, _ := c.Get("role"); role == "admin" {
+		return ""
+	}
+	if orgID, ok := c.Get("org_id"); ok {
+		if s, ok := orgID.(string); ok {
+			return s
+		}
+	}
+	return ""
 }
 
 func nextList(c *gin.Context, count int, size, offset int) {
@@ -181,7 +198,8 @@ func Metrics() gin.HandlerFunc {
 func ListServices(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		size, offset := paginate(c)
-		rows, err := store.ListServices(size, offset)
+		orgID := getOrgID(c)
+		rows, err := store.ListServices(orgID, size, offset)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
@@ -196,6 +214,10 @@ func CreateService(store *storage.Store) gin.HandlerFunc {
 		if err := c.ShouldBindJSON(&s); err != nil {
 badRequest(c, err)
 			return
+		}
+		orgID := getOrgID(c)
+		if orgID != "" {
+			s.OrgID = orgID
 		}
 		result, err := store.CreateService(&s)
 		if err != nil {
@@ -212,7 +234,8 @@ badRequest(c, err)
 
 func GetService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		s, err := store.GetService(c.Param("id"))
+		orgID := getOrgID(c)
+		s, err := store.GetService(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "service not found"})
 			return
@@ -232,7 +255,8 @@ func UpdateService(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
-		result, err := store.UpdateService(c.Param("id"), &s)
+		orgID := getOrgID(c)
+		result, err := store.UpdateService(c.Param("id"), orgID, &s)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "service not found"})
 			return
@@ -247,7 +271,8 @@ badRequest(c, err)
 
 func DeleteService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := store.DeleteService(c.Param("id")); err != nil {
+		orgID := getOrgID(c)
+		if err := store.DeleteService(c.Param("id"), orgID); err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}

@@ -19,12 +19,15 @@ func NewStore(db *sql.DB, rdb *Redis) *Store {
 
 // ── Services ───────────────────────────────────────────────────────────────
 
-func (s *Store) ListServices(limit, offset int) ([]Service, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error) {
+	query := `
 		SELECT id, name, protocol, host, port, path, url, retries,
 		       connect_timeout, read_timeout, write_timeout, enabled,
-		       created_at, updated_at
-		FROM services ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM services
+		WHERE ($1 = '' OR org_id = $1)
+		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -37,38 +40,22 @@ func (s *Store) ListServices(limit, offset int) ([]Service, error) {
 		var enabled sql.NullBool
 		var created, updated sql.NullString
 		if err := rows.Scan(&r.ID, &name, &protocol, &host, &port, &path, &url,
-			&retries, &connect, &read, &write, &enabled, &created, &updated); err != nil {
+			&retries, &connect, &read, &write, &enabled, &r.OrgID, &created, &updated); err != nil {
 			return nil, err
 		}
 		r.Name = name.String
 		r.Protocol = protocol.String
 		r.Host = host.String
-		if port.Valid {
-			r.Port = int(port.Int64)
-		}
+		if port.Valid { r.Port = int(port.Int64) }
 		r.Path = path.String
 		r.URL = url.String
-		if retries.Valid {
-			r.Retries = int(retries.Int64)
-		}
-		if connect.Valid {
-			r.ConnectTimeout = int(connect.Int64)
-		}
-		if read.Valid {
-			r.ReadTimeout = int(read.Int64)
-		}
-		if write.Valid {
-			r.WriteTimeout = int(write.Int64)
-		}
-		if enabled.Valid {
-			r.Enabled = enabled.Bool
-		}
-		if created.Valid {
-			r.CreatedAt = created.String
-		}
-		if updated.Valid {
-			r.UpdatedAt = updated.String
-		}
+		if retries.Valid { r.Retries = int(retries.Int64) }
+		if connect.Valid { r.ConnectTimeout = int(connect.Int64) }
+		if read.Valid { r.ReadTimeout = int(read.Int64) }
+		if write.Valid { r.WriteTimeout = int(write.Int64) }
+		if enabled.Valid { r.Enabled = enabled.Bool }
+		if created.Valid { r.CreatedAt = created.String }
+		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
 	}
 	return out, nil
@@ -76,37 +63,43 @@ func (s *Store) ListServices(limit, offset int) ([]Service, error) {
 
 func (s *Store) CreateService(svc *Service) (*Service, error) {
 	var id string
+	orgID := svc.OrgID
+	if orgID == "" {
+		orgID = "00000000-0000-0000-0000-000000000000"
+	}
 	err := s.db.QueryRow(`
 		INSERT INTO services (name, protocol, host, port, path, url, retries,
-			connect_timeout, read_timeout, write_timeout, enabled)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			connect_timeout, read_timeout, write_timeout, enabled, org_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		RETURNING id, created_at, updated_at`,
 		svc.Name, orString(svc.Protocol, "http"), svc.Host, orInt(svc.Port, 80),
 		svc.Path, svc.URL, orInt(svc.Retries, 5),
 		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
-		orInt(svc.WriteTimeout, 60000), orBool(svc.Enabled, true),
+		orInt(svc.WriteTimeout, 60000), orBool(svc.Enabled, true), orgID,
 	).Scan(&id, &svc.CreatedAt, &svc.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	svc.ID = id
+	svc.OrgID = orgID
 	return svc, nil
 }
 
-func (s *Store) GetService(id string) (*Service, error) {
+func (s *Store) GetService(id, orgID string) (*Service, error) {
 	return s.getOneService(s.db.QueryRow(`
 		SELECT id, name, protocol, host, port, path, url, retries,
 		       connect_timeout, read_timeout, write_timeout, enabled,
-		       created_at, updated_at FROM services WHERE id = $1`, id))
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM services WHERE id = $1 AND ($2 = '' OR org_id = $2)`, id, orgID))
 }
 
-func (s *Store) UpdateService(id string, svc *Service) (*Service, error) {
+func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) {
 	err := s.db.QueryRow(`
 		UPDATE services SET
 			name=$2, protocol=$3, host=$4, port=$5, path=$6, url=$7,
 			retries=$8, connect_timeout=$9, read_timeout=$10,
 			write_timeout=$11, enabled=$12, updated_at=NOW()
-		WHERE id=$1 RETURNING updated_at`,
+		WHERE id=$1 AND ($2 = '' OR org_id = $2) RETURNING updated_at`,
 		id, svc.Name, orString(svc.Protocol, "http"), svc.Host,
 		orInt(svc.Port, 80), svc.Path, svc.URL, orInt(svc.Retries, 5),
 		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
@@ -119,8 +112,8 @@ func (s *Store) UpdateService(id string, svc *Service) (*Service, error) {
 	return svc, nil
 }
 
-func (s *Store) DeleteService(id string) error {
-	_, err := s.db.Exec("DELETE FROM services WHERE id=$1", id)
+func (s *Store) DeleteService(id, orgID string) error {
+	_, err := s.db.Exec("DELETE FROM services WHERE id=$1 AND ($2 = '' OR org_id = $2)", id, orgID)
 	return err
 }
 
@@ -131,7 +124,7 @@ func (s *Store) getOneService(row *sql.Row) (*Service, error) {
 	var enabled sql.NullBool
 	var created, updated sql.NullString
 	err := row.Scan(&r.ID, &name, &protocol, &host, &port, &path, &url,
-		&retries, &connect, &read, &write, &enabled, &created, &updated)
+		&retries, &connect, &read, &write, &enabled, &r.OrgID, &created, &updated)
 	if err != nil {
 		return nil, err
 	}
