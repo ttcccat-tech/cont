@@ -56,6 +56,11 @@
   - QA: Targets Create→201 ✅, PATCH weight→200 ✅, Delete→204 ✅
   - QA: Consumers Create→201 ✅, Delete→204 ✅; AuthGroups Create→201 ✅, Delete→204 ✅
 
+- [ ] **Cont SaaS Phase 2：Workspace 綁定 Organization + 多租戶資料隔離** — 待實作
+  - Phase 1 已完成（Organization 資料模型、users.org_id、OTP 註冊 flow）
+  - Phase 2 待做：Workspace 與 Organization 綁定、資料庫查詢自動加上 org_id 過濾、多租戶隔離中介層
+  - Phase 3 待做：plan/billing/Stripe 整合
+
 ## ✅ 已完成
 
 - [x] **Workspace 使用者管理 UI（Workspace 級 RBAC）** — commit `b2544b7b` + `1d74dfb3` + `3f97b2d3`
