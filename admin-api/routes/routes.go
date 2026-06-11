@@ -1,8 +1,12 @@
 package routes
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -1516,6 +1520,8 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 			ActorUsername: reviewerStr,
 			Description:  "Approved API key request: " + existing.KeyName,
 		})
+		// Send notification (non-blocking)
+		go SendAPIKeyApprovalNotification(store, existing, reviewerStr, "approved")
 		c.JSON(200, updated)
 	}
 }
@@ -1555,6 +1561,8 @@ func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
 			ActorUsername: reviewerStr,
 			Description:  "Rejected API key request: " + existing.KeyName,
 		})
+		// Send notification (non-blocking)
+		go SendAPIKeyApprovalNotification(store, existing, reviewerStr, "rejected")
 		c.JSON(200, updated)
 	}
 }
@@ -1790,5 +1798,55 @@ func ConfigCheck() gin.HandlerFunc {
 			"version": "1.0.0",
 			"build":   "cont-admin-api",
 		})
+	}
+}
+
+// ── Notification Helpers ─────────────────────────────────────────────────────
+
+// notifyWebhook sends a POST request to a webhook URL with the given payload.
+// Returns silently if the URL is empty or the request fails (non-blocking).
+func notifyWebhook(webhookURL string, payload map[string]interface{}) {
+	if webhookURL == "" {
+		return
+	}
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
+}
+
+// SendAPIKeyApprovalNotification sends Slack/Email notifications when an API key request is approved or rejected.
+func SendAPIKeyApprovalNotification(store *storage.Store, keyReq *storage.APIKeyRequest, approvedBy, status string) {
+	// Fetch applicant's email from user record
+	var applicantEmail string
+	applicant, _ := store.GetUser(keyReq.ApplicantUserID)
+	if applicant != nil {
+		applicantEmail = applicant.Email
+	}
+
+	// Build Slack message
+	slackPayload := map[string]interface{}{
+		"text": fmt.Sprintf("🔑 API Key Request %s: *%s*\n• Key Name: %s\n• Consumer: %s\n• Status: %s\n• Reviewed by: %s",
+			strings.ToUpper(status), keyReq.KeyName, keyReq.KeyName, keyReq.ConsumerName, status, approvedBy),
+	}
+
+	// Build email payload (generic JSON — can be consumed by any email automation service)
+	emailPayload := map[string]interface{}{
+		"subject": fmt.Sprintf("API Key Request [%s] %s", strings.ToUpper(status), keyReq.KeyName),
+		"to":      applicantEmail,
+		"body":    fmt.Sprintf("Your API key request '%s' for consumer '%s' has been %s by %s.", keyReq.KeyName, keyReq.ConsumerName, status, approvedBy),
+	}
+
+	// Try to send via configured webhook URLs (from alert rules settings or env)
+	// Slack: use SLACK_WEBHOOK_URL env var if set, otherwise skip
+	if slackURL := os.Getenv("SLACK_WEBHOOK_URL"); slackURL != "" {
+		notifyWebhook(slackURL, slackPayload)
+	}
+
+	// Email: use EMAIL_WEBHOOK_URL env var (e.g., a Mailgun/SendGrid relay endpoint)
+	if emailURL := os.Getenv("EMAIL_WEBHOOK_URL"); emailURL != "" && applicantEmail != "" {
+		notifyWebhook(emailURL, emailPayload)
 	}
 }
