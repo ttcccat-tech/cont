@@ -6,14 +6,55 @@
 
 ## 🟡 預計優化
 
-- [ ] **Workspace 使用者管理 UI（Workspace 級 RBAC）** — 前端 Workspace 頁面新增「成員」tab，讓 admin 管理誰可以進哪些 workspace
-  - GET /workspaces/:id/users → 列出已指派的使用者（user_id, role）
-  - PUT /workspaces/:id/users → 指派/更新使用者 workspace 角色
-  - DELETE /workspaces/:id/users/:userId → 移除使用者 workspace 存取
-  - 前端 WorkspaceDetail.tsx 或 Settings.tsx 新增成員管理介面
-  - 每個成員可編輯角色（viewer/editor/admin），可移除
+- [ ] **使用者管理精細化（RBAC 增強）** — 目前的 AuthGroups 群組管理已完整，但每個使用者的 workspace 存取權需要可從 UI 管理
+  - 前端：在 Users.tsx 新增「Workspace 指派」面板，admin 可指派使用者到特定 workspace
+  - 後端：GET /users/:id/workspaces（已存在），需驗證前端能正確呼叫並顯示
+  - 或改進 WorkspaceDetail 的成員列表：支援搜尋/篩選、新增多個成員、批次更新角色
+
+- [ ] **Proxy Lua Plugin 鏈完善化** — 目前的 OpenResty Lua 插件鏈（access/header_filter/body_filter/log）還沒有實際的 auth / rate-limit 邏輯
+  - access.lua：實作 JWT 驗證、API Key 驗證、BasicAuth 驗證、rate-limit 邏輯
+  - header_filter.lua：實作 response header 操作（CORS、rate-limit headers）
+  - body_filter.lua：實作 response body 轉換（JSON pretty、error wrapping）
+  - log.lua：實作 access log + metrics 寫入
+
+- [ ] **Upstreams 健康檢查 UI** — HealthPortal 頁面現在是 no-op，需串接 Cont Proxy 的 healthcheck.lua
+  - 前端：顯示每個 upstream 的 target 健康狀態
+  - 後端：GET /upstreams/:id/health（從 healthcheck.lua 讀取狀態）
+  - 或透過 Cont Proxy 的 /status 端點讀取 upstream 狀態
+
+- [ ] **Metrics Dashboard** — Cont 已支援 Prometheus metrics，需串接 Grafana
+  - 確認 /metrics 端點格式（Prometheus client_golang）
+  - 製作 Grafana dashboard JSON（request rate、latency、error rate、DB/Redis 連線）
+  - 設定 Prometheus scrape config 或 Grafana datasources
+
+- [ ] **API Key 申請 Flow 完整化** — 申請 → 審批 → 核發 → 通知，整個流程 UI 完善化
+  - ApiKeyRequests.tsx：申請表單（reason、scope、expire）、狀態追蹤（pending/approved/rejected）
+  - 後端：核發後自動產生 key，寄送 email / Slack 通知
+  - Admin：審批介面可一次核准/拒絕多筆
+
+- [ ] **商業化：SaaS 註冊機制** — 從單機部署進化為多租戶 SaaS
+  - 方案 A（推薦）：Tenant = Workspace 超集
+    - 每個 Organization（組織）有自己的 workspace pool
+    - Organization 有獨立的 plan（Free/Pro/Enterprise）、billing、API quota
+    - 用 email 註冊Organization，email 即登入帳號
+    - 登入後預設建立一個 default workspace
+  - 方案 B：訂閱制
+    - 系統管理員在後台管理 Organization 帳號
+    - Organization 可建立多個 workspace，費用按 workspace 數量計算
+  - 核心資料模型：Organization（id, name, plan, stripe_customer_id, created_at）、OrganizationUser（org_id, user_id, role）
+  - 現有 users / workspaces / auth_groups 保持不變，新增 organization_id 作為頂層隔離層
+  - 前端：在 Settings.tsx 新增「Organization 設定」（名稱、邀請成員、升級方案）
+  - 登入頁：支援 email 註冊（SendOTP / VerifyOTP）或 OAuth（Google）
 
 ## ✅ 已完成
+
+- [x] **Workspace 使用者管理 UI（Workspace 級 RBAC）** — commit `b2544b7b` + `1d74dfb3` + `3f97b2d3`
+  - Backend: `ListWorkspaceUsers` store method + `ListWorkspaceUsers` handler (GET /workspaces/:id/users)
+  - Backend: `ListWorkspaceUsers` 確保回傳 `[]` 而非 `null`
+  - API: GET /workspaces/:id/users → 200 ✅, PUT /workspaces/:id/users → 200 ✅, DELETE /workspaces/:id/users/:userId → 204 ✅
+  - Frontend: Workspaces.tsx（列表/建立/刪除 Workspace）、WorkspaceDetail.tsx（成員管理：新增成員/變更角色/移除成員）
+  - App.tsx: /workspaces 和 /workspaces/:id 路由
+  - kong.ts: `WorkspaceUserAssignment` interface + `getWorkspaceUsers/setWorkspaceUser/removeWorkspaceUser` API calls
 
 - [x] **Users 頁面黑屏 + 多頁面 `.map is not a function`** — commit `955de998` + `45ee1525`
   - WorkspaceContext: `listMyWorkspaces()` / `listWorkspaces()` 加 `Array.isArray` normalize 回 array
