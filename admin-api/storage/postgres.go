@@ -49,15 +49,11 @@ func (s *Store) PingRedis() error {
 	}
 	return s.rdb.Ping(context.Background())
 }
-const RoleColumnMigration = `
-ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'viewer'
-`
+const RoleColumnMigration = `` // DEPRECATED: role column now part of users table creation
 
 func RunMigrations(db *sql.DB) error {
-	// Add role column if it doesn't exist
-	if _, err := db.Exec(RoleColumnMigration); err != nil {
-		return fmt.Errorf("role column migration failed: %w", err)
-	}
+	// DEPRECATED: RoleColumnMigration moved into migrations list after users table
+	_ = RoleColumnMigration
 
 	migrations := []string{
 		`CREATE TABLE IF NOT EXISTS services (
