@@ -82,7 +82,7 @@ export default function Sidebar() {
             K
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>kgo</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Cont</div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>企業級 API 閘道器管理</div>
           </div>
         </div>
@@ -102,7 +102,7 @@ export default function Sidebar() {
             style={{ width: '100%' }}
             options={[
               { value: 'all', label: '全部工作區' },
-              ...workspaces.map(w => ({ value: w.id, label: w.label || w.name }))
+              ...workspaces.map(w => ({ value: w.id, label: w.name }))
             ]}
           />
         </div>

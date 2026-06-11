@@ -843,6 +843,128 @@ func DeleteWorkspace(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// SetUserWorkspace assigns a user to a workspace with a specific role
+func SetUserWorkspace(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			UserID string `json:"user_id" binding:"required"`
+			Role   string `json:"role" binding:"required,oneof=viewer editor admin"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			badRequest(c, err)
+			return
+		}
+		wsID := c.Param("id")
+		if err := store.SetUserWorkspace(req.UserID, wsID, req.Role); err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"message": "user workspace assignment updated"})
+	}
+}
+
+// RemoveUserWorkspace removes a user's access to a workspace
+func RemoveUserWorkspace(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.Param("userId")
+		wsID := c.Param("id")
+		if err := store.RemoveUserWorkspace(userID, wsID); err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
+// GetUserWorkspaces returns all workspace assignments for a specific user
+func GetUserWorkspaces(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.Param("userId")
+		workspaces, err := store.ListUserWorkspaces(userID)
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"data": workspaces})
+	}
+}
+
+// RequireWorkspacePermission middleware checks if user has access to a specific workspace
+// entity: the resource entity being accessed (services, routes, consumers, plugins, upstreams, targets)
+// write: whether this is a write operation
+func RequireWorkspacePermission(store *storage.Store, entity string, write bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := c.Get("user_id")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "user_id not found in token"})
+			return
+		}
+		role, _ := c.Get("role")
+		roleStr := role.(string)
+
+		// Global admin bypasses workspace-level access checks
+		if roleStr == "admin" {
+			c.Next()
+			return
+		}
+
+		// Get workspace ID from query param or route param
+		workspaceID := c.Query("workspace")
+		if workspaceID == "" {
+			workspaceID = c.Param("workspace")
+		}
+
+		// If no workspace specified, fall back to the first assigned workspace
+		if workspaceID == "" {
+			workspaces, err := store.ListUserWorkspaces(userID.(string))
+			if err != nil || len(workspaces) == 0 {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "no workspace access"})
+				return
+			}
+			workspaceID = workspaces[0].ID
+		}
+
+		wsRole, err := store.GetUserWorkspaceRole(userID.(string), workspaceID)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if wsRole == "" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "workspace access denied"})
+			return
+		}
+
+		// Map workspace role to permission level for this entity
+		// viewer -> level 1 (read-only), editor -> level 2 (read+write), admin -> level 3 (full)
+		wsLevel := 0
+		switch wsRole {
+		case "viewer":
+			wsLevel = 1
+		case "editor":
+			wsLevel = 2
+		case "admin":
+			wsLevel = 3
+		}
+
+		// For write operations, require editor or admin workspace role
+		if write && wsLevel < 2 {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "write permission denied for " + entity})
+			return
+		}
+
+		// For delete operations, require admin workspace role
+		if entity == "delete" && wsLevel < 3 {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "delete permission denied"})
+			return
+		}
+
+		// Store workspace ID in context for downstream handlers
+		c.Set("workspace_id", workspaceID)
+		c.Set("workspace_role", wsRole)
+		c.Next()
+	}
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 type LoginRequest struct {

@@ -27,7 +27,7 @@ const statusConfig = {
 }
 
 async function apiGet(path: string) {
-  const token = localStorage.getItem('kgo_token')
+  const token = localStorage.getItem('cont_token')
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   })
@@ -36,7 +36,7 @@ async function apiGet(path: string) {
 }
 
 async function apiPost(path: string, body?: any) {
-  const token = localStorage.getItem('kgo_token')
+  const token = localStorage.getItem('cont_token')
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -47,7 +47,7 @@ async function apiPost(path: string, body?: any) {
 }
 
 async function apiPut(path: string, body: any) {
-  const token = localStorage.getItem('kgo_token')
+  const token = localStorage.getItem('cont_token')
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

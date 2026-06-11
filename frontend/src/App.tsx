@@ -55,7 +55,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
           zIndex: 99,
         }}>
           <span style={{ color: 'var(--highlight)', fontSize: 18, fontWeight: 600 }}>
-            kgo
+            cont
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ color: 'var(--muted)', fontSize: 13 }}>v2.0</span>

@@ -61,7 +61,7 @@ export default function SettingsPage() {
       setLoading(true)
       // Kong 3.x settings via Admin API node-level config endpoint
       // Note: Many settings require restart. Here we save to localStorage as UI-level prefs.
-      localStorage.setItem('kgo_settings', JSON.stringify(values))
+      localStorage.setItem('cont_settings', JSON.stringify(values))
       message.success('設定已儲存（部分設定需重啟 Kong 生效）')
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)

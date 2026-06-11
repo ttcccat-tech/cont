@@ -13,8 +13,8 @@ export const analyticsClient = axios.create({ baseURL: API_BASE })
 
 // ── Storage keys ──────────────────────────────────────────
 const WS_KEY = 'kgo_ws'
-const TOKEN_KEY = 'kgo_token'
-const PERMS_KEY = 'kgo_perms'
+const TOKEN_KEY = 'cont_token'
+const PERMS_KEY = 'cont_perms'
 
 // ── Workspace helpers ─────────────────────────────────────
 export function getKongWorkspace(): string {

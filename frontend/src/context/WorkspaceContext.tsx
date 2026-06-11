@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import api, { Workspace, listWorkspaces, listMyWorkspaces } from '../api/kong'
 
-const WS_KEY = 'kgo_ws'
+const WS_KEY = 'cont_ws'
 
 export function getKongWorkspace(): string {
   return sessionStorage.getItem(WS_KEY) || 'default'

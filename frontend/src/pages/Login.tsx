@@ -237,7 +237,7 @@ export default function Login() {
           }}>
             K
           </div>
-          <h2 style={{ color: 'var(--text)', margin: 0 }}>kgo</h2>
+          <h2 style={{ color: 'var(--text)', margin: 0 }}>Cont</h2>
           <p style={{ color: 'var(--muted)', fontSize: 13, margin: '4px 0 0' }}>
             API Gateway Management Platform
           </p>

@@ -37,7 +37,7 @@ const operatorOptions = [
 ]
 
 async function apiFetch(path: string, options?: RequestInit) {
-  const token = localStorage.getItem('kgo_token')
+  const token = localStorage.getItem('cont_token')
   const hasBody = !!options?.body
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,

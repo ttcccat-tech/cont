@@ -154,6 +154,10 @@ func main() {
 			ws.PUT("/:id", routes.RequirePermission("workspaces", true), routes.UpdateWorkspace(store))
 			ws.PATCH("/:id", routes.RequirePermission("workspaces", true), routes.UpdateWorkspace(store))
 			ws.DELETE("/:id", routes.RequirePermission("workspaces", true), routes.DeleteWorkspace(store))
+			// Workspace user assignment management
+			ws.PUT("/:id/users", routes.RequirePermission("workspaces", true), routes.SetUserWorkspace(store))
+			ws.DELETE("/:id/users/:userId", routes.RequirePermission("workspaces", true), routes.RemoveUserWorkspace(store))
+			ws.GET("/users/:userId", routes.RequirePermission("workspaces", false), routes.GetUserWorkspaces(store))
 		}
 
 		// Roles (RBAC)
