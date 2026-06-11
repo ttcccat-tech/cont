@@ -2,23 +2,6 @@
 
 ## 🔴 未完成（進行中）
 
-- 🔴 **Users 頁面黑屏 `d.map is not a function`** — WorkspaceContext 的 `listMyWorkspaces()` 回 `{data, next}` 格式但 state 型別是 `Workspace[]`，`setWorkspaces(list)` 把整個物件設進去導致全域崩潰
-  - 驗證：`curl http://localhost:18082/api/workspaces` → `{data, next}` (dict)
-  - 驗證：`curl http://localhost:18082/api/users` → `list` (array，直接成功)
-  - 修復：`listMyWorkspaces()` 需加 `Array.isArray` normalize：`.then(res => { const list = Array.isArray(res) ? res : (res?.data ?? []); setWorkspaces(list) })`
-  - 檔案：`frontend/src/context/WorkspaceContext.tsx`
-
-- 🔴 **API path 後端不存在（404）** — 前端 call 這些路徑但後端無對應端點：
-  - `/api/apikeys/requests` → 後端實作於 `/api-keys` 或 `/apikeys`（非 `/api/apikeys/requests`）
-  - `/api/health/services` → 後端無此端點（只有 `/health-check`）
-  - `/api/stats/overview` → 後端根本沒有 stats端點
-  - 修復：確認後端實際端點路徑，對齊前端 `kong.ts` 的 API call path，或移除前端這些 call
-
-- 🔴 **多頁面 `.map is not a function`** — Consumers、Services、Routes、Plugins、Upstreams 頁面對 `{data:[...]}` 直接 `.map()`，需加 `Array.isArray` guard
-  - 根因：Cont backend 回 `{data: [...], next: ...}` 格式，前端期待 array
-  - 驗證：`/api/consumers` → dict{data,next}，`/api/services` → dict{data,next}，`/api/routes` → dict{data,next}，`/api/plugins` → dict{data,next}
-  - 修復方向：在 `kong.ts` api 層統一做 response normalize（`Array.isArray(res) ? res : (res?.data ?? [])`），不要每個頁面自己處理
-
 ## 🟡 預計優化
 
 - [ ] **Workspace 使用者管理 UI（Workspace 級 RBAC）** — 前端 Workspace 頁面新增「成員」tab，讓 admin 管理誰可以進哪些 workspace
@@ -29,6 +12,17 @@
   - 每個成員可編輯角色（viewer/editor/admin），可移除
 
 ## ✅ 已完成
+
+- [x] **Users 頁面黑屏 + 多頁面 `.map is not a function`** — commit `955de998` + `45ee1525`
+  - WorkspaceContext: `listMyWorkspaces()` / `listWorkspaces()` 加 `Array.isArray` normalize 回 array
+  - kong.ts api 層統一 normalize：`api.listServices/Routes/Plugins/Consumers` 直接回 `data` array
+  - 移除 `getApiKeyRequests`、`getHealthServices`、`getStatsOverview` 三個不存在後端端的 dead API calls
+  - QA: services/consumers/routes/plugins LIST → 200 ✅, CREATE → 201 ✅, DELETE → 204 ✅
+
+- [x] **API path 後端不存在（404）** — commit `45ee1525`
+  - 移除前端三個無後端對應的 API function：getApiKeyRequests, getHealthServices, getStatsOverview
+  - 這些 function 定義了但從未被任何 page 使用（僅是 dead code）
+  - 後端正確端點：GET /api-keys（需登入認證）
 
 - [x] **Workspace 多租戶隔離（RBAC + 資料隔離）** — commit `3c80a047` + `82ab87ca`
   - `workspace_auth_groups` table（workspace_id, auth_group_id, role）
