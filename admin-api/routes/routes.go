@@ -1220,7 +1220,8 @@ func CreateAuthGroup(store *storage.Store) gin.HandlerFunc {
 func GetAuthGroup(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		g, err := store.GetAuthGroup(id)
+		groupID := resolveGroupID(store, id)
+		g, err := store.GetAuthGroup(groupID)
 		if err != nil {
 			c.JSON(404, gin.H{"message": "group not found"})
 			return
@@ -1232,13 +1233,14 @@ func GetAuthGroup(store *storage.Store) gin.HandlerFunc {
 func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+		groupID := resolveGroupID(store, id)
 		var req UpdateAuthGroupRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			badRequest(c, err)
 			return
 		}
 		// Fetch existing to merge
-		existing, err := store.GetAuthGroup(id)
+		existing, err := store.GetAuthGroup(groupID)
 		if err != nil {
 			c.JSON(404, gin.H{"message": "group not found"})
 			return
@@ -1254,7 +1256,7 @@ func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 		if req.Permissions != nil {
 			existing.Permissions = req.Permissions
 		}
-		updated, err := store.UpdateAuthGroup(id, existing)
+		updated, err := store.UpdateAuthGroup(groupID, existing)
 		if err != nil {
 			if isUniqueViolation(err) {
 				c.JSON(409, gin.H{"message": "group name already exists"})
@@ -1276,7 +1278,7 @@ func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 		store.CreateAuditLog(&storage.AuditLog{
 			AuditType:     "update",
 			TargetType:    "AuthGroup",
-			TargetID:      id,
+			TargetID:      groupID,
 			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Updated AuthGroup: " + existing.Name,
@@ -1288,12 +1290,13 @@ func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 func DeleteAuthGroup(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		existing, _ := store.GetAuthGroup(id)
+		groupID := resolveGroupID(store, id)
+		existing, _ := store.GetAuthGroup(groupID)
 		if existing == nil {
 			c.JSON(404, gin.H{"message": "group not found"})
 			return
 		}
-		if err := store.DeleteAuthGroup(id); err != nil {
+		if err := store.DeleteAuthGroup(groupID); err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
@@ -1310,7 +1313,7 @@ func DeleteAuthGroup(store *storage.Store) gin.HandlerFunc {
 		store.CreateAuditLog(&storage.AuditLog{
 			AuditType:     "delete",
 			TargetType:    "AuthGroup",
-			TargetID:      id,
+			TargetID:      groupID,
 			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Deleted AuthGroup: " + existing.Name,
