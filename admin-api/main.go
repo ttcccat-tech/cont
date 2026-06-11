@@ -162,6 +162,8 @@ func main() {
 			groups.PUT("/:id", routes.RequirePermission("groups", true), routes.UpdateAuthGroup(store))
 			groups.PATCH("/:id", routes.RequirePermission("groups", true), routes.UpdateAuthGroup(store))
 			groups.DELETE("/:id", routes.RequirePermission("groups", true), routes.DeleteAuthGroup(store))
+			groups.GET("/:id/members", routes.RequirePermission("groups", false), routes.GetGroupMembers(store))
+			groups.PUT("/:id/members", routes.RequirePermission("groups", true), routes.SetGroupMembers(store))
 		}
 
 		// Resources
