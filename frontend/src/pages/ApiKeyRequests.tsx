@@ -53,14 +53,14 @@ export default function ApiKeyRequestsPage() {
 
   const fetchAll = () => {
     setLoading(true)
-    apiFetch('/apikeys/requests')
+    apiFetch('/api-keys')
       .then(data => setAllRequests(Array.isArray(data) ? data : data.data || []))
       .catch(() => message.error('載入全部申請失敗'))
       .finally(() => setLoading(false))
   }
 
   const fetchMine = () => {
-    apiFetch('/apikeys/requests/mine')
+    apiFetch('/api-keys/mine')
       .then(data => setMyRequests(Array.isArray(data) ? data : data.data || []))
       .catch(() => message.error('載入我的申請失敗'))
   }
@@ -74,7 +74,7 @@ export default function ApiKeyRequestsPage() {
     try {
       const values = await form.validateFields()
       setSubmitting(true)
-      await apiFetch('/apikeys/requests', {
+      await apiFetch('/api-keys', {
         method: 'POST',
         body: JSON.stringify(values),
       })
@@ -91,7 +91,7 @@ export default function ApiKeyRequestsPage() {
 
   const handleApprove = async (id: number) => {
     try {
-      await apiFetch(`/apikeys/requests/${id}/approve`, { method: 'PUT' })
+      await apiFetch(`/api-keys/${id}/approve`, { method: 'PUT' })
       message.success('已核准申請')
       fetchAll()
       fetchMine()
@@ -102,7 +102,7 @@ export default function ApiKeyRequestsPage() {
 
   const handleReject = async (id: number) => {
     try {
-      await apiFetch(`/apikeys/requests/${id}/reject`, { method: 'PUT' })
+      await apiFetch(`/api-keys/${id}/reject`, { method: 'PUT' })
       message.success('已拒絕申請')
       fetchAll()
       fetchMine()
