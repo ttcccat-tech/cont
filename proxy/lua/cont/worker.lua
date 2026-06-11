@@ -1,7 +1,7 @@
 -- cont.worker
 -- Per-worker initialization and background timers
 
-local cont = require("cont.init")
+local cont = require("init")
 
 -- Config reload timer (every 10 seconds)
 local function start_config_sync()

@@ -651,6 +651,45 @@ func ValidateCredential(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// ValidateJWT is an internal endpoint for proxy JWT token validation
+// Called by the Cont proxy's access.lua during jwt-auth plugin access phase
+func ValidateJWT(store *storage.Store, jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenStr := c.Param("token")
+		if tokenStr == "" {
+			c.JSON(401, gin.H{"message": "missing token"})
+			return
+		}
+
+		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
+			return []byte(jwtSecret), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(401, gin.H{"message": "invalid or expired token"})
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(401, gin.H{"message": "invalid token claims"})
+			return
+		}
+
+		// Extract user_id from "sub" claim
+		userID, _ := claims["sub"].(string)
+		consumerID := userID // consumer_id == user_id in Cont
+
+		c.JSON(200, gin.H{
+			"consumer_id": consumerID,
+			"user_id":     userID,
+		})
+	}
+}
+
 // ── Plugins ────────────────────────────────────────────────────────────────
 
 func ListPlugins(store *storage.Store) gin.HandlerFunc {

@@ -1,6 +1,7 @@
 -- cont.log
--- Post-request processing — plugin log() chains + metrics
+-- Post-request processing — plugin log() chains + structured access logging + metrics
 
+-- ── Metrics Recording ────────────────────────────────────────────────────────
 local function record_metrics()
     local metrics = ngx.shared.cont_metrics
     if not metrics then
@@ -63,9 +64,83 @@ local function record_metrics()
     end
 end
 
--- Run plugin log() chains
+-- ── Structured Access Log ────────────────────────────────────────────────────
+local function write_access_log()
+    local log_format = os.getenv("CONT_LOG_FORMAT") or "json"
+    local log_level = os.getenv("CONT_LOG_LEVEL") or "info"
+
+    -- Determine log level based on status
+    local status = ngx.status
+    local level = "info"
+    if status >= 500 then
+        level = "error"
+    elseif status >= 400 then
+        level = "warn"
+    end
+
+    -- Skip if log level is higher than configured
+    local level_priority = { debug = 0, info = 1, warn = 2, error = 3 }
+    if (level_priority[level] or 0) < (level_priority[log_level] or 1) then
+        return
+    end
+
+    local route = ngx.ctx.matched_route
+    local service = ngx.ctx.service
+    local upstream_target = ngx.ctx.upstream_target
+
+    local entry = {
+        timestamp = ngx.now() * 1000,  -- ms epoch
+        request = {
+            method = ngx.req.get_method(),
+            uri = ngx.var.uri,
+            query = ngx.var.query_string or "",
+            size = tonumber(ngx.var.request_length) or 0,
+        },
+        response = {
+            status = status,
+            size = tonumber(ngx.var.bytes_sent) or 0,
+            latency_ms = math.floor((tonumber(ngx.var.request_time) or 0) * 1000),
+            upstream_latency_ms = math.floor((tonumber(ngx.var.upstream_response_time) or 0) * 1000),
+        },
+        client = {
+            ip = ngx.var.remote_addr or "0.0.0.0",
+            port = tonumber(ngx.var.remote_port) or 0,
+        },
+        upstream = upstream_target or "",
+        route_id = ngx.ctx.route_id or "",
+        service_id = ngx.ctx.service_id or "",
+        consumer_id = ngx.ctx.authenticated_consumer_id or "",
+        user_agent = ngx.var.http_user_agent or "",
+        referer = ngx.var.http_referer or "",
+    }
+
+    local cjson = require("cjson")
+    local log_line
+    if log_format == "text" then
+        log_line = string.format('[%s] %s %s %d %dms consumer=%s route=%s',
+            os.date("!%Y-%m-%dT%H:%M:%SZ"),
+            entry.request.method,
+            entry.request.uri,
+            status,
+            entry.response.latency_ms,
+            entry.consumer_id ~= "" and entry.consumer_id or "-",
+            entry.route_id ~= "" and entry.route_id or "-"
+        )
+    else
+        log_line = cjson.encode(entry)
+    end
+
+    if level == "error" then
+        ngx.log(ngx.ERR, "cont.access: ", log_line)
+    elseif level == "warn" then
+        ngx.log(ngx.WARN, "cont.access: ", log_line)
+    else
+        ngx.log(ngx.INFO, "cont.access: ", log_line)
+    end
+end
+
+-- ── Run Plugin log() Chains ─────────────────────────────────────────────────
 local function run_plugin_logs()
-    -- Use global 'cont' from init_by_lua
     if not cont or not cont.plugins then
         return
     end
@@ -85,6 +160,7 @@ local function run_plugin_logs()
     end
 end
 
--- Main log phase
+-- ── Main Log Phase ───────────────────────────────────────────────────────────
 record_metrics()
+write_access_log()
 run_plugin_logs()
