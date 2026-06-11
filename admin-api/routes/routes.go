@@ -3,6 +3,7 @@ package routes
 import (
 	"database/sql"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1038,6 +1039,11 @@ badRequest(c, err)
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
+		userID, _ := c.Get("user_id")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
 		actor, _ := c.Get("username")
 		actorStr := ""
 		if actor != nil {
@@ -1046,7 +1052,8 @@ badRequest(c, err)
 		store.CreateAuditLog(&storage.AuditLog{
 			AuditType:     "create",
 			TargetType:    "User",
-			TargetID:      user.ID,
+			TargetID:      userIDStr,
+			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Created user: " + user.Username,
 		})
@@ -1089,6 +1096,11 @@ func UpdateUser(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 		updated, _ := store.GetUser(id)
+		userID, _ := c.Get("user_id")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
 		actor, _ := c.Get("username")
 		actorStr := ""
 		if actor != nil {
@@ -1097,7 +1109,8 @@ func UpdateUser(store *storage.Store) gin.HandlerFunc {
 		store.CreateAuditLog(&storage.AuditLog{
 			AuditType:     "update",
 			TargetType:    "User",
-			TargetID:      id,
+			TargetID:      userIDStr,
+			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Updated user: " + existing.Username,
 		})
@@ -1117,6 +1130,11 @@ func DeleteUser(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		userID, _ := c.Get("user_id")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
 		actor, _ := c.Get("username")
 		actorStr := ""
 		if actor != nil {
@@ -1125,7 +1143,8 @@ func DeleteUser(store *storage.Store) gin.HandlerFunc {
 		store.CreateAuditLog(&storage.AuditLog{
 			AuditType:     "delete",
 			TargetType:    "User",
-			TargetID:      id,
+			TargetID:      userIDStr,
+			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Deleted user: " + existing.Username,
 		})
@@ -1172,6 +1191,11 @@ func CreateAuthGroup(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		userID, _ := c.Get("user_id")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
 		actor, _ := c.Get("username")
 		actorStr := ""
 		if actor != nil {
@@ -1181,6 +1205,7 @@ func CreateAuthGroup(store *storage.Store) gin.HandlerFunc {
 			AuditType:     "create",
 			TargetType:    "AuthGroup",
 			TargetID:      created.ID,
+			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Created AuthGroup: " + created.Name,
 		})
@@ -1234,6 +1259,11 @@ func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		userID, _ := c.Get("user_id")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
 		actor, _ := c.Get("username")
 		actorStr := ""
 		if actor != nil {
@@ -1243,6 +1273,7 @@ func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 			AuditType:     "update",
 			TargetType:    "AuthGroup",
 			TargetID:      id,
+			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Updated AuthGroup: " + existing.Name,
 		})
@@ -1262,6 +1293,11 @@ func DeleteAuthGroup(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		userID, _ := c.Get("user_id")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
 		actor, _ := c.Get("username")
 		actorStr := ""
 		if actor != nil {
@@ -1271,6 +1307,7 @@ func DeleteAuthGroup(store *storage.Store) gin.HandlerFunc {
 			AuditType:     "delete",
 			TargetType:    "AuthGroup",
 			TargetID:      id,
+			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Deleted AuthGroup: " + existing.Name,
 		})
@@ -1453,6 +1490,11 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 		if reviewer != nil {
 			reviewerStr = reviewer.(string)
 		}
+		reviewerID, _ := c.Get("user_id")
+		reviewerIDStr := ""
+		if reviewerID != nil {
+			reviewerIDStr = reviewerID.(string)
+		}
 		existing, err := store.GetAPIKeyRequest(id)
 		if err != nil || existing == nil {
 			c.JSON(404, gin.H{"message": "API key request not found"})
@@ -1470,6 +1512,7 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 			AuditType:    "update",
 			TargetType:   "APIKeyRequest",
 			TargetID:     id,
+			ActorUserID:  reviewerIDStr,
 			ActorUsername: reviewerStr,
 			Description:  "Approved API key request: " + existing.KeyName,
 		})
@@ -1485,6 +1528,11 @@ func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
 		reviewerStr := ""
 		if reviewer != nil {
 			reviewerStr = reviewer.(string)
+		}
+		reviewerID, _ := c.Get("user_id")
+		reviewerIDStr := ""
+		if reviewerID != nil {
+			reviewerIDStr = reviewerID.(string)
 		}
 		existing, err := store.GetAPIKeyRequest(id)
 		if err != nil || existing == nil {
@@ -1503,6 +1551,7 @@ func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
 			AuditType:    "update",
 			TargetType:   "APIKeyRequest",
 			TargetID:     id,
+			ActorUserID:  reviewerIDStr,
 			ActorUsername: reviewerStr,
 			Description:  "Rejected API key request: " + existing.KeyName,
 		})
@@ -1576,7 +1625,7 @@ func CreateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 		store.CreateAuditLog(&storage.AuditLog{
 			AuditType:     "create",
 			TargetType:    "APIKeyRequest",
-			TargetID:      created.ID,
+			TargetID:      strconv.FormatInt(created.ID, 10),
 			ActorUsername: actorStr,
 			Description:   "Created API key request: " + created.KeyName,
 		})
@@ -1641,6 +1690,11 @@ func DeleteAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		userID, _ := c.Get("user_id")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
 		actor, _ := c.Get("username")
 		actorStr := ""
 		if actor != nil {
@@ -1650,6 +1704,7 @@ func DeleteAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 			AuditType:     "delete",
 			TargetType:    "APIKeyRequest",
 			TargetID:      id,
+			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Deleted API key request: " + existing.KeyName,
 		})
