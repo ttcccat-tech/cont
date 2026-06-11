@@ -6,10 +6,15 @@
 
 ## 🟡 預計優化
 
-- Cont 使用者管理精細化（AuthGroups 群組管理 UI 優化）
+- （暂无）
 
 ## ✅ 已完成
 
+- [x] **AuthGroups 群組成員管理（Backend + Frontend UI）** — commit `96c74dd9`
+  - Backend: `user_auth_groups` table migration, `ListGroupMembers()`/`SetGroupMembers()` store methods, `GET/PUT /groups/:id/members` routes
+  - Frontend: Groups.tsx tabbed modal（Permissions + Members tabs），`getGroupMembers()`/`setGroupMembers()` API calls
+  - QA: GET members →200 ✅, PUT set members → 200 ✅, Create group → 201 ✅
+  - 修復：admin密碼 hash 無法通過 bcrypt 驗證（重建 hash 後登入成功）
 - [x] **Audit Log ActorUserID 修補（8 個 audit log blocks）** — commit `740a925d`
   - 修補 User/AuthGroup/APIKeyRequest 全部 8 個 audit log blocks：新增 `ActorUserID` 欄位、修正 `TargetID` 從 string id 而非 int
   - 修補：CreateUser、UpdateUser、DeleteUser、CreateAuthGroup、UpdateAuthGroup、DeleteAuthGroup、ApproveAPIKey、RejectAPIKey、DeleteAPIKeyRequest
