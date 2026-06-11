@@ -162,23 +162,27 @@ func (s *Store) getOneService(row *sql.Row) (*Service, error) {
 
 // ── Services (helper) ──────────────────────────────────────────────────────
 
-func (s *Store) GetServiceByName(name string) (*Service, error) {
+func (s *Store) GetServiceByName(name, orgID string) (*Service, error) {
 	row := s.db.QueryRow(`
 		SELECT id, name, protocol, host, port, path, url, retries,
 		       connect_timeout, read_timeout, write_timeout, enabled,
-		       created_at, updated_at FROM services WHERE name=$1`, name)
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM services WHERE name=$1 AND ($2 = '' OR org_id = $2)`, name, orgID)
 	return s.getOneService(row)
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
 
-func (s *Store) ListRoutes(limit, offset int) ([]Route, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListRoutes(orgID string, limit, offset int) ([]Route, error) {
+	query := `
 		SELECT id, name, service_id, protocols, hosts, paths, methods,
 		       strip_path, preserve_host, regex_priority,
 		       https_redirect_status_code, connection_timeout, enabled,
-		       created_at, updated_at
-		FROM routes ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM routes
+		WHERE ($1 = '' OR org_id = $1)
+		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -195,43 +199,23 @@ func (s *Store) ListRoutes(limit, offset int) ([]Route, error) {
 		var created, updated sql.NullString
 		if err := rows.Scan(&r.ID, &name, &serviceID, &protocols, &hosts,
 			&paths, &methods, &stripPath, &preserveHost, &regexPriority,
-			&httpsStatus, &connTimeout, &enabled, &created, &updated); err != nil {
+			&httpsStatus, &connTimeout, &enabled, &r.OrgID, &created, &updated); err != nil {
 			return nil, err
 		}
 		jsonScanSlice(&r.Protocols, protocols)
 		jsonScanSlice(&r.Hosts, hosts)
 		jsonScanSlice(&r.Paths, paths)
 		jsonScanSlice(&r.Methods, methods)
-		if name.Valid {
-			r.Name = name.String
-		}
-		if serviceID.Valid {
-			r.Service = &ServiceRef{ID: serviceID.String}
-		}
-		if stripPath.Valid {
-			r.StripPath = stripPath.Bool
-		}
-		if preserveHost.Valid {
-			r.PreserveHost = preserveHost.Bool
-		}
-		if regexPriority.Valid {
-			r.RegexPriority = int(regexPriority.Int64)
-		}
-		if httpsStatus.Valid {
-			r.HTTPSRedirectStatusCode = int(httpsStatus.Int64)
-		}
-		if connTimeout.Valid {
-			r.ConnectionTimeout = int(connTimeout.Int64)
-		}
-		if enabled.Valid {
-			r.Enabled = enabled.Bool
-		}
-		if created.Valid {
-			r.CreatedAt = created.String
-		}
-		if updated.Valid {
-			r.UpdatedAt = updated.String
-		}
+		if name.Valid { r.Name = name.String }
+		if serviceID.Valid { r.Service = &ServiceRef{ID: serviceID.String} }
+		if stripPath.Valid { r.StripPath = stripPath.Bool }
+		if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
+		if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
+		if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
+		if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
+		if enabled.Valid { r.Enabled = enabled.Bool }
+		if created.Valid { r.CreatedAt = created.String }
+		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
 	}
 	return out, nil
@@ -242,31 +226,35 @@ func (s *Store) CreateRoute(r *Route) (*Route, error) {
 	hosts := orSlice(r.Hosts, []string{})
 	paths := orSlice(r.Paths, []string{})
 	methods := orSlice(r.Methods, []string{})
-
+	orgID := r.OrgID
+	if orgID == "" {
+		orgID = "00000000-0000-0000-0000-000000000000"
+	}
 	err := s.db.QueryRow(`
 		INSERT INTO routes (name, service_id, protocols, hosts, paths, methods,
 			strip_path, preserve_host, regex_priority, https_redirect_status_code,
-			connection_timeout, enabled)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			connection_timeout, enabled, org_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING id, created_at, updated_at`,
 		r.Name, r.GetServiceID(), "{"+strings.Join(protocols,",")+"}", "{"+strings.Join(hosts,",")+"}", "{"+strings.Join(paths,",")+"}", "{"+strings.Join(methods,",")+"}",
 		orBool(r.StripPath, true), orBool(r.PreserveHost, false),
 		orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426),
-		orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true),
+		orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true), orgID,
 	).Scan(&r.ID, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	r.OrgID = orgID
 	return r, nil
 }
 
-func (s *Store) GetRoute(id string) (*Route, error) {
+func (s *Store) GetRoute(id, orgID string) (*Route, error) {
 	row := s.db.QueryRow(`
 		SELECT id, name, service_id, protocols, hosts, paths, methods,
 		       strip_path, preserve_host, regex_priority,
 		       https_redirect_status_code, connection_timeout, enabled,
-		       created_at, updated_at
-		FROM routes WHERE id = $1`, id)
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM routes WHERE id = $1 AND ($2 = '' OR org_id = $2)`, id, orgID)
 	var r Route
 	var name, serviceID sql.NullString
 	var protocols, hosts, paths, methods []byte
@@ -276,59 +264,42 @@ func (s *Store) GetRoute(id string) (*Route, error) {
 	var created, updated sql.NullString
 	err := row.Scan(&r.ID, &name, &serviceID, &protocols, &hosts,
 		&paths, &methods, &stripPath, &preserveHost, &regexPriority,
-		&httpsStatus, &connTimeout, &enabled, &created, &updated)
+		&httpsStatus, &connTimeout, &enabled, &r.OrgID, &created, &updated)
 	if err != nil {
 		return nil, err
 	}
-r.Name = name.String
-		if serviceID.Valid {
-			r.Service = &ServiceRef{ID: serviceID.String}
-		}
-		jsonScanSlice(&r.Protocols, protocols)
-		jsonScanSlice(&r.Hosts, hosts)
-		jsonScanSlice(&r.Paths, paths)
-		jsonScanSlice(&r.Methods, methods)
-		if stripPath.Valid {
-		r.StripPath = stripPath.Bool
-	}
-	if preserveHost.Valid {
-		r.PreserveHost = preserveHost.Bool
-	}
-	if regexPriority.Valid {
-		r.RegexPriority = int(regexPriority.Int64)
-	}
-	if httpsStatus.Valid {
-		r.HTTPSRedirectStatusCode = int(httpsStatus.Int64)
-	}
-	if connTimeout.Valid {
-		r.ConnectionTimeout = int(connTimeout.Int64)
-	}
-	if enabled.Valid {
-		r.Enabled = enabled.Bool
-	}
-	if created.Valid {
-		r.CreatedAt = created.String
-	}
-	if updated.Valid {
-		r.UpdatedAt = updated.String
-	}
+	if name.Valid { r.Name = name.String }
+	if serviceID.Valid { r.Service = &ServiceRef{ID: serviceID.String} }
+	jsonScanSlice(&r.Protocols, protocols)
+	jsonScanSlice(&r.Hosts, hosts)
+	jsonScanSlice(&r.Paths, paths)
+	jsonScanSlice(&r.Methods, methods)
+	if stripPath.Valid { r.StripPath = stripPath.Bool }
+	if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
+	if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
+	if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
+	if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
+	if enabled.Valid { r.Enabled = enabled.Bool }
+	if created.Valid { r.CreatedAt = created.String }
+	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
 }
 
-func (s *Store) UpdateRoute(id string, r *Route) (*Route, error) {
+func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	protocols := orSlice(r.Protocols, []string{"http", "https"})
 	hosts := orSlice(r.Hosts, []string{})
 	paths := orSlice(r.Paths, []string{})
 	methods := orSlice(r.Methods, []string{})
 
-	// Build UPDATE with only provided fields — avoid empty string for UUID
 	setClauses := []string{"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6", "strip_path=$7", "preserve_host=$8", "regex_priority=$9", "https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12"}
-	args := []interface{}{id, r.Name, "{" + strings.Join(protocols, ",") + "}", "{" + strings.Join(hosts, ",") + "}", "{" + strings.Join(paths, ",") + "}", "{" + strings.Join(methods, ",") + "}", orBool(r.StripPath, true), orBool(r.PreserveHost, false), orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426), orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true)}
+	args := []interface{}{id, r.Name, "{"+strings.Join(protocols, ",")+"}", "{"+strings.Join(hosts, ",")+"}", "{"+strings.Join(paths, ",")+"}", "{"+strings.Join(methods, ",")+"}", orBool(r.StripPath, true), orBool(r.PreserveHost, false), orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426), orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true)}
 	if svcID := r.GetServiceID(); svcID != "" {
 		setClauses = append([]string{"service_id=$13"}, setClauses...)
 		args = append([]interface{}{svcID}, args...)
 	}
-	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 RETURNING updated_at"
+	setClauses = append(setClauses, "org_id=$14")
+	args = append(args, orgID)
+	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($14 = '' OR org_id = $14) RETURNING updated_at"
 
 	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
 	if err != nil {
@@ -338,8 +309,8 @@ func (s *Store) UpdateRoute(id string, r *Route) (*Route, error) {
 	return r, nil
 }
 
-func (s *Store) DeleteRoute(id string) error {
-	_, err := s.db.Exec("DELETE FROM routes WHERE id=$1", id)
+func (s *Store) DeleteRoute(id, orgID string) error {
+	_, err := s.db.Exec("DELETE FROM routes WHERE id=$1 AND ($2 = '' OR org_id = $2)", id, orgID)
 	return err
 }
 

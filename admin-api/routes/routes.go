@@ -285,7 +285,8 @@ func DeleteService(store *storage.Store) gin.HandlerFunc {
 func ListRoutes(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		size, offset := paginate(c)
-		rows, err := store.ListRoutes(size, offset)
+		orgID := getOrgID(c)
+		rows, err := store.ListRoutes(orgID, size, offset)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
@@ -301,9 +302,10 @@ func CreateRoute(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
+		orgID := getOrgID(c)
 		// Resolve service.name → service.id if service_id is empty
 		if r.Service != nil && r.Service.ID == "" && r.GetServiceName() != "" {
-			svc, err := store.GetServiceByName(r.GetServiceName())
+			svc, err := store.GetServiceByName(r.GetServiceName(), orgID)
 			if err != nil {
 				c.JSON(400, gin.H{"message": "service not found: " + r.GetServiceName()})
 				return
@@ -314,6 +316,7 @@ badRequest(c, err)
 			}
 			r.Service.ID = svc.ID
 		}
+		r.OrgID = orgID
 		result, err := store.CreateRoute(&r)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
@@ -325,7 +328,8 @@ badRequest(c, err)
 
 func GetRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		r, err := store.GetRoute(c.Param("id"))
+		orgID := getOrgID(c)
+		r, err := store.GetRoute(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "route not found"})
 			return
@@ -345,7 +349,8 @@ func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
-		result, err := store.UpdateRoute(c.Param("id"), &r)
+		orgID := getOrgID(c)
+		result, err := store.UpdateRoute(c.Param("id"), orgID, &r)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "route not found"})
 			return
@@ -360,7 +365,8 @@ badRequest(c, err)
 
 func DeleteRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := store.DeleteRoute(c.Param("id")); err != nil {
+		orgID := getOrgID(c)
+		if err := store.DeleteRoute(c.Param("id"), orgID); err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
