@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Select } from 'antd'
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Select, Drawer, Checkbox, List, Divider, Alert } from 'antd'
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, GroupOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { Workspace, listWorkspaces, getUsers, createUser, updateUser, deleteUser } from '../api/kong'
+import { Workspace, listWorkspaces, getUsers, createUser, updateUser, deleteUser, getGroups, getGroupMembers, setGroupMembers, AuthGroup } from '../api/kong'
 
 interface User {
   id: string
@@ -24,6 +24,13 @@ export default function Users() {
   const [submitting, setSubmitting] = useState(false)
   const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([])
   const [workspaceIds, setWorkspaceIds] = useState<string[]>([])
+  // Group assignment
+  const [groupDrawerOpen, setGroupDrawerOpen] = useState(false)
+  const [assigningUser, setAssigningUser] = useState<User | null>(null)
+  const [allGroups, setAllGroups] = useState<AuthGroup[]>([])
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
+  const [groupLoading, setGroupLoading] = useState(false)
+  const [groupSaving, setGroupSaving] = useState(false)
 
   const fetchUsers = () => {
     setLoading(true)
@@ -90,6 +97,69 @@ export default function Users() {
     }
   }
 
+  // ── Group assignment ───────────────────────────────────
+  const openGroupDrawer = async (user: User) => {
+    setAssigningUser(user)
+    setGroupDrawerOpen(true)
+    setGroupLoading(true)
+    try {
+      const [groups, ...memberResults] = await Promise.all([
+        getGroups(),
+        ...(user.groups || []).map(g =>
+          g.name ? getGroupMembers(g.name).catch(() => ({ members: [] })) : Promise.resolve({ members: [] })
+        ),
+      ])
+      setAllGroups(groups)
+      // Build set of group names this user belongs to
+      const memberGroups = new Set<string>()
+      for (const res of memberResults) {
+        const m = (res as any)?.members || []
+        if (m.some((u: any) => u.id === user.id)) {
+          // Find which group's member list contained this user
+          // We need to map back — use group names from user.groups
+        }
+      }
+      // Use the groups array from user object directly
+      setSelectedGroupIds(user.groups?.map(g => g.name) || [])
+    } catch (e) {
+      message.error('無法載入群組列表')
+    } finally {
+      setGroupLoading(false)
+    }
+  }
+
+  const handleSaveGroups = async () => {
+    if (!assigningUser?.id) return
+    setGroupSaving(true)
+    try {
+      // For each group, set its members
+      // We need to know which groups to add user to vs remove from
+      // Simple approach: get current members of each group, diff
+      const currentGroupIds = assigningUser.groups?.map(g => g.name) || []
+      const toAdd = selectedGroupIds.filter(id => !currentGroupIds.includes(id))
+      const toRemove = currentGroupIds.filter(id => !selectedGroupIds.includes(id))
+      await Promise.all([
+        ...toAdd.map(groupId => getGroupMembers(groupId).then(res => {
+          const members: string[] = (res as any)?.members?.map((m: any) => m.id) || []
+          if (!members.includes(assigningUser.id!)) {
+            return setGroupMembers(groupId, [...members, assigningUser.id!])
+          }
+        }).catch(() => {})),
+        ...toRemove.map(groupId => getGroupMembers(groupId).then(res => {
+          const members: string[] = (res as any)?.members?.map((m: any) => m.id) || []
+          return setGroupMembers(groupId, members.filter(id => id !== assigningUser.id))
+        }).catch(() => {})),
+      ])
+      message.success('群組指派已更新')
+      setGroupDrawerOpen(false)
+      fetchUsers()
+    } catch (e: any) {
+      message.error('儲存失敗: ' + (e?.message || ''))
+    } finally {
+      setGroupSaving(false)
+    }
+  }
+
   const columns: ColumnsType<User> = [
     {
       title: 'Username',
@@ -144,9 +214,10 @@ export default function Users() {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 220,
       render: (_, r) => (
         <Space>
+          <Button size="small" icon={<GroupOutlined />} onClick={() => openGroupDrawer(r)}>指派群組</Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openModal(r)}>編輯</Button>
           <Popconfirm title={`確認刪除使用者「${r.username}」？`} onConfirm={() => r.id && handleDelete(r.id, r.username)}>
             <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
@@ -221,6 +292,57 @@ export default function Users() {
           )}
         </Form>
       </Modal>
+
+      {/* Group Assignment Drawer */}
+      <Drawer
+        title={<Space><GroupOutlined /> 指派群組：<Tag color="blue">{assigningUser?.username}</Tag></Space>}
+        open={groupDrawerOpen}
+        onClose={() => setGroupDrawerOpen(false)}
+        width={480}
+        extra={
+          <Button type="primary" loading={groupSaving} onClick={handleSaveGroups}>
+            儲存
+          </Button>
+        }
+      >
+        {groupLoading ? (
+          <div style={{ textAlign: 'center', padding: 32 }}>載入中...</div>
+        ) : (
+          <>
+            <Alert
+              message="勾選使用者所屬的群組。變更會即時更新。"
+              type="info"
+              style={{ marginBottom: 16 }}
+            />
+            <List
+              dataSource={allGroups}
+              renderItem={group => (
+                <List.Item
+                  key={group.id || group.name}
+                  extra={
+                    <Checkbox
+                      checked={selectedGroupIds.includes(group.name)}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setSelectedGroupIds(prev => [...prev, group.name])
+                        } else {
+                          setSelectedGroupIds(prev => prev.filter(id => id !== group.name))
+                        }
+                      }}
+                    />
+                  }
+                >
+                  <List.Item.Meta
+                    title={<b style={{ color: 'var(--highlight)' }}>{group.label || group.name}</b>}
+                    description={group.description || ''}
+                  />
+                </List.Item>
+              )}
+              locale={{ emptyText: '尚無可用群組' }}
+            />
+          </>
+        )}
+      </Drawer>
     </div>
   )
 }
