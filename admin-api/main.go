@@ -205,6 +205,9 @@ func main() {
 		// Health & Config Check (for HealthPortal)
 		admin.GET("/health-check", routes.HealthCheck(store))
 		admin.GET("/config-check", routes.ConfigCheck())
+
+		// Crypto utilities
+		admin.POST("/crypto/rsa-keypair", routes.GenerateRSAKeyPair)
 	}
 
 	port := os.Getenv("ADMIN_PORT")
