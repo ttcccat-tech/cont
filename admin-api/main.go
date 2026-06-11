@@ -156,19 +156,19 @@ func main() {
 		// Auth Groups
 		groups := admin.Group("/groups")
 		{
-			groups.GET("", routes.ListAuthGroups(store))
-			groups.POST("", routes.CreateAuthGroup(store))
-			groups.GET("/:id", routes.GetAuthGroup(store))
-			groups.PUT("/:id", routes.UpdateAuthGroup(store))
-			groups.PATCH("/:id", routes.UpdateAuthGroup(store))
-			groups.DELETE("/:id", routes.DeleteAuthGroup(store))
+			groups.GET("", routes.RequirePermission("groups", false), routes.ListAuthGroups(store))
+			groups.POST("", routes.RequirePermission("groups", true), routes.CreateAuthGroup(store))
+			groups.GET("/:id", routes.RequirePermission("groups", false), routes.GetAuthGroup(store))
+			groups.PUT("/:id", routes.RequirePermission("groups", true), routes.UpdateAuthGroup(store))
+			groups.PATCH("/:id", routes.RequirePermission("groups", true), routes.UpdateAuthGroup(store))
+			groups.DELETE("/:id", routes.RequirePermission("groups", true), routes.DeleteAuthGroup(store))
 		}
 
 		// Resources
 		admin.GET("/resources", routes.ListResources(store))
 
 		// Audit Logs
-		admin.GET("/audit", routes.ListAuditLogs(store))
+		admin.GET("/audit", routes.RequirePermission("groups", false), routes.ListAuditLogs(store))
 
 		// Alert Rules
 		alerts := admin.Group("/alerts")
@@ -184,12 +184,15 @@ func main() {
 		// API Key Requests
 		apikeys := admin.Group("/api-keys")
 		{
-			apikeys.GET("", routes.ListAPIKeyRequests(store))
+			apikeys.GET("", routes.RequirePermission("groups", false), routes.ListAPIKeyRequests(store))
 			apikeys.POST("", routes.CreateAPIKeyRequest(store))
-			apikeys.GET("/:id", routes.GetAPIKeyRequest(store))
-			apikeys.PUT("/:id", routes.UpdateAPIKeyRequest(store))
-			apikeys.PATCH("/:id", routes.UpdateAPIKeyRequest(store))
-			apikeys.DELETE("/:id", routes.DeleteAPIKeyRequest(store))
+			apikeys.GET("/:id", routes.RequirePermission("groups", false), routes.GetAPIKeyRequest(store))
+			apikeys.PUT("/:id", routes.RequirePermission("groups", true), routes.UpdateAPIKeyRequest(store))
+			apikeys.PATCH("/:id", routes.RequirePermission("groups", true), routes.UpdateAPIKeyRequest(store))
+			apikeys.DELETE("/:id", routes.RequirePermission("groups", true), routes.DeleteAPIKeyRequest(store))
+			apikeys.PUT("/:id/approve", routes.RequirePermission("groups", true), routes.ApproveAPIKey(store))
+			apikeys.PUT("/:id/reject", routes.RequirePermission("groups", true), routes.RejectAPIKey(store))
+			apikeys.GET("/mine", routes.ListMyAPIKeyRequests(store))
 		}
 
 		// Config Snapshots

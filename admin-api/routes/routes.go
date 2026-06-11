@@ -1038,6 +1038,18 @@ badRequest(c, err)
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "User",
+			TargetID:      user.ID,
+			ActorUsername: actorStr,
+			Description:   "Created user: " + user.Username,
+		})
 		c.JSON(201, user)
 	}
 }
@@ -1077,6 +1089,18 @@ func UpdateUser(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 		updated, _ := store.GetUser(id)
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "update",
+			TargetType:    "User",
+			TargetID:      id,
+			ActorUsername: actorStr,
+			Description:   "Updated user: " + existing.Username,
+		})
 		c.JSON(200, updated)
 	}
 }
@@ -1093,6 +1117,18 @@ func DeleteUser(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "delete",
+			TargetType:    "User",
+			TargetID:      id,
+			ActorUsername: actorStr,
+			Description:   "Deleted user: " + existing.Username,
+		})
 		c.JSON(204, nil)
 	}
 }
@@ -1136,6 +1172,18 @@ func CreateAuthGroup(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "AuthGroup",
+			TargetID:      created.ID,
+			ActorUsername: actorStr,
+			Description:   "Created AuthGroup: " + created.Name,
+		})
 		c.JSON(201, created)
 	}
 }
@@ -1186,6 +1234,18 @@ func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "update",
+			TargetType:    "AuthGroup",
+			TargetID:      id,
+			ActorUsername: actorStr,
+			Description:   "Updated AuthGroup: " + existing.Name,
+		})
 		c.JSON(200, updated)
 	}
 }
@@ -1202,6 +1262,18 @@ func DeleteAuthGroup(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "delete",
+			TargetType:    "AuthGroup",
+			TargetID:      id,
+			ActorUsername: actorStr,
+			Description:   "Deleted AuthGroup: " + existing.Name,
+		})
 		c.JSON(204, nil)
 	}
 }
@@ -1226,8 +1298,7 @@ func ListResources(store *storage.Store) gin.HandlerFunc {
 
 func ListAuditLogs(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		_, size := paginate(c)
-		_, offset := paginate(c)
+		size, offset := paginate(c)
 		logs, err := store.ListAuditLogs(size, offset)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
@@ -1373,6 +1444,101 @@ type UpdateAPIKeyReq struct {
 	ReviewedBy    string `json:"reviewed_by,omitempty"`
 }
 
+// ApproveAPIKey approves an API key request and returns the generated key
+func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		reviewer, _ := c.Get("username")
+		reviewerStr := ""
+		if reviewer != nil {
+			reviewerStr = reviewer.(string)
+		}
+		existing, err := store.GetAPIKeyRequest(id)
+		if err != nil || existing == nil {
+			c.JSON(404, gin.H{"message": "API key request not found"})
+			return
+		}
+		existing.Status = "approved"
+		existing.ReviewedBy = reviewerStr
+		updated, err := store.UpdateAPIKeyRequest(id, existing)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		// Write audit log
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:    "update",
+			TargetType:   "APIKeyRequest",
+			TargetID:     id,
+			ActorUsername: reviewerStr,
+			Description:  "Approved API key request: " + existing.KeyName,
+		})
+		c.JSON(200, updated)
+	}
+}
+
+// RejectAPIKey rejects an API key request
+func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		reviewer, _ := c.Get("username")
+		reviewerStr := ""
+		if reviewer != nil {
+			reviewerStr = reviewer.(string)
+		}
+		existing, err := store.GetAPIKeyRequest(id)
+		if err != nil || existing == nil {
+			c.JSON(404, gin.H{"message": "API key request not found"})
+			return
+		}
+		existing.Status = "rejected"
+		existing.ReviewedBy = reviewerStr
+		updated, err := store.UpdateAPIKeyRequest(id, existing)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		// Write audit log
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:    "update",
+			TargetType:   "APIKeyRequest",
+			TargetID:     id,
+			ActorUsername: reviewerStr,
+			Description:  "Rejected API key request: " + existing.KeyName,
+		})
+		c.JSON(200, updated)
+	}
+}
+
+// ListMyAPIKeyRequests returns API key requests for the current user
+func ListMyAPIKeyRequests(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		username, _ := c.Get("username")
+		usernameStr := ""
+		if username != nil {
+			usernameStr = username.(string)
+		}
+		allReqs, err := store.ListAPIKeyRequests()
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		// Filter to requests by this user
+		var mine []storage.APIKeyRequest
+		for _, r := range allReqs {
+			if r.ApplicantUserID == userIDStr || r.ApplicantUsername == usernameStr {
+				mine = append(mine, r)
+			}
+		}
+		c.JSON(200, mine)
+	}
+}
+
 func ListAPIKeyRequests(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqs, err := store.ListAPIKeyRequests()
@@ -1402,6 +1568,18 @@ func CreateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "APIKeyRequest",
+			TargetID:      created.ID,
+			ActorUsername: actorStr,
+			Description:   "Created API key request: " + created.KeyName,
+		})
 		c.JSON(201, created)
 	}
 }
@@ -1463,6 +1641,18 @@ func DeleteAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "delete",
+			TargetType:    "APIKeyRequest",
+			TargetID:      id,
+			ActorUsername: actorStr,
+			Description:   "Deleted API key request: " + existing.KeyName,
+		})
 		c.JSON(204, nil)
 	}
 }
