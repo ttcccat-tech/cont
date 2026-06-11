@@ -11,6 +11,13 @@
   - 後端：GET /users/:id/workspaces（已存在），需驗證前端能正確呼叫並顯示
   - 或改進 WorkspaceDetail 的成員列表：支援搜尋/篩選、新增多個成員、批次更新角色
 
+- [x] **使用者管理精細化（RBAC 增強）** — commit `673fc680`
+  - kong.ts: 新增 `getUserWorkspaces()` 對應 GET /workspaces/users/:userId
+  - Users.tsx: 新增「指派工作區」按鈕 + Drawer（Checkbox + 角色選擇 viewer/editor/admin）
+  - store.go: `ListUserWorkspaces` 回傳 `[]WorkspaceUserAssignment`（含 role 欄位），Scan w.id→UserID, w.name→Username
+  - routes.go: 修正 `workspaces[0].ID` → `workspaces[0].UserID`
+  - QA: PUT → 200 ✅, GET → 200 ✅ (含 role), DELETE → 204 ✅
+
 - [ ] **Proxy Lua Plugin 鏈完善化** — 目前的 OpenResty Lua 插件鏈（access/header_filter/body_filter/log）還沒有實際的 auth / rate-limit 邏輯
   - access.lua：實作 JWT 驗證、API Key 驗證、BasicAuth 驗證、rate-limit 邏輯
   - header_filter.lua：實作 response header 操作（CORS、rate-limit headers）
