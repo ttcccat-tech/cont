@@ -11,12 +11,14 @@
   - 後端：GET /users/:id/workspaces（已存在），需驗證前端能正確呼叫並顯示
   - 或改進 WorkspaceDetail 的成員列表：支援搜尋/篩選、新增多個成員、批次更新角色
 
-- [x] **使用者管理精細化（RBAC 增強）** — commit `673fc680`
+- [x] **使用者管理精細化（RBAC 增強）** — commit `673fc680` + `a3a6bd82`
   - kong.ts: 新增 `getUserWorkspaces()` 對應 GET /workspaces/users/:userId
   - Users.tsx: 新增「指派工作區」按鈕 + Drawer（Checkbox + 角色選擇 viewer/editor/admin）
-  - store.go: `ListUserWorkspaces` 回傳 `[]WorkspaceUserAssignment`（含 role 欄位），Scan w.id→UserID, w.name→Username
+  - store.go: `ListUserWorkspaces` 回傳 `[]WorkspaceUserAssignment`（含 role 欄位）
   - routes.go: 修正 `workspaces[0].ID` → `workspaces[0].UserID`
   - QA: PUT → 200 ✅, GET → 200 ✅ (含 role), DELETE → 204 ✅
+  - Bug fix `a3a6bd82`: store.go Scan w.id→WorkspaceID (not UserID), models.go 新增 WorkspaceID 欄位，kong.ts WorkspaceUserAssignment 新增 workspace_id 欄位，Users.tsx openWsDrawer 直接使用 workspace_id
+  - API 驗證：GET /workspaces/users/:userId → workspace_id ✅, user_id ✅, role ✅, DELETE → 204 ✅
 
 - [x] **Proxy Lua Plugin 鏈完善化** — commit `270ea8b1` + `fb15630c`
   - access.lua: JWT validation (validate_jwt), consumer auth (key-auth/basic-auth/hmac-auth via /internal/validate-cred), OPTIONS preflight, route matching, load balancing (roundrobin/leastconn/weighted-ip-hash)
