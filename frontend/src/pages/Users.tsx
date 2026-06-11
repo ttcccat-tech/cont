@@ -82,7 +82,7 @@ export default function Users() {
 
   const handleDelete = async (id: string, username: string) => {
     try {
-      await userClient.delete(`/api/users/${id}`)
+      await deleteUser(id)
       message.success('刪除成功')
       fetchUsers()
     } catch (e: any) {
