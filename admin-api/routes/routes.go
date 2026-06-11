@@ -96,11 +96,7 @@ func parseIntFmt(s string, v *int) (int, error) {
 }
 
 // getOrgID extracts org_id from the request context.
-// Admin role bypasses org_id filtering (returns "" to see all orgs).
 func getOrgID(c *gin.Context) string {
-	if role, _ := c.Get("role"); role == "admin" {
-		return ""
-	}
 	if orgID, ok := c.Get("org_id"); ok {
 		if s, ok := orgID.(string); ok {
 			return s
@@ -379,7 +375,8 @@ func DeleteRoute(store *storage.Store) gin.HandlerFunc {
 func ListUpstreams(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		size, offset := paginate(c)
-		rows, err := store.ListUpstreams(size, offset)
+		orgID := getOrgID(c)
+		rows, err := store.ListUpstreams(orgID, size, offset)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
@@ -395,6 +392,10 @@ func CreateUpstream(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
+		orgID := getOrgID(c)
+		if orgID != "" {
+			u.OrgID = orgID
+		}
 		result, err := store.CreateUpstream(&u)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
@@ -406,7 +407,8 @@ badRequest(c, err)
 
 func GetUpstream(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		u, err := store.GetUpstream(c.Param("id"))
+		orgID := getOrgID(c)
+		u, err := store.GetUpstream(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "upstream not found"})
 			return
@@ -426,7 +428,8 @@ func UpdateUpstream(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
-		result, err := store.UpdateUpstream(c.Param("id"), &u)
+		orgID := getOrgID(c)
+		result, err := store.UpdateUpstream(c.Param("id"), orgID, &u)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "upstream not found"})
 			return
@@ -441,7 +444,8 @@ badRequest(c, err)
 
 func DeleteUpstream(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := store.DeleteUpstream(c.Param("id")); err != nil {
+		orgID := getOrgID(c)
+		if err := store.DeleteUpstream(c.Param("id"), orgID); err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
@@ -452,7 +456,8 @@ func DeleteUpstream(store *storage.Store) gin.HandlerFunc {
 func GetUpstreamHealth(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		upstreamID := c.Param("id")
-		upstream, err := store.GetUpstream(upstreamID)
+		orgID := getOrgID(c)
+		upstream, err := store.GetUpstream(upstreamID, orgID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "upstream not found"})
 			return
@@ -508,7 +513,7 @@ func GetUpstreamHealth(store *storage.Store) gin.HandlerFunc {
 			"upstream_name": upstream.Name,
 			"algorithm":     upstream.Algorithm,
 			"enabled":       upstream.Enabled,
-			"targets":        targetHealths,
+			"targets":       targetHealths,
 		})
 	}
 }
@@ -534,6 +539,11 @@ badRequest(c, err)
 			return
 		}
 		t.UpstreamID = c.Param("id")
+		// Inherit org_id from upstream for data consistency
+		orgID := getOrgID(c)
+		if orgID != "" {
+			t.OrgID = orgID
+		}
 		result, err := store.CreateTarget(&t)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
@@ -550,7 +560,8 @@ func UpdateTarget(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
-		result, err := store.UpdateTarget(c.Param("id"), c.Param("target_id"), &t)
+		orgID := getOrgID(c)
+		result, err := store.UpdateTarget(c.Param("id"), c.Param("target_id"), orgID, &t)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
@@ -561,7 +572,8 @@ badRequest(c, err)
 
 func DeleteTarget(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := store.DeleteTarget(c.Param("id"), c.Param("target_id")); err != nil {
+		orgID := getOrgID(c)
+		if err := store.DeleteTarget(c.Param("id"), c.Param("target_id"), orgID); err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
@@ -574,7 +586,8 @@ func DeleteTarget(store *storage.Store) gin.HandlerFunc {
 func ListConsumers(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		size, offset := paginate(c)
-		rows, err := store.ListConsumers(size, offset)
+		orgID := getOrgID(c)
+		rows, err := store.ListConsumers(orgID, size, offset)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
@@ -590,6 +603,10 @@ func CreateConsumer(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
+		orgID := getOrgID(c)
+		if orgID != "" {
+			con.OrgID = orgID
+		}
 		result, err := store.CreateConsumer(&con)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
@@ -601,7 +618,8 @@ badRequest(c, err)
 
 func GetConsumer(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		con, err := store.GetConsumer(c.Param("id"))
+		orgID := getOrgID(c)
+		con, err := store.GetConsumer(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "consumer not found"})
 			return
@@ -621,7 +639,8 @@ func UpdateConsumer(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
-		result, err := store.UpdateConsumer(c.Param("id"), &con)
+		orgID := getOrgID(c)
+		result, err := store.UpdateConsumer(c.Param("id"), orgID, &con)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "consumer not found"})
 			return
@@ -636,7 +655,8 @@ badRequest(c, err)
 
 func DeleteConsumer(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := store.DeleteConsumer(c.Param("id")); err != nil {
+		orgID := getOrgID(c)
+		if err := store.DeleteConsumer(c.Param("id"), orgID); err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
@@ -648,9 +668,10 @@ func DeleteConsumer(store *storage.Store) gin.HandlerFunc {
 
 func ListCredentials(store *storage.Store, credentialType string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		orgID := getOrgID(c)
 		consumerID := c.Param("id")
 		// Verify consumer exists
-		if _, err := store.GetConsumer(consumerID); err != nil {
+		if _, err := store.GetConsumer(consumerID, orgID); err != nil {
 			if err == sql.ErrNoRows {
 				c.JSON(404, gin.H{"message": "consumer not found"})
 				return
@@ -674,9 +695,10 @@ func ListCredentials(store *storage.Store, credentialType string) gin.HandlerFun
 
 func CreateCredential(store *storage.Store, credentialType string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		orgID := getOrgID(c)
 		consumerID := c.Param("id")
 		// Verify consumer exists
-		if _, err := store.GetConsumer(consumerID); err != nil {
+		if _, err := store.GetConsumer(consumerID, orgID); err != nil {
 			if err == sql.ErrNoRows {
 				c.JSON(404, gin.H{"message": "consumer not found"})
 				return
@@ -794,7 +816,8 @@ func ValidateJWT(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 func ListPlugins(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		size, offset := paginate(c)
-		rows, err := store.ListPlugins(size, offset)
+		orgID := getOrgID(c)
+		rows, err := store.ListPlugins(orgID, size, offset)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
@@ -810,6 +833,10 @@ func CreatePlugin(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
+		orgID := getOrgID(c)
+		if orgID != "" {
+			p.OrgID = orgID
+		}
 		result, err := store.CreatePlugin(&p)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
@@ -821,7 +848,8 @@ badRequest(c, err)
 
 func GetPlugin(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		p, err := store.GetPlugin(c.Param("id"))
+		orgID := getOrgID(c)
+		p, err := store.GetPlugin(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "plugin not found"})
 			return
@@ -841,7 +869,8 @@ func UpdatePlugin(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
-		result, err := store.UpdatePlugin(c.Param("id"), &p)
+		orgID := getOrgID(c)
+		result, err := store.UpdatePlugin(c.Param("id"), orgID, &p)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "plugin not found"})
 			return
@@ -856,7 +885,8 @@ badRequest(c, err)
 
 func DeletePlugin(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := store.DeletePlugin(c.Param("id")); err != nil {
+		orgID := getOrgID(c)
+		if err := store.DeletePlugin(c.Param("id"), orgID); err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
@@ -1205,11 +1235,12 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 
 		// Generate JWT
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"sub":      user.ID,
+			"sub":     user.ID,
 			"username": user.Username,
-			"role":     user.Role,
-			"exp":      time.Now().Add(24 * time.Hour).Unix(),
-			"iat":      time.Now().Unix(),
+			"role":    user.Role,
+			"org_id":  user.OrgID,
+			"exp":     time.Now().Add(24 * time.Hour).Unix(),
+			"iat":     time.Now().Unix(),
 		})
 		tokenStr, err := token.SignedString([]byte(jwtSecret))
 		if err != nil {
@@ -2195,7 +2226,7 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 			consumerName = existing.KeyName + "-consumer"
 		}
 		var consumerID string
-		consumers, _ := store.ListConsumers(100, 0)
+		consumers, _ := store.ListConsumers("", 100, 0)
 		for _, con := range consumers {
 			if con.Username == consumerName {
 				consumerID = con.ID

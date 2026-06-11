@@ -316,11 +316,14 @@ func (s *Store) DeleteRoute(id, orgID string) error {
 
 // ── Upstreams ──────────────────────────────────────────────────────────────
 
-func (s *Store) ListUpstreams(limit, offset int) ([]Upstream, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListUpstreams(orgID string, limit, offset int) ([]Upstream, error) {
+	query := `
 		SELECT id, name, algorithm, slots, healthchecks, enabled,
-		       created_at, updated_at
-		FROM upstreams ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM upstreams
+		WHERE ($1 = '' OR org_id = $1)
+		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -333,43 +336,45 @@ func (s *Store) ListUpstreams(limit, offset int) ([]Upstream, error) {
 		var enabled sql.NullBool
 		var created, updated sql.NullString
 		if err := rows.Scan(&u.ID, &name, &algorithm, &slots,
-			&healthchecks, &enabled, &created, &updated); err != nil {
+			&healthchecks, &enabled, &u.OrgID, &created, &updated); err != nil {
 			return nil, err
 		}
 		u.Name = name.String
 		u.Algorithm = orString(algorithm.String, "roundrobin")
-		if slots.Valid {
-			u.Slots = int(slots.Int64)
-		}
+		if slots.Valid { u.Slots = int(slots.Int64) }
 		u.Healthchecks = healthchecks.String
-		if enabled.Valid {
-			u.Enabled = enabled.Bool
-		}
-		if created.Valid {
-			u.CreatedAt = created.String
-		}
-		if updated.Valid {
-			u.UpdatedAt = updated.String
-		}
+		if enabled.Valid { u.Enabled = enabled.Bool }
+		if created.Valid { u.CreatedAt = created.String }
+		if updated.Valid { u.UpdatedAt = updated.String }
 		out = append(out, u)
 	}
 	return out, nil
 }
 
 func (s *Store) CreateUpstream(u *Upstream) (*Upstream, error) {
+	orgID := u.OrgID
+	var orgIDArg interface{}
+	if orgID != "" {
+		orgIDArg = orgID
+	} else {
+		orgIDArg = nil
+	}
 	err := s.db.QueryRow(`
-		INSERT INTO upstreams (name, algorithm, slots, healthchecks, enabled)
-		VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at, updated_at`,
+		INSERT INTO upstreams (name, algorithm, slots, healthchecks, enabled, org_id)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at, updated_at`,
 		u.Name, orString(u.Algorithm, "roundrobin"), orInt(u.Slots, 10000),
-		u.Healthchecks, orBool(u.Enabled, true),
+		u.Healthchecks, orBool(u.Enabled, true), orgIDArg,
 	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	if orgID != "" {
+		u.OrgID = orgID
+	}
 	return u, nil
 }
 
-func (s *Store) GetUpstream(id string) (*Upstream, error) {
+func (s *Store) GetUpstream(id, orgID string) (*Upstream, error) {
 	var u Upstream
 	var name, algorithm, healthchecks sql.NullString
 	var slots sql.NullInt64
@@ -377,35 +382,28 @@ func (s *Store) GetUpstream(id string) (*Upstream, error) {
 	var created, updated sql.NullString
 	err := s.db.QueryRow(`
 		SELECT id, name, algorithm, slots, healthchecks, enabled,
-		       created_at, updated_at
-		FROM upstreams WHERE id=$1`, id).Scan(
-		&u.ID, &name, &algorithm, &slots, &healthchecks, &enabled, &created, &updated)
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM upstreams WHERE id=$1 AND ($2 = '' OR org_id = $2)`,
+		id, orgID).Scan(
+		&u.ID, &name, &algorithm, &slots, &healthchecks, &enabled, &u.OrgID, &created, &updated)
 	if err != nil {
 		return nil, err
 	}
 	u.Name = name.String
 	u.Algorithm = algorithm.String
-	if slots.Valid {
-		u.Slots = int(slots.Int64)
-	}
+	if slots.Valid { u.Slots = int(slots.Int64) }
 	u.Healthchecks = healthchecks.String
-	if enabled.Valid {
-		u.Enabled = enabled.Bool
-	}
-	if created.Valid {
-		u.CreatedAt = created.String
-	}
-	if updated.Valid {
-		u.UpdatedAt = updated.String
-	}
+	if enabled.Valid { u.Enabled = enabled.Bool }
+	if created.Valid { u.CreatedAt = created.String }
+	if updated.Valid { u.UpdatedAt = updated.String }
 	return &u, nil
 }
 
-func (s *Store) UpdateUpstream(id string, u *Upstream) (*Upstream, error) {
+func (s *Store) UpdateUpstream(id, orgID string, u *Upstream) (*Upstream, error) {
 	err := s.db.QueryRow(`
 		UPDATE upstreams SET name=$2, algorithm=$3, slots=$4,
 			healthchecks=$5, enabled=$6, updated_at=NOW()
-		WHERE id=$1 RETURNING updated_at`,
+		WHERE id=$1 AND ($2 = '' OR org_id = $2) RETURNING updated_at`,
 		id, u.Name, orString(u.Algorithm, "roundrobin"),
 		orInt(u.Slots, 10000), u.Healthchecks, orBool(u.Enabled, true),
 	).Scan(&u.UpdatedAt)
@@ -416,8 +414,8 @@ func (s *Store) UpdateUpstream(id string, u *Upstream) (*Upstream, error) {
 	return u, nil
 }
 
-func (s *Store) DeleteUpstream(id string) error {
-	_, err := s.db.Exec("DELETE FROM upstreams WHERE id=$1", id)
+func (s *Store) DeleteUpstream(id, orgID string) error {
+	_, err := s.db.Exec("DELETE FROM upstreams WHERE id=$1 AND ($2 = '' OR org_id = $2)", id, orgID)
 	return err
 }
 
@@ -425,7 +423,8 @@ func (s *Store) DeleteUpstream(id string) error {
 
 func (s *Store) ListTargetsByUpstream(upstreamID string) ([]Target, error) {
 	rows, err := s.db.Query(`
-		SELECT id, target, weight, enabled, created_at
+		SELECT id, target, weight, enabled,
+		       COALESCE(org_id, '') as org_id, created_at
 		FROM targets WHERE upstream_id=$1 ORDER BY created_at`, upstreamID)
 	if err != nil {
 		return nil, err
@@ -438,42 +437,46 @@ func (s *Store) ListTargetsByUpstream(upstreamID string) ([]Target, error) {
 		var weight sql.NullInt64
 		var enabled sql.NullBool
 		var created sql.NullString
-		if err := rows.Scan(&t.ID, &target, &weight, &enabled, &created); err != nil {
+		if err := rows.Scan(&t.ID, &target, &weight, &enabled, &t.OrgID, &created); err != nil {
 			return nil, err
 		}
 		t.UpstreamID = upstreamID
 		t.Target = target.String
-		if weight.Valid {
-			t.Weight = int(weight.Int64)
-		}
-		if enabled.Valid {
-			t.Enabled = enabled.Bool
-		}
-		if created.Valid {
-			t.CreatedAt = created.String
-		}
+		if weight.Valid { t.Weight = int(weight.Int64) }
+		if enabled.Valid { t.Enabled = enabled.Bool }
+		if created.Valid { t.CreatedAt = created.String }
 		out = append(out, t)
 	}
 	return out, nil
 }
 
 func (s *Store) CreateTarget(t *Target) (*Target, error) {
+	orgID := t.OrgID
+	var orgIDArg interface{}
+	if orgID != "" {
+		orgIDArg = orgID
+	} else {
+		orgIDArg = nil
+	}
 	err := s.db.QueryRow(`
-		INSERT INTO targets (upstream_id, target, weight, enabled)
-		VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
-		t.UpstreamID, t.Target, orInt(t.Weight, 100), orBool(t.Enabled, true),
+		INSERT INTO targets (upstream_id, target, weight, enabled, org_id)
+		VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at`,
+		t.UpstreamID, t.Target, orInt(t.Weight, 100), orBool(t.Enabled, true), orgIDArg,
 	).Scan(&t.ID, &t.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
+	if orgID != "" {
+		t.OrgID = orgID
+	}
 	return t, nil
 }
 
-func (s *Store) UpdateTarget(upstreamID, targetID string, t *Target) (*Target, error) {
+func (s *Store) UpdateTarget(upstreamID, targetID, orgID string, t *Target) (*Target, error) {
 	err := s.db.QueryRow(`
 		UPDATE targets SET target=$2, weight=$3, enabled=$4
-		WHERE id=$1 AND upstream_id=$5 RETURNING id`,
-		targetID, t.Target, orInt(t.Weight, 100), orBool(t.Enabled, true), upstreamID,
+		WHERE id=$1 AND upstream_id=$5 AND ($6 = '' OR org_id = $6) RETURNING id`,
+		targetID, t.Target, orInt(t.Weight, 100), orBool(t.Enabled, true), upstreamID, orgID,
 	).Scan(&t.ID)
 	if err != nil {
 		return nil, err
@@ -482,17 +485,21 @@ func (s *Store) UpdateTarget(upstreamID, targetID string, t *Target) (*Target, e
 	return t, nil
 }
 
-func (s *Store) DeleteTarget(upstreamID, targetID string) error {
-	_, err := s.db.Exec("DELETE FROM targets WHERE id=$1 AND upstream_id=$2", targetID, upstreamID)
+func (s *Store) DeleteTarget(upstreamID, targetID, orgID string) error {
+	_, err := s.db.Exec("DELETE FROM targets WHERE id=$1 AND upstream_id=$2 AND ($3 = '' OR org_id = $3)", targetID, upstreamID, orgID)
 	return err
 }
 
 // ── Consumers ───────────────────────────────────────────────────────────────
 
-func (s *Store) ListConsumers(limit, offset int) ([]Consumer, error) {
-	rows, err := s.db.Query(`
-		SELECT id, username, custom_id, enabled, created_at, updated_at
-		FROM consumers ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+func (s *Store) ListConsumers(orgID string, limit, offset int) ([]Consumer, error) {
+	query := `
+		SELECT id, username, custom_id, enabled,
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM consumers
+		WHERE ($1 = '' OR org_id = $1)
+		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -503,67 +510,67 @@ func (s *Store) ListConsumers(limit, offset int) ([]Consumer, error) {
 		var username, customID sql.NullString
 		var enabled sql.NullBool
 		var created, updated sql.NullString
-		if err := rows.Scan(&c.ID, &username, &customID, &enabled, &created, &updated); err != nil {
+		if err := rows.Scan(&c.ID, &username, &customID, &enabled, &c.OrgID, &created, &updated); err != nil {
 			return nil, err
 		}
 		c.Username = username.String
 		c.CustomID = customID.String
-		if enabled.Valid {
-			c.Enabled = enabled.Bool
-		}
-		if created.Valid {
-			c.CreatedAt = created.String
-		}
-		if updated.Valid {
-			c.UpdatedAt = updated.String
-		}
+		if enabled.Valid { c.Enabled = enabled.Bool }
+		if created.Valid { c.CreatedAt = created.String }
+		if updated.Valid { c.UpdatedAt = updated.String }
 		out = append(out, c)
 	}
 	return out, nil
 }
 
 func (s *Store) CreateConsumer(c *Consumer) (*Consumer, error) {
+	orgID := c.OrgID
+	var orgIDArg interface{}
+	if orgID != "" {
+		orgIDArg = orgID
+	} else {
+		orgIDArg = nil
+	}
 	err := s.db.QueryRow(`
-		INSERT INTO consumers (username, custom_id, enabled)
-		VALUES ($1,$2,$3) RETURNING id, created_at, updated_at`,
-		c.Username, c.CustomID, orBool(c.Enabled, true),
+		INSERT INTO consumers (username, custom_id, enabled, org_id)
+		VALUES ($1,$2,$3,$4) RETURNING id, created_at, updated_at`,
+		c.Username, c.CustomID, orBool(c.Enabled, true), orgIDArg,
 	).Scan(&c.ID, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	if orgID != "" {
+		c.OrgID = orgID
+	}
 	return c, nil
 }
 
-func (s *Store) GetConsumer(id string) (*Consumer, error) {
+func (s *Store) GetConsumer(id, orgID string) (*Consumer, error) {
 	var c Consumer
 	var username, customID sql.NullString
 	var enabled sql.NullBool
 	var created, updated sql.NullString
 	err := s.db.QueryRow(`
-		SELECT id, username, custom_id, enabled, created_at, updated_at
-		FROM consumers WHERE id=$1`, id).Scan(
-		&c.ID, &username, &customID, &enabled, &created, &updated)
+		SELECT id, username, custom_id, enabled,
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM consumers WHERE id=$1 AND ($2 = '' OR org_id = $2)`,
+		id, orgID).Scan(
+		&c.ID, &username, &customID, &enabled, &c.OrgID, &created, &updated)
 	if err != nil {
 		return nil, err
 	}
 	c.Username = username.String
 	c.CustomID = customID.String
-	if enabled.Valid {
-		c.Enabled = enabled.Bool
-	}
-	if created.Valid {
-		c.CreatedAt = created.String
-	}
-	if updated.Valid {
-		c.UpdatedAt = updated.String
-	}
+	if enabled.Valid { c.Enabled = enabled.Bool }
+	if created.Valid { c.CreatedAt = created.String }
+	if updated.Valid { c.UpdatedAt = updated.String }
 	return &c, nil
 }
 
-func (s *Store) UpdateConsumer(id string, c *Consumer) (*Consumer, error) {
+func (s *Store) UpdateConsumer(id, orgID string, c *Consumer) (*Consumer, error) {
 	err := s.db.QueryRow(`
 		UPDATE consumers SET username=$2, custom_id=$3, enabled=$4, updated_at=NOW()
-		WHERE id=$1 RETURNING updated_at`,
+		WHERE id=$1 AND ($2 = '' OR org_id = $2) RETURNING updated_at`,
 		id, c.Username, c.CustomID, orBool(c.Enabled, true),
 	).Scan(&c.UpdatedAt)
 	if err != nil {
@@ -573,8 +580,8 @@ func (s *Store) UpdateConsumer(id string, c *Consumer) (*Consumer, error) {
 	return c, nil
 }
 
-func (s *Store) DeleteConsumer(id string) error {
-	_, err := s.db.Exec("DELETE FROM consumers WHERE id=$1", id)
+func (s *Store) DeleteConsumer(id, orgID string) error {
+	_, err := s.db.Exec("DELETE FROM consumers WHERE id=$1 AND ($2 = '' OR org_id = $2)", id, orgID)
 	return err
 }
 
@@ -666,11 +673,14 @@ func (s *Store) DeleteConsumerCredential(consumerID, credentialType, credentialI
 
 // ── Plugins ────────────────────────────────────────────────────────────────
 
-func (s *Store) ListPlugins(limit, offset int) ([]Plugin, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListPlugins(orgID string, limit, offset int) ([]Plugin, error) {
+	query := `
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
-		       created_at, updated_at
-		FROM plugins ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM plugins
+		WHERE ($1 = '' OR org_id = $1)
+		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -684,7 +694,7 @@ func (s *Store) ListPlugins(limit, offset int) ([]Plugin, error) {
 		var enabled sql.NullBool
 		var created, updated sql.NullString
 		if err := rows.Scan(&p.ID, &name, &routeID, &serviceID, &consumerID,
-			&config, &enabled, &created, &updated); err != nil {
+			&config, &enabled, &p.OrgID, &created, &updated); err != nil {
 			return nil, err
 		}
 		p.Name = name.String
@@ -715,29 +725,33 @@ func (s *Store) ListPlugins(limit, offset int) ([]Plugin, error) {
 }
 
 func (s *Store) CreatePlugin(p *Plugin) (*Plugin, error) {
+	orgID := p.OrgID
+	var orgIDArg interface{}
+	if orgID != "" {
+		orgIDArg = orgID
+	} else {
+		orgIDArg = nil
+	}
 	configJSON, _ := json.Marshal(p.Config)
 	var routeID, serviceID, consumerID *string
-	if p.Route != nil {
-		routeID = &p.Route.ID
-	}
-	if p.Service != nil {
-		serviceID = &p.Service.ID
-	}
-	if p.Consumer != nil {
-		consumerID = &p.Consumer.ID
-	}
+	if p.Route != nil { routeID = &p.Route.ID }
+	if p.Service != nil { serviceID = &p.Service.ID }
+	if p.Consumer != nil { consumerID = &p.Consumer.ID }
 	err := s.db.QueryRow(`
-		INSERT INTO plugins (name, route_id, service_id, consumer_id, config, enabled)
-		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at, updated_at`,
-		p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true),
+		INSERT INTO plugins (name, route_id, service_id, consumer_id, config, enabled, org_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at, updated_at`,
+		p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true), orgIDArg,
 	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	if orgID != "" {
+		p.OrgID = orgID
+	}
 	return p, nil
 }
 
-func (s *Store) GetPlugin(id string) (*Plugin, error) {
+func (s *Store) GetPlugin(id, orgID string) (*Plugin, error) {
 	var p Plugin
 	var name sql.NullString
 	var routeID, serviceID, consumerID sql.NullString
@@ -746,9 +760,11 @@ func (s *Store) GetPlugin(id string) (*Plugin, error) {
 	var created, updated sql.NullString
 	err := s.db.QueryRow(`
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
-		       created_at, updated_at FROM plugins WHERE id=$1`, id).Scan(
+		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		FROM plugins WHERE id=$1 AND ($2 = '' OR org_id = $2)`,
+		id, orgID).Scan(
 		&p.ID, &name, &routeID, &serviceID, &consumerID,
-		&config, &enabled, &created, &updated)
+		&config, &enabled, &p.OrgID, &created, &updated)
 	if err != nil {
 		return nil, err
 	}
@@ -777,23 +793,17 @@ func (s *Store) GetPlugin(id string) (*Plugin, error) {
 	return &p, nil
 }
 
-func (s *Store) UpdatePlugin(id string, p *Plugin) (*Plugin, error) {
+func (s *Store) UpdatePlugin(id, orgID string, p *Plugin) (*Plugin, error) {
 	configJSON, _ := json.Marshal(p.Config)
 	var routeID, serviceID, consumerID *string
-	if p.Route != nil {
-		routeID = &p.Route.ID
-	}
-	if p.Service != nil {
-		serviceID = &p.Service.ID
-	}
-	if p.Consumer != nil {
-		consumerID = &p.Consumer.ID
-	}
+	if p.Route != nil { routeID = &p.Route.ID }
+	if p.Service != nil { serviceID = &p.Service.ID }
+	if p.Consumer != nil { consumerID = &p.Consumer.ID }
 	err := s.db.QueryRow(`
 		UPDATE plugins SET name=$2, route_id=$3, service_id=$4, consumer_id=$5,
 			config=$6, enabled=$7, updated_at=NOW()
-		WHERE id=$1 RETURNING updated_at`,
-		id, p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true),
+		WHERE id=$1 AND ($8 = '' OR org_id = $8) RETURNING updated_at`,
+		id, p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true), orgID,
 	).Scan(&p.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -802,8 +812,8 @@ func (s *Store) UpdatePlugin(id string, p *Plugin) (*Plugin, error) {
 	return p, nil
 }
 
-func (s *Store) DeletePlugin(id string) error {
-	_, err := s.db.Exec("DELETE FROM plugins WHERE id=$1", id)
+func (s *Store) DeletePlugin(id, orgID string) error {
+	_, err := s.db.Exec("DELETE FROM plugins WHERE id=$1 AND ($2 = '' OR org_id = $2)", id, orgID)
 	return err
 }
 
