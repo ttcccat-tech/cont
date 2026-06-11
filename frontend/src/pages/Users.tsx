@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Select, Drawer, Checkbox, List, Divider, Alert } from 'antd'
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, GroupOutlined, WorkspaceOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, GroupOutlined, TeamOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { Workspace, listWorkspaces, getUsers, createUser, updateUser, deleteUser, getGroups, getGroupMembers, setGroupMembers, getUserWorkspaces, setWorkspaceUser, removeWorkspaceUser, AuthGroup } from '../api/kong'
 
@@ -271,7 +271,7 @@ export default function Users() {
       width: 220,
       render: (_, r) => (
         <Space>
-          <Button size="small" icon={<WorkspaceOutlined />} onClick={() => openWsDrawer(r)}>指派工作區</Button>
+          <Button size="small" icon={<TeamOutlined />} onClick={() => openWsDrawer(r)}>指派工作區</Button>
           <Button size="small" icon={<GroupOutlined />} onClick={() => openGroupDrawer(r)}>指派群組</Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openModal(r)}>編輯</Button>
           <Popconfirm title={`確認刪除使用者「${r.username}」？`} onConfirm={() => r.id && handleDelete(r.id, r.username)}>
@@ -401,7 +401,7 @@ export default function Users() {
 
       {/* Workspace Assignment Drawer */}
       <Drawer
-        title={<Space><WorkspaceOutlined /> 指派工作區：<Tag color="blue">{wsAssigningUser?.username}</Tag></Space>}
+        title={<Space><TeamOutlined /> 指派工作區：<Tag color="blue">{wsAssigningUser?.username}</Tag></Space>}
         open={wsDrawerOpen}
         onClose={() => setWsDrawerOpen(false)}
         width={480}

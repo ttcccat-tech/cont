@@ -1,29 +1,24 @@
 import { useEffect, useState } from 'react'
-import { Card, Row, Col, Statistic, Button, Space, Tag, Tooltip, Badge, Table, Modal, Form, Input, message, Spin, Typography } from 'antd'
-import { ReloadOutlined, SafetyCertificateOutlined, EditOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons'
+import { Card, Row, Col, Statistic, Button, Space, Tag, Tooltip, Badge, Table, Modal, Form, Input, message, Spin, Typography, Select, Alert } from 'antd'
+import { ReloadOutlined, SafetyCertificateOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import SwaggerUI from 'swagger-ui-react'
-import 'swagger-ui-react/swagger-ui.css'
 import api from '../api/kong'
+import type { KongUpstream, UpstreamHealth, TargetHealth } from '../api/kong'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
-interface ServiceHealth {
-  service_id: string
-  service_name: string
-  health_url: string | null
-  doc_url: string | null
-  status: 'healthy' | 'unhealthy' | 'unreachable' | 'unknown'
-  latency_ms: number
-  error_message: string | null
-  last_check_at: string | null
+interface UpstreamHealthData extends KongUpstream {
+  targets: TargetHealth[]
+  healthyCount: number
+  unhealthyCount: number
+  overallStatus: 'healthy' | 'unhealthy' | 'partial' | 'unknown'
 }
 
 const statusConfig = {
-  healthy: { color: '#52c41a', label: '健康', icon: '✔' },
-  unhealthy: { color: '#ff4d4f', label: '異常', icon: '✘' },
-  unreachable: { color: '#ff4d4f', label: '無法連線', icon: '✘' },
-  unknown: { color: '#8c8c8c', label: '未知', icon: '?' },
+  healthy: { color: '#52c41a', label: '健康', icon: <CheckCircleOutlined style={{ color: '#52c41a' }} /> },
+  unhealthy: { color: '#ff4d4f', label: '異常', icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} /> },
+  partial: { color: '#faad14', label: '部分異常', icon: <MinusCircleOutlined style={{ color: '#faad14' }} /> },
+  unknown: { color: '#8c8c8c', label: '未知', icon: <MinusCircleOutlined style={{ color: '#8c8c8c' }} /> },
 }
 
 async function apiGet(path: string) {
@@ -35,296 +30,358 @@ async function apiGet(path: string) {
   return res.json()
 }
 
-async function apiPost(path: string, body?: any) {
-  const token = localStorage.getItem('cont_token')
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
-}
-
-async function apiPut(path: string, body: any) {
-  const token = localStorage.getItem('cont_token')
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const cfg = statusConfig[status as keyof typeof statusConfig] || statusConfig.unknown
+function StatusBadge({ status }: { status: keyof typeof statusConfig }) {
+  const cfg = statusConfig[status] || statusConfig.unknown
   return (
-    <Badge
-      status={status === 'healthy' ? 'success' : status === 'unknown' ? 'default' : 'error'}
-      text={<span style={{ color: cfg.color, fontWeight: 600 }}>{cfg.label}</span>}
-    />
+    <Space size={4}>
+      {cfg.icon}
+      <span style={{ color: cfg.color, fontWeight: 600 }}>{cfg.label}</span>
+    </Space>
+  )
+}
+
+function HealthDot({ healthy }: { healthy: boolean }) {
+  return (
+    <div style={{
+      width: 10, height: 10, borderRadius: '50%',
+      background: healthy ? '#52c41a' : '#ff4d4f',
+      boxShadow: healthy ? '0 0 6px #52c41a' : 'none'
+    }} />
   )
 }
 
 export default function HealthPortal() {
-  const [services, setServices] = useState<ServiceHealth[]>([])
-  const [summary, setSummary] = useState<{ total: number, healthy: number, unhealthy: number, unreachable: number, unknown: number }>({ total: 0, healthy: 0, unhealthy: 0, unreachable: 0, unknown: 0 })
+  const [upstreams, setUpstreams] = useState<UpstreamHealthData[]>([])
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(false)
-  const [editModal, setEditModal] = useState(false)
-  const [editing, setEditing] = useState<ServiceHealth | null>(null)
-  const [docModal, setDocModal] = useState(false)
-  const [docUrl, setDocUrl] = useState<string>('')
+  const [detailModal, setDetailModal] = useState(false)
+  const [selectedUpstream, setSelectedUpstream] = useState<UpstreamHealthData | null>(null)
+  const [healthData, setHealthData] = useState<UpstreamHealth | null>(null)
+  const [healthLoading, setHealthLoading] = useState(false)
   const [form] = Form.useForm()
-  const [saving, setSaving] = useState(false)
 
-  const fetchHealth = () => {
+  const fetchUpstreams = () => {
     setLoading(true)
-    apiGet('/services')
+    apiGet('/upstreams')
       .then(data => {
-        const svcs = Array.isArray(data) ? data : (data?.data || [])
-        // Backend has no health tracking — show services with unknown status
-        const healthData: ServiceHealth[] = svcs.map((s: any) => ({
-          service_id: s.id,
-          service_name: s.name || s.id,
-          health_url: null,
-          doc_url: null,
-          status: 'unknown' as const,
-          latency_ms: 0,
-          error_message: null,
-          last_check_at: null,
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        const upstreamsWithHealth: UpstreamHealthData[] = list.map((u: KongUpstream) => ({
+          ...u,
+          targets: [],
+          healthyCount: 0,
+          unhealthyCount: 0,
+          overallStatus: 'unknown' as const,
         }))
-        setServices(healthData)
-        setSummary({ total: healthData.length, healthy: 0, unhealthy: 0, unreachable: 0, unknown: healthData.length })
+        setUpstreams(upstreamsWithHealth)
       })
       .catch(() => {
-        setServices([])
-        setSummary({ total: 0, healthy: 0, unhealthy: 0, unreachable: 0, unknown: 0 })
+        message.error('無法取得上游列表')
+        setUpstreams([])
       })
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchHealth() }, [])
-
-  const handleCheck = async () => {
-    // Backend has no /health/check endpoint — just refresh
-    message.info('健康檢查功能後端尚未實作，已刷新服務列表')
-    fetchHealth()
+  const fetchUpstreamHealth = (upstreamId: string) => {
+    setHealthLoading(true)
+    apiGet(`/upstreams/${upstreamId}/health`)
+      .then((data: UpstreamHealth) => {
+        setHealthData(data)
+      })
+      .catch(() => {
+        message.error('無法取得健康狀態')
+        setHealthData(null)
+      })
+      .finally(() => setHealthLoading(false))
   }
 
-  const openEdit = (svc: ServiceHealth) => {
-    setEditing(svc)
-    form.setFieldsValue({ health_url: svc.health_url, doc_url: svc.doc_url })
-    setEditModal(true)
+  useEffect(() => {
+    fetchUpstreams()
+  }, [])
+
+  const openDetail = async (upstream: UpstreamHealthData) => {
+    setSelectedUpstream(upstream)
+    setDetailModal(true)
+    fetchUpstreamHealth(upstream.id!)
   }
 
-  const openDocModal = (url: string) => {
-    setDocUrl(url)
-    setDocModal(true)
+  const handleRefresh = () => {
+    fetchUpstreams()
   }
 
-  const handleEditSave = async () => {
-    // Backend has no /health/services endpoint — just close modal
-    message.info('健康檢查設定後端尚未實作')
-    setEditModal(false)
+  const handleCheckAll = async () => {
+    setChecking(true)
+    try {
+      await Promise.all(upstreams.map(u => apiGet(`/upstreams/${u.id}/health`)))
+      message.success('已刷新所有上游健康狀態')
+      fetchUpstreams()
+    } catch {
+      message.error('部分上游健康檢查失敗')
+    } finally {
+      setChecking(false)
+    }
   }
 
-  const columns: ColumnsType<ServiceHealth> = [
+  const targetColumns: ColumnsType<TargetHealth> = [
+    {
+      title: '狀態',
+      key: 'healthy',
+      width: 80,
+      render: (_, t) => <HealthDot healthy={t.healthy} />
+    },
+    { title: 'Target', dataIndex: 'target', key: 'target', render: v => <code style={{ fontSize: 12 }}>{v}</code> },
+    { title: 'Host', dataIndex: 'host', key: 'host', render: v => <span style={{ color: '#555' }}>{v}</span> },
+    { title: 'Port', dataIndex: 'port', key: 'port', width: 70 },
+    { title: 'Weight', dataIndex: 'weight', key: 'weight', width: 70 },
+    {
+      title: 'Enabled',
+      dataIndex: 'enabled',
+      key: 'enabled',
+      width: 80,
+      render: v => v ? <Tag color="green">是</Tag> : <Tag color="red">否</Tag>
+    },
+    {
+      title: '健康狀態',
+      key: 'status',
+      width: 100,
+      render: (_, t) => t.healthy
+        ? <Tag color="success">健康</Tag>
+        : <Tag color="error">異常</Tag>
+    },
+  ]
+
+  const upstreamColumns: ColumnsType<UpstreamHealthData> = [
     {
       title: '狀態',
       key: 'status',
-      width: 100,
-      render: (_, r) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{
-            width: 12, height: 12, borderRadius: '50%',
-            background: statusConfig[r.status as keyof typeof statusConfig]?.color || '#8c8c8c',
-            boxShadow: r.status === 'healthy' ? `0 0 8px ${statusConfig.healthy.color}` : 'none'
-          }} />
-          <StatusBadge status={r.status} />
-        </div>
-      )
+      width: 120,
+      render: (_, u) => {
+        const healthy = u.healthyCount
+        const unhealthy = u.unhealthyCount
+        const total = healthy + unhealthy
+        if (total === 0) return <StatusBadge status="unknown" />
+        if (unhealthy === 0) return <StatusBadge status="healthy" />
+        if (healthy === 0) return <StatusBadge status="unhealthy" />
+        return <StatusBadge status="partial" />
+      }
     },
-    { title: '服務名稱', dataIndex: 'service_name', key: 'service_name', render: v => <Tag color="blue">{v}</Tag> },
+    { title: '名稱', dataIndex: 'name', key: 'name', render: v => <Tag color="blue">{v}</Tag> },
+    { title: '演算法', dataIndex: 'algorithm', key: 'algorithm', width: 120 },
     {
-      title: '健康檢查 URL',
-      dataIndex: 'health_url',
-      key: 'health_url',
-      ellipsis: true,
-      render: v => v ? <code style={{ fontSize: 11 }}>{v}</code> : <span style={{ color: '#8c8c8c' }}>未設定</span>
-    },
-    {
-      title: '延遲',
-      key: 'latency',
-      width: 100,
-      render: (_, r) => r.latency_ms > 0 ? <span style={{ color: r.latency_ms > 3000 ? '#ff4d4f' : r.latency_ms > 1000 ? '#faad14' : '#52c41a' }}>{r.latency_ms}ms</span> : '-'
-    },
-    {
-      title: '錯誤',
-      dataIndex: 'error_message',
-      key: 'error_message',
-      ellipsis: true,
-      render: v => v ? <Tooltip title={v}><span style={{ color: '#ff4d4f', fontSize: 12 }}>{v}</span></Tooltip> : '-'
+      title: 'Targets',
+      key: 'targets',
+      width: 120,
+      render: (_, u) => {
+        const healthy = u.healthyCount
+        const unhealthy = u.unhealthyCount
+        const total = healthy + unhealthy
+        if (total === 0) return <span style={{ color: '#8c8c8c' }}>無資料</span>
+        return (
+          <Space size={4}>
+            <span style={{ color: '#52c41a' }}>● {healthy}</span>
+            {unhealthy > 0 && <span style={{ color: '#ff4d4f' }}>● {unhealthy}</span>}
+            <span style={{ color: '#8c8c8c' }}>/ {total}</span>
+          </Space>
+        )
+      }
     },
     {
-      title: '文件',
-      key: 'doc',
-      width: 100,
-      render: (_, r) => r.doc_url ? (
-        <Space size={4}>
-          <Button size="small" icon={<FileTextOutlined />} onClick={() => openDocModal(r.doc_url!)}>Swagger</Button>
-          <a href={r.doc_url} target="_blank" rel="noopener noreferrer"><EyeOutlined /></a>
-        </Space>
-      ) : <span style={{ color: '#8c8c8c', fontSize: 12 }}>未設定</span>
-    },
-    {
-      title: '最後檢查',
-      key: 'last_check',
-      width: 160,
-      render: (_, r) => r.last_check_at ? new Date(r.last_check_at).toLocaleString() : '-'
+      title: 'Enabled',
+      dataIndex: 'enabled',
+      key: 'enabled',
+      width: 80,
+      render: v => v ? <Tag color="green">是</Tag> : <Tag color="red">否</Tag>
     },
     {
       title: '操作',
       key: 'action',
-      width: 80,
-      render: (_, r) => (
-        <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>設定</Button>
+      width: 100,
+      render: (_, u) => (
+        <Button size="small" type="link" onClick={() => openDetail(u)}>
+          詳細
+        </Button>
       )
-    }
+    },
   ]
+
+  // Summary stats
+  const totalUpstreams = upstreams.length
+  const healthyUpstreams = upstreams.filter(u => u.overallStatus === 'healthy').length
+  const unhealthyUpstreams = upstreams.filter(u => u.overallStatus === 'unhealthy').length
+  const partialUpstreams = upstreams.filter(u => u.overallStatus === 'partial').length
+  const totalTargets = upstreams.reduce((sum, u) => sum + u.healthyCount + u.unhealthyCount, 0)
+  const totalHealthyTargets = upstreams.reduce((sum, u) => sum + u.healthyCount, 0)
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1>健康狀態監控</h1>
+        <h1>上游健康狀態監控</h1>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={fetchHealth} loading={loading}>刷新</Button>
-          <Button type="primary" icon={<SafetyCertificateOutlined />} onClick={handleCheck} loading={checking}>執行檢查</Button>
+          <Button icon={<ReloadOutlined />} onClick={handleRefresh} loading={loading}>刷新列表</Button>
+          <Button type="primary" icon={<SafetyCertificateOutlined />} onClick={handleCheckAll} loading={checking}>
+            執行健康檢查
+          </Button>
         </Space>
       </div>
 
       {/* Summary Cards */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={6}>
+        <Col span={4}>
           <Card size="small">
-            <Statistic title="總服務數" value={summary.total} valueStyle={{ color: '#1890ff' }} />
+            <Statistic title="上游總數" value={totalUpstreams} valueStyle={{ color: '#1890ff' }} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card size="small">
-            <Statistic title="健康" value={summary.healthy} valueStyle={{ color: '#52c41a' }}
+            <Statistic title="健康上游" value={healthyUpstreams} valueStyle={{ color: '#52c41a' }}
               prefix={<span style={{ color: '#52c41a', marginRight: 4 }}>●</span>} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card size="small">
-            <Statistic title="異常" value={summary.unhealthy + summary.unreachable} valueStyle={{ color: '#ff4d4f' }}
+            <Statistic title="異常上游" value={unhealthyUpstreams} valueStyle={{ color: '#ff4d4f' }}
               prefix={<span style={{ color: '#ff4d4f', marginRight: 4 }}>●</span>} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card size="small">
-            <Statistic title="未知" value={summary.unknown} valueStyle={{ color: '#8c8c8c' }} />
+            <Statistic title="部分異常" value={partialUpstreams} valueStyle={{ color: '#faad14' }}
+              prefix={<span style={{ color: '#faad14', marginRight: 4 }}>●</span>} />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card size="small">
+            <Statistic title="Target 總數" value={totalTargets} valueStyle={{ color: '#8c8c8c' }} />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card size="small">
+            <Statistic title="健康 Target" value={totalHealthyTargets} valueStyle={{ color: '#52c41a' }}
+              prefix={<span style={{ color: '#52c41a', marginRight: 4 }}>●</span>} suffix={`/ ${totalTargets}`} />
           </Card>
         </Col>
       </Row>
 
-      {/* Health Status Grid - Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {loading ? (
-          <Col span={24} style={{ textAlign: 'center', padding: 40 }}>
+      {loading ? (
+        <Card style={{ textAlign: 'center', padding: 40 }}>
+          <Spin size="large" />
+          <div style={{ marginTop: 16, color: '#8c8c8c' }}>載入中...</div>
+        </Card>
+      ) : upstreams.length === 0 ? (
+        <Card style={{ textAlign: 'center', color: '#8c8c8c', padding: 40 }}>
+          尚無上游設定，請先在「上游」頁面建立 Upstream
+        </Card>
+      ) : (
+        <>
+          {/* Upstream Cards */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            {upstreams.map(u => {
+              const cfg = statusConfig[u.overallStatus] || statusConfig.unknown
+              return (
+                <Col key={u.id} span={6}>
+                  <Card
+                    size="small"
+                    style={{
+                      borderLeft: `4px solid ${cfg.color}`,
+                      boxShadow: u.overallStatus === 'healthy' ? `0 0 12px ${cfg.color}40` : 'none'
+                    }}
+                    title={<Space><HealthDot healthy={u.overallStatus === 'healthy'} /><span>{u.name}</span></Space>}
+                    extra={<Tag color={u.enabled ? 'green' : 'red'}>{u.enabled ? '啟用' : '停用'}</Tag>}
+                  >
+                    <div style={{ fontSize: 13, color: '#555', marginBottom: 4 }}>
+                      演算法: <code>{u.algorithm || 'roundrobin'}</code>
+                    </div>
+                    <div style={{ fontSize: 12, marginBottom: 8 }}>
+                      <Space size={4}>
+                        <span style={{ color: '#52c41a' }}>● {u.healthyCount} 健康</span>
+                        {u.unhealthyCount > 0 && <span style={{ color: '#ff4d4f' }}>● {u.unhealthyCount} 異常</span>}
+                      </Space>
+                    </div>
+                    <Button size="small" type="link" onClick={() => openDetail(u)}>
+                      查看詳情 →
+                    </Button>
+                  </Card>
+                </Col>
+              )
+            })}
+          </Row>
+
+          {/* Upstreams Table */}
+          <Card title="上游列表">
+            <Table
+              columns={upstreamColumns}
+              dataSource={upstreams as any[]}
+              rowKey="id"
+              loading={loading}
+              pagination={{ pageSize: 10, size: 'small' }}
+              size="small"
+            />
+          </Card>
+        </>
+      )}
+
+      {/* Upstream Detail Modal */}
+      <Modal
+        title={<Space><SafetyCertificateOutlined />上游健康狀態 — {selectedUpstream?.name}</Space>}
+        open={detailModal}
+        onCancel={() => { setDetailModal(false); setHealthData(null) }}
+        footer={[
+          <Button key="refresh" icon={<SyncOutlined spin={healthLoading} />} onClick={() => selectedUpstream && fetchUpstreamHealth(selectedUpstream.id!)}>
+            刷新
+          </Button>,
+          <Button key="close" type="primary" onClick={() => setDetailModal(false)}>關閉</Button>
+        ]}
+        width={800}
+      >
+        {healthLoading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
             <Spin size="large" />
-          </Col>
-        ) : services.length === 0 ? (
-          <Col span={24}>
-            <Card style={{ textAlign: 'center', color: '#8c8c8c' }}>
-              尚無健康檢查設定，請在「服務」頁面設定健康檢查 URL
-            </Card>
-          </Col>
-        ) : services.map(svc => {
-          const cfg = statusConfig[svc.status as keyof typeof statusConfig] || statusConfig.unknown
-          return (
-            <Col key={svc.service_id} span={6}>
-              <Card
-                size="small"
-                style={{
-                  borderLeft: `4px solid ${cfg.color}`,
-                  boxShadow: svc.status === 'healthy' ? `0 0 12px ${cfg.color}40` : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Tag color="blue">{svc.service_name}</Tag>
-                  <div style={{
-                    width: 14, height: 14, borderRadius: '50%',
-                    background: cfg.color,
-                    boxShadow: svc.status === 'healthy' ? `0 0 10px ${cfg.color}` : 'none',
-                    animation: svc.status === 'healthy' ? 'pulse 2s infinite' : 'none'
-                  }} />
-                </div>
-                <div style={{ fontSize: 12, color: cfg.color, fontWeight: 600, marginBottom: 4 }}>{cfg.label}</div>
-                {svc.latency_ms > 0 && <div style={{ fontSize: 11, color: '#8c8c8c' }}>延遲: {svc.latency_ms}ms</div>}
-                {svc.error_message && <div style={{ fontSize: 11, color: '#ff4d4f', marginTop: 4 }}>{svc.error_message}</div>}
-                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                  {svc.doc_url && (
-                    <a onClick={() => openDocModal(svc.doc_url!)} style={{ fontSize: 11, cursor: 'pointer' }}>📄 Swagger</a>
-                  )}
-                  <a onClick={() => openEdit(svc)} style={{ fontSize: 11, cursor: 'pointer' }}>⚙️ 設定</a>
-                </div>
-                <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
-              </Card>
-            </Col>
-          )
-        })}
-      </Row>
+            <div style={{ marginTop: 16 }}>正在獲取健康狀態...</div>
+          </div>
+        ) : healthData ? (
+          <div>
+            <Alert
+              type={healthData.targets.every(t => t.healthy) ? 'success' : healthData.targets.some(t => t.healthy) ? 'warning' : 'error'}
+              message={
+                <Space>
+                  {healthData.upstream_name}
+                  — {healthData.targets.filter(t => t.healthy).length} / {healthData.targets.length} targets 健康
+                </Space>
+              }
+              style={{ marginBottom: 16 }}
+            />
 
-      {/* Table of all services */}
-      <Card title="詳細列表" size="small">
-        <Table
-          columns={columns}
-          dataSource={services as any[]}
-          rowKey="service_id"
-          loading={loading}
-          pagination={{ pageSize: 10, size: 'small' }}
-          size="small"
-        />
-      </Card>
+            <Row gutter={16} style={{ marginBottom: 16 }}>
+              <Col span={6}>
+                <Statistic title="上游名稱" value={healthData.upstream_name} />
+              </Col>
+              <Col span={6}>
+                <Statistic title="負載平衡" value={healthData.algorithm} />
+              </Col>
+              <Col span={6}>
+                <Statistic title="Target 數" value={healthData.targets.length} />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="狀態"
+                  value={healthData.targets.filter(t => t.healthy).length === healthData.targets.length ? '全部健康' : '有異常'}
+                  valueStyle={{ color: healthData.targets.every(t => t.healthy) ? '#52c41a' : '#ff4d4f' }}
+                />
+              </Col>
+            </Row>
 
-      {/* Edit Modal */}
-      <Modal
-        title={`健康檢查設定 — ${editing?.service_name}`}
-        open={editModal}
-        onOk={handleEditSave}
-        confirmLoading={saving}
-        onCancel={() => setEditModal(false)}
-        okText="儲存"
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="health_url" label="健康檢查 URL" tooltip="Service 的 /health 或 /status endpoint">
-            <Input placeholder="https://api.example.com/health" />
-          </Form.Item>
-          <Form.Item name="doc_url" label="API 文件 URL" tooltip="OpenAPI/Swagger 文件連結">
-            <Input placeholder="https://api.example.com/docs" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Swagger UI Modal */}
-      <Modal
-        title={<><FileTextOutlined style={{ marginRight: 8 }} />API 文件 — {editing?.service_name}</>}
-        open={docModal}
-        onCancel={() => setDocModal(false)}
-        footer={null}
-        width="80%"
-        style={{ top: 20 }}
-      >
-        <div style={{ height: '70vh', overflow: 'auto' }}>
-          {docUrl ? (
-            <SwaggerUI url={docUrl} />
-          ) : (
-            <div style={{ textAlign: 'center', color: '#8c8c8c', padding: 40 }}>尚無文件 URL</div>
-          )}
-        </div>
+            <Table
+              columns={targetColumns}
+              dataSource={healthData.targets}
+              rowKey="id"
+              pagination={false}
+              size="small"
+            />
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#8c8c8c', padding: 40 }}>
+            無法載入健康狀態資料
+          </div>
+        )}
       </Modal>
     </div>
   )

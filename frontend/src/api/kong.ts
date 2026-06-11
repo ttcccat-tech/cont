@@ -51,6 +51,21 @@ analyticsClient.interceptors.response.use(r => r, err => {
 })
 
 // ── Types ─────────────────────────────────────────────────
+export interface KongUpstream {
+  id?: string; name: string; algorithm?: string; slots?: number
+  healthchecks?: string; enabled?: boolean; created_at?: number
+}
+
+export interface TargetHealth {
+  id: string; target: string; weight: number; enabled: boolean
+  healthy: boolean; port: number; host: string
+}
+
+export interface UpstreamHealth {
+  upstream_id: string; upstream_name: string; algorithm: string
+  enabled: boolean; targets: TargetHealth[]
+}
+
 export interface KongService {
   id?: string; name: string; url?: string; host: string; port: number
   path?: string; protocol?: string; retries?: number; connect_timeout?: number
@@ -197,9 +212,13 @@ export const getMetrics = () => kongClient.get(wsPrefix('/metrics'), { transform
 })
 
 // ── Cont Admin API ────────────────────────────────────────
-// All entities use analyticsClient (which goes through nginx /api/* to Cont backend).
+// All entities use analyticsClient (which goes through nginx /api/* to Cont backend.
 // JWT token injected automatically by analyticsClient interceptor.
 export const api = {
+  listUpstreams: () => analyticsClient.get<KongUpstream[]>(wsPrefix('/upstreams')).then(r => r.data?.data ?? []),
+  getUpstream: (id: string) => analyticsClient.get<KongUpstream>(wsPrefix(`/upstreams/${id}`)).then(r => r.data),
+  getUpstreamHealth: (id: string) => analyticsClient.get<UpstreamHealth>(wsPrefix(`/upstreams/${id}/health`)).then(r => r.data),
+
   listServices: () => analyticsClient.get<KongService[]>(wsPrefix('/services')).then(r => r.data?.data ?? []),
   getService: (id: string) => analyticsClient.get<KongService>(wsPrefix(`/services/${id}`)).then(r => r.data),
   createService: (data: Partial<KongService>) => analyticsClient.post<KongService>(wsPrefix('/services'), data).then(r => r.data),

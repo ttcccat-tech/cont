@@ -107,6 +107,7 @@ func main() {
 			up.PUT("/:id", routes.RequirePermission("upstreams", true), routes.UpdateUpstream(store))
 			up.PATCH("/:id", routes.RequirePermission("upstreams", true), routes.UpdateUpstream(store))
 			up.DELETE("/:id", routes.RequirePermission("upstreams", true), routes.DeleteUpstream(store))
+			up.GET("/:id/health", routes.RequirePermission("upstreams", false), routes.GetUpstreamHealth(store))
 			up.GET("/:id/targets", routes.RequirePermission("targets", false), routes.ListTargets(store))
 			up.POST("/:id/targets", routes.RequirePermission("targets", true), routes.CreateTarget(store))
 			up.PUT("/:id/targets/:target_id", routes.RequirePermission("targets", true), routes.UpdateTarget(store))

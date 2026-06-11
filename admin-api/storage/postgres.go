@@ -18,6 +18,11 @@ func (s *Store) DB() *sql.DB {
 	return s.db
 }
 
+// Redis returns the underlying Redis client
+func (s *Store) Redis() *Redis {
+	return s.rdb
+}
+
 func NewPostgres(url string) (*sql.DB, error) {
 	if url == "" {
 		url = "postgres://kong:kongpass@localhost:5432/cont?sslmode=disable"

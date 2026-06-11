@@ -2,6 +2,7 @@ package routes
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -411,6 +412,70 @@ func DeleteUpstream(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 		c.Status(http.StatusNoContent)
+	}
+}
+
+func GetUpstreamHealth(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		upstreamID := c.Param("id")
+		upstream, err := store.GetUpstream(upstreamID)
+		if err == sql.ErrNoRows {
+			c.JSON(404, gin.H{"message": "upstream not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+
+		targets, err := store.ListTargetsByUpstream(upstreamID)
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+
+		ctx := context.Background()
+		healthStatuses, _ := store.Redis().GetTargetHealthStatuses(ctx, upstreamID)
+
+		type TargetHealth struct {
+			ID       string `json:"id"`
+			Target   string `json:"target"`
+			Weight   int    `json:"weight"`
+			Enabled  bool   `json:"enabled"`
+			Healthy  bool   `json:"healthy"`
+			Port     int    `json:"port"`
+			Host     string `json:"host"`
+		}
+
+		targetHealths := make([]TargetHealth, 0, len(targets))
+		for _, t := range targets {
+			healthy := healthStatuses[t.Target] != true
+			port := 80
+			host := t.Target
+			if idx := strings.LastIndex(t.Target, ":"); idx > 0 {
+				host = t.Target[:idx]
+				if p, err := strconv.Atoi(t.Target[idx+1:]); err == nil {
+					port = p
+				}
+			}
+			targetHealths = append(targetHealths, TargetHealth{
+				ID:      t.ID,
+				Target:  t.Target,
+				Weight:  t.Weight,
+				Enabled: t.Enabled,
+				Healthy: healthy,
+				Port:    port,
+				Host:    host,
+			})
+		}
+
+		c.JSON(200, gin.H{
+			"upstream_id":   upstream.ID,
+			"upstream_name": upstream.Name,
+			"algorithm":     upstream.Algorithm,
+			"enabled":       upstream.Enabled,
+			"targets":        targetHealths,
+		})
 	}
 }
 

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -44,6 +45,22 @@ func (r *Redis) SetTargetHealth(ctx context.Context, upstream, target string, he
 		return r.client.Del(ctx, key).Err()
 	}
 	return r.client.Set(ctx, key, "1", 0).Err()
+}
+
+// Get all target health statuses for an upstream
+func (r *Redis) GetTargetHealthStatuses(ctx context.Context, upstream string) (map[string]bool, error) {
+	keyPattern := fmt.Sprintf("cont:health:%s:*", upstream)
+	keys, err := r.client.Keys(ctx, keyPattern).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]bool)
+	for _, k := range keys {
+		// key format: cont:health:{upstream}:{target}
+		target := strings.TrimPrefix(k, fmt.Sprintf("cont:health:%s:", upstream))
+		result[target] = true // key exists = unhealthy
+	}
+	return result, nil
 }
 
 // Plugin config cache (avoid hitting Postgres on every request)
