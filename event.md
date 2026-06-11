@@ -6,7 +6,7 @@
 
 ## 🟡 預計優化
 
-- （暂无）
+- Cont 使用者管理精細化（AuthGroups 群組管理、API Key 審批流程、Audit Log 查詢介面）
 
 ## ✅ 已完成
 
