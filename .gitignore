@@ -2,3 +2,6 @@
 frontend/dist/
 admin-api/cont-admin-api
 admin-api/*.exe
+
+# Environment secrets
+.env
