@@ -295,6 +295,28 @@ func RunMigrations(db *sql.DB) error {
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_consumer_cred_key_type ON consumer_credentials(credential_type, key)`,
 		`CREATE INDEX IF NOT EXISTS idx_consumer_cred_consumer ON consumer_credentials(consumer_id)`,
+
+		// Workspace AuthGroups binding (many-to-many with role)
+		`CREATE TABLE IF NOT EXISTS workspace_auth_groups (
+			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			auth_group_id UUID NOT NULL REFERENCES auth_groups(id) ON DELETE CASCADE,
+			role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('viewer', 'editor', 'admin')),
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			PRIMARY KEY (workspace_id, auth_group_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_wag_workspace ON workspace_auth_groups(workspace_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_wag_group ON workspace_auth_groups(auth_group_id)`,
+
+		// User-Workspace binding (which workspaces a user can access)
+		`CREATE TABLE IF NOT EXISTS user_workspaces (
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('viewer', 'editor', 'admin')),
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			PRIMARY KEY (user_id, workspace_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_uw_user ON user_workspaces(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_uw_workspace ON user_workspaces(workspace_id)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

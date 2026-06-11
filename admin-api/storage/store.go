@@ -911,6 +911,67 @@ func (s *Store) DeleteWorkspace(id string) error {
 	return err
 }
 
+// ── User Workspaces ─────────────────────────────────────────────────────────
+
+// ListUserWorkspaces returns all workspaces a user has access to (direct assignment)
+// Returns standard Workspace objects so the frontend can use them directly
+func (s *Store) ListUserWorkspaces(userID string) ([]Workspace, error) {
+	rows, err := s.db.Query(`
+		SELECT w.id, w.name, w.created_at
+		FROM user_workspaces uw
+		JOIN workspaces w ON w.id = uw.workspace_id
+		WHERE uw.user_id = $1
+		ORDER BY w.name`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Workspace
+	for rows.Next() {
+		var w Workspace
+		var name sql.NullString
+		var created sql.NullString
+		if err := rows.Scan(&w.ID, &name, &created); err != nil {
+			return nil, err
+		}
+		w.Name = name.String
+		if created.Valid {
+			w.CreatedAt = created.String
+		}
+		out = append(out, w)
+	}
+	return out, rows.Err()
+}
+
+// GetUserWorkspaceRole returns the user's role in a workspace (empty string if no access)
+func (s *Store) GetUserWorkspaceRole(userID, workspaceID string) (string, error) {
+	var role string
+	err := s.db.QueryRow(`
+		SELECT role FROM user_workspaces
+		WHERE user_id = $1 AND workspace_id = $2`, userID, workspaceID).Scan(&role)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return role, err
+}
+
+// SetUserWorkspace sets a user's role in a workspace (upsert)
+func (s *Store) SetUserWorkspace(userID, workspaceID, role string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO user_workspaces (user_id, workspace_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, workspace_id) DO UPDATE SET role = $3`,
+		userID, workspaceID, role)
+	return err
+}
+
+// RemoveUserWorkspace removes a user's access to a workspace
+func (s *Store) RemoveUserWorkspace(userID, workspaceID string) error {
+	_, err := s.db.Exec(`DELETE FROM user_workspaces WHERE user_id=$1 AND workspace_id=$2`,
+		userID, workspaceID)
+	return err
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 func jsonScanSlice(out *[]string, data []byte) {

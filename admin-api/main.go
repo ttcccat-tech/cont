@@ -149,6 +149,7 @@ func main() {
 		{
 			ws.GET("", routes.RequirePermission("workspaces", false), routes.ListWorkspaces(store))
 			ws.POST("", routes.RequirePermission("workspaces", true), routes.CreateWorkspace(store))
+			ws.GET("/mine", routes.ListMyWorkspaces(store))
 			ws.GET("/:id", routes.RequirePermission("workspaces", false), routes.GetWorkspace(store))
 			ws.PUT("/:id", routes.RequirePermission("workspaces", true), routes.UpdateWorkspace(store))
 			ws.PATCH("/:id", routes.RequirePermission("workspaces", true), routes.UpdateWorkspace(store))

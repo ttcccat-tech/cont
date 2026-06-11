@@ -757,7 +757,23 @@ badRequest(c, err)
 
 func GetWorkspace(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		w, err := store.GetWorkspace(c.Param("id"))
+		userID, _ := c.Get("user_id")
+		role, _ := c.Get("role")
+		wsID := c.Param("id")
+
+		// Check if user has access to this workspace
+		wsRole, err := store.GetUserWorkspaceRole(userID.(string), wsID)
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		// Global admin bypasses workspace-level access checks
+		if role.(string) != "admin" && wsRole == "" {
+			c.JSON(404, gin.H{"message": "workspace not found"})
+			return
+		}
+
+		w, err := store.GetWorkspace(wsID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "workspace not found"})
 			return
@@ -767,6 +783,33 @@ func GetWorkspace(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 		c.JSON(200, w)
+	}
+}
+
+// ListMyWorkspaces returns workspaces accessible to the current user
+func ListMyWorkspaces(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		role, _ := c.Get("role")
+
+		// Admin sees all workspaces
+		if role.(string) == "admin" {
+			rows, err := store.ListWorkspaces()
+			if err != nil {
+				c.JSON(500, gin.H{"message": err.Error()})
+				return
+			}
+			c.JSON(200, gin.H{"data": rows, "next": ""})
+			return
+		}
+
+		// Non-admin: only workspaces they are explicitly assigned to
+		workspaces, err := store.ListUserWorkspaces(userID.(string))
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"data": workspaces, "next": ""})
 	}
 }
 
