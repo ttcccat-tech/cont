@@ -48,13 +48,16 @@
   - Bug fix: GetAPIKeyRequest SQL scan 漏掉 key_value 欄位賦值，導致核准後 API 回傳 key_value: null
 ## 🟡 預計優化
 
-- [ ] **商業化：SaaS 註冊機制** — 從單機部署進化為多租戶 SaaS
-  - Phase 1（現在做）：Organization 資料模型 + 登入頁 email 註冊（SendOTP/VerifyOTP）
-  - Phase 2：Workspace 綁定 Organization，多租戶資料隔離
-  - 方案：Organization = top-level entity，users/workspaces 隸屬 org_id
-  - 使用 email 註冊，email 即帳號，預設建立 default workspace
-  - 前端：Settings.tsx 新增 Organization 設定面板
-  - Phase 3：plan/billing/Stripe 整合（留待後續）
+- [x] **商業化：SaaS 註冊機制（Phase 1 完成）** — commit `1bef089b`
+  - Organization 資料模型（name, plan: free/pro/enterprise）
+  - users.org_id 欄位，多租戶隔離基礎
+  - otps table（email, code, purpose, expires_at, verified）+ 索引
+  - SendOTP endpoint（crypto/rand 6位數，10分鐘過期，dev mode 回傳 code）
+  - VerifyOTP endpoint（驗證後自動建立 org + user + default workspace）
+  - Login.tsx 完整註冊 flow（Step1 寄驗證碼 → Step2 填資料 → 自動登入）
+  - QA: SendOTP → 200 ✅, VerifyOTP → JWT+user+org ✅, wrong code → 400 ✅, login new user → 200 ✅
+  - Phase 2（待做）：Workspace 綁定 Organization，多租戶資料隔離
+  - Phase 3（待做）：plan/billing/Stripe 整合
 
 - [ ] **Cont 單元測試覆蓋率提升（admin-api CRUD handlers HTTP 層測試）** — 現有測試覆蓋 auth/validation/routes，但 CRUD HTTP handlers 缺乏 HTTP 層測試（sqlmock 被安全策略阻擋，改用 integration test 框架或重構測試策略）
 
