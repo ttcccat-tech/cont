@@ -96,7 +96,11 @@ func parseIntFmt(s string, v *int) (int, error) {
 }
 
 // getOrgID extracts org_id from the request context.
+// Admin role bypasses org_id filtering (returns "" to see all orgs).
 func getOrgID(c *gin.Context) string {
+	if role, _ := c.Get("role"); role != nil && fmt.Sprintf("%v", role) == "admin" {
+		return ""
+	}
 	if orgID, ok := c.Get("org_id"); ok {
 		if s, ok := orgID.(string); ok {
 			return s
@@ -898,7 +902,8 @@ func DeletePlugin(store *storage.Store) gin.HandlerFunc {
 
 func ListWorkspaces(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := store.ListWorkspaces()
+		orgID := getOrgID(c)
+		rows, err := store.ListWorkspaces(orgID)
 		if err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
@@ -928,6 +933,7 @@ func GetWorkspace(store *storage.Store) gin.HandlerFunc {
 		userID, _ := c.Get("user_id")
 		role, _ := c.Get("role")
 		wsID := c.Param("id")
+		orgID := getOrgID(c)
 
 		// Check if user has access to this workspace
 		wsRole, err := store.GetUserWorkspaceRole(userID.(string), wsID)
@@ -941,7 +947,7 @@ func GetWorkspace(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 
-		w, err := store.GetWorkspace(wsID)
+		w, err := store.GetWorkspace(wsID, orgID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "workspace not found"})
 			return
@@ -959,10 +965,11 @@ func ListMyWorkspaces(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, _ := c.Get("user_id")
 		role, _ := c.Get("role")
+		orgID := getOrgID(c)
 
-		// Admin sees all workspaces
+		// Admin sees all workspaces within their org
 		if role.(string) == "admin" {
-			rows, err := store.ListWorkspaces()
+			rows, err := store.ListWorkspaces(orgID)
 			if err != nil {
 				c.JSON(500, gin.H{"message": err.Error()})
 				return
@@ -983,12 +990,13 @@ func ListMyWorkspaces(store *storage.Store) gin.HandlerFunc {
 
 func UpdateWorkspace(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		orgID := getOrgID(c)
 		var w storage.Workspace
 		if err := c.ShouldBindJSON(&w); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
-		result, err := store.UpdateWorkspace(c.Param("id"), &w)
+		result, err := store.UpdateWorkspace(c.Param("id"),&w, orgID)
 		if err == sql.ErrNoRows {
 			c.JSON(404, gin.H{"message": "workspace not found"})
 			return
@@ -1003,7 +1011,8 @@ badRequest(c, err)
 
 func DeleteWorkspace(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := store.DeleteWorkspace(c.Param("id")); err != nil {
+		orgID := getOrgID(c)
+		if err := store.DeleteWorkspace(c.Param("id"), orgID); err != nil {
 			c.JSON(500, gin.H{"message": err.Error()})
 			return
 		}
