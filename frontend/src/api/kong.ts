@@ -89,6 +89,7 @@ export interface PermissionEntry { resource_id: string; mode: PermissionMode }
 export interface Resource { id: string; name: string; path: string; type?: string }
 export interface AuthGroup { id?: string; name: string; label: string; description?: string; permissions?: PermissionEntry[]; created_at?: number }
 export interface Workspace { id: string; name: string; label: string; description?: string; kong_workspace_id?: string; created_at?: number; group_ids?: string[] }
+export interface WorkspaceUserAssignment { user_id: string; username: string; display_name?: string; email?: string; role: string; assigned_at?: string }
 export interface AuditEntry { id: number; audit_type: string; target_type: string; target_id: string; actor_username: string; actor_user_id: string; description: string; created_at: string }
 
 function parsePromMetrics(text: string): Record<string, number> {
@@ -145,6 +146,14 @@ export const createWorkspace = (data: { name: string; label: string; description
 export const updateWorkspace = (id: string, data: { label?: string; description?: string }) =>
   analyticsClient.patch<Workspace>(`/workspaces/${id}`, data).then(r => r.data)
 export const deleteWorkspace = (id: string) => analyticsClient.delete(`/workspaces/${id}`)
+
+// Workspace user assignment management
+export const getWorkspaceUsers = (workspaceId: string) =>
+  analyticsClient.get<{ data: WorkspaceUserAssignment[] }>(`/workspaces/${workspaceId}/users`).then(r => r.data?.data ?? [])
+export const setWorkspaceUser = (workspaceId: string, userId: string, role: string) =>
+  analyticsClient.put(`/workspaces/${workspaceId}/users`, { user_id: userId, role }).then(r => r.data)
+export const removeWorkspaceUser = (workspaceId: string, userId: string) =>
+  analyticsClient.delete(`/workspaces/${workspaceId}/users/${userId}`)
 
 export const listResources = () => analyticsClient.get<{ resources: Resource[] }>('/resources').then(r => r.data?.resources ?? [])
 

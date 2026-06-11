@@ -17,6 +17,10 @@ import HealthPortal from './pages/HealthPortal'
 import AlertRules from './pages/AlertRules'
 import ApiKeyRequests from './pages/ApiKeyRequests'
 import ApiDocs from './pages/ApiDocs'
+import Users from './pages/Users'
+import Groups from './pages/Groups'
+import WorkspaceDetail from './pages/WorkspaceDetail'
+import Workspaces from './pages/Workspaces'
 import { getToken, clearAuth } from './api/kong'
 import { WorkspaceProvider } from './context/WorkspaceContext'
 import { AuthProvider } from './context/AuthContext'
@@ -113,6 +117,8 @@ export default function App() {
                   <Route path="/api-docs" element={<ApiDocs />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/groups" element={<Groups />} />
+                  <Route path="/workspaces" element={<Workspaces />} />
+                  <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
                 </Routes>
               </AppLayout>
             </AuthProvider>

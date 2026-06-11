@@ -47,6 +47,7 @@ export default function Sidebar() {
   const adminItems = [
     { key: '/users', icon: <UserOutlined />, label: 'users 使用者' },
     { key: '/groups', icon: <TeamOutlined />, label: 'groups 群組' },
+    { key: '/workspaces', icon: <SafetyOutlined />, label: 'workspaces 工作區' },
   ]
 
   const menuItems = perms.users || perms.groups ? [...baseItems, ...adminItems] : baseItems
