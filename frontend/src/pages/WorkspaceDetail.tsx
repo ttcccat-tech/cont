@@ -62,8 +62,9 @@ export default function WorkspaceDetailPage() {
       const values = await form.validateFields()
       if (!id) return
       setSubmitting(true)
-      await setWorkspaceUser(id, values.user_id, values.role)
-      message.success('已指派成員')
+      const userIds: string[] = Array.isArray(values.user_ids) ? values.user_ids : [values.user_ids]
+      await Promise.all(userIds.map(userId => setWorkspaceUser(id, userId, values.role || 'viewer')))
+      message.success(userIds.length === 1 ? '已指派成員' : `已指派 ${userIds.length} 位成員`)
       setAddModalOpen(false)
       form.resetFields()
       fetchMembers()
@@ -294,11 +295,12 @@ export default function WorkspaceDetailPage() {
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
-            name="user_id"
+            name="user_ids"
             label="選擇使用者"
-            rules={[{ required: true, message: '請選擇使用者' }]}
+            rules={[{ required: true, message: '請選擇使用者' }, { type: 'array', min: 1, message: '請至少選擇一位使用者' }]}
           >
             <Select
+              mode="multiple"
               showSearch
               placeholder="搜尋使用者..."
               options={availableUsers.map(u => ({
