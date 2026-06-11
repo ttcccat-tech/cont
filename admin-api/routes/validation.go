@@ -18,6 +18,7 @@ func registerCustomValidators() {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("fqdn", validateFQDN)
 		v.RegisterValidation("host_port", validateHostPort)
+		v.RegisterValidation("starts_with", validateStartsWith)
 		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 			name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
 			if name == "-" {
@@ -96,4 +97,13 @@ func isValidPort(s string) bool {
 		}
 	}
 	return port >= 1
+}
+
+func validateStartsWith(fl validator.FieldLevel) bool {
+	val := fl.Field().String()
+	prefix := fl.Param()
+	if val == "" {
+		return true
+	}
+	return strings.HasPrefix(val, prefix)
 }

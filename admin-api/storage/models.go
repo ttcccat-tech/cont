@@ -96,8 +96,8 @@ type ConfigSnapshot struct {
 
 type Service struct {
 	ID              string `json:"id"`
-	Name            string `json:"name,omitempty" binding:"required,max=255"`
-	Protocol        string `json:"protocol,omitempty" binding:"required,oneof=http https tcp tls udp grpc grpcs"`
+	Name            string `json:"name,omitempty" binding:"omitempty,max=255"`
+	Protocol        string `json:"protocol,omitempty" binding:"omitempty,oneof=http https tcp tls udp grpc grpcs"`
 	Host            string `json:"host,omitempty"`
 	Port            int    `json:"port,omitempty" binding:"omitempty,min=1,max=65535"`
 	Path            string `json:"path,omitempty" binding:"omitempty,max=8192"`
