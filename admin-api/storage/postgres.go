@@ -262,6 +262,17 @@ func RunMigrations(db *sql.DB) error {
 			expires_at TIMESTAMPTZ NOT NULL
 		)`,
 
+		// Login attempts for brute-force protection
+		`CREATE TABLE IF NOT EXISTS login_attempts (
+			id SERIAL PRIMARY KEY,
+			username TEXT NOT NULL,
+			ip_address TEXT,
+			success BOOLEAN DEFAULT false,
+			attempted_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON login_attempts(username, attempted_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address, attempted_at DESC)`,
+
 		// Add oauth fields to users
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_provider TEXT`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_subject TEXT`,

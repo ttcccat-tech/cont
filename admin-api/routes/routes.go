@@ -740,6 +740,13 @@ var demoUsers = map[string]struct {
 	},
 }
 
+// Login rate limit constants
+const (
+	LoginMaxAttempts     = 5       // max failed attempts before lockout
+	LoginWindowSeconds   = 60      // time window for max attempts (seconds)
+	LoginLockoutSeconds  = 300     // lockout duration after max failed attempts (5 minutes)
+)
+
 func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest
@@ -747,15 +754,33 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 			c.JSON(400, gin.H{"error": "invalid request"})
 			return
 		}
+		// Get client IP for attempt tracking
+		clientIP := c.ClientIP()
+
+		// Check lockout (user-based)
+		locked, err := store.IsLockedOut(req.Username, LoginMaxAttempts, LoginWindowSeconds)
+		if err == nil && locked {
+			c.JSON(429, gin.H{"error": "too many failed login attempts, account temporarily locked"})
+			return
+		}
+
 		user, err := store.GetUserByUsername(req.Username)
 		if err != nil || user == nil {
+			// Record failed attempt even for unknown user
+			store.RecordFailedLogin(req.Username, clientIP)
 			c.JSON(401, gin.H{"error": "invalid credentials"})
 			return
 		}
+
 		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+			store.RecordFailedLogin(req.Username, clientIP)
 			c.JSON(401, gin.H{"error": "invalid credentials"})
 			return
 		}
+
+		// Successful login: clear failed attempts
+		store.ClearFailedLogins(req.Username)
+
 		// Generate JWT
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"sub":      user.ID,

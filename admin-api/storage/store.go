@@ -1714,3 +1714,46 @@ func sanitizeOAuthUsername(email, provider string) string {
 	}
 	return provider + "_user"
 }
+
+// RecordFailedLogin records a failed login attempt for brute-force protection
+func (s *Store) RecordFailedLogin(username, ipAddress string) error {
+	_, err := s.db.Exec(
+		`INSERT INTO login_attempts (username, ip_address, success) VALUES ($1, $2, false)`,
+		username, ipAddress,
+	)
+	return err
+}
+
+// ClearFailedLogins clears all failed attempts for a user (on successful login)
+func (s *Store) ClearFailedLogins(username string) error {
+	_, err := s.db.Exec(`DELETE FROM login_attempts WHERE username=$1 AND success=false`, username)
+	return err
+}
+
+// IsLockedOut returns true if the user has failed more than maxAttempts in the given window
+func (s *Store) IsLockedOut(username string, maxAttempts int, windowSeconds int) (bool, error) {
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM login_attempts
+		WHERE username=$1 AND success=false
+		AND attempted_at > NOW() - INTERVAL '1 second' * $2
+	`, username, windowSeconds).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count >= maxAttempts, nil
+}
+
+// GetLoginAttemptsByIP returns the number of failed attempts from a given IP in the window
+func (s *Store) GetLoginAttemptsByIP(ipAddress string, windowSeconds int) (int, error) {
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM login_attempts
+		WHERE ip_address=$1 AND success=false
+		AND attempted_at > NOW() - INTERVAL '1 second' * $2
+	`, ipAddress, windowSeconds).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
