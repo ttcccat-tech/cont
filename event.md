@@ -18,11 +18,11 @@
   - routes.go: 修正 `workspaces[0].ID` → `workspaces[0].UserID`
   - QA: PUT → 200 ✅, GET → 200 ✅ (含 role), DELETE → 204 ✅
 
-- [ ] **Proxy Lua Plugin 鏈完善化** — 目前的 OpenResty Lua 插件鏈（access/header_filter/body_filter/log）還沒有實際的 auth / rate-limit 邏輯
-  - access.lua：實作 JWT 驗證、API Key 驗證、BasicAuth 驗證、rate-limit 邏輯
-  - header_filter.lua：實作 response header 操作（CORS、rate-limit headers）
-  - body_filter.lua：實作 response body 轉換（JSON pretty、error wrapping）
-  - log.lua：實作 access log + metrics 寫入
+- [x] **Proxy Lua Plugin 鏈完善化** — commit `270ea8b1` + `fb15630c`
+  - access.lua: JWT validation (validate_jwt), consumer auth (key-auth/basic-auth/hmac-auth via /internal/validate-cred), OPTIONS preflight, route matching, load balancing (roundrobin/leastconn/weighted-ip-hash)
+  - header_filter.lua: Kong-compatible headers (Via, X-Kong-Proxy-Latency, X-Kong-Upstream-Latency), CORS env support, consumer info headers (X-Consumer-ID, X-Credential-Identifier)
+  - body_filter.lua: JSON pretty-print (CONT_JSON_PRETTY), error wrapping (CONT_WRAP_ERRORS)
+  - log.lua: structured JSON/text access logging (CONT_LOG_FORMAT/CONT_LOG_LEVEL), Prometheus metrics (nginx_requests_total, nginx_request_latency_ms, route/consumer labels), plugin log() chains
 
 - [x] **Upstreams 健康檢查 UI** — commit `177ed99b`
   - Backend: GET /upstreams/:id/health endpoint reading from Redis health keys (cont:health:{upstream}:*)
