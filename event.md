@@ -32,10 +32,15 @@
   - kong.ts: KongUpstream/TargetHealth/UpstreamHealth types + listUpstreams/getUpstream/getUpstreamHealth API
   - Users.tsx: fix WorkspaceOutlined → TeamOutlined (icon doesn't exist in antd)
 
-- [ ] **Metrics Dashboard** — Cont 已支援 Prometheus metrics，需串接 Grafana
-  - 確認 /metrics 端點格式（Prometheus client_golang）
-  - 製作 Grafana dashboard JSON（request rate、latency、error rate、DB/Redis 連線）
-  - 設定 Prometheus scrape config 或 Grafana datasources
+- [x] **Metrics Dashboard** — commit `7cbabd63`
+  - monitoring/prometheus/prometheus.yml: scrape cont-admin-api:8001/metrics every 10s
+  - monitoring/grafana/dashboards/cont-overview.json: 6-panel Grafana dashboard
+    (Request Rate, Latency, DB/Redis connections, Memory, Goroutines, Throughput)
+  - monitoring/grafana/datasources.yaml: Prometheus datasource (proxy access, 10s interval)
+  - monitoring/grafana/dashboards/dashboards.yaml: file-based dashboard provider
+  - monitoring/docker-compose.monitoring.yml: local Prometheus v2.53 + Grafana 11.2 stack
+  - QA: Prometheus scrape ✅ (cont-admin-api: up), Grafana ✅ (HTTP 200), dashboard provisioned ✅
+  - 使用方式：`docker compose -f monitoring/docker-compose.monitoring.yml up -d`
 
 - [ ] **API Key 申請 Flow 完整化** — 申請 → 審批 → 核發 → 通知，整個流程 UI 完善化
   - ApiKeyRequests.tsx：申請表單（reason、scope、expire）、狀態追蹤（pending/approved/rejected）
