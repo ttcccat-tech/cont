@@ -6,11 +6,15 @@
 
 ## 🟡 預計優化
 
-- Cont 使用者-群組指派 UI（Users頁面新增「指派群組」功能，支援將使用者加入/移出 AuthGroups）
-- Cont Consumer 管理頁面（新增 Consumers.tsx，Kong Consumer CRUD介面）
+- （暂无）
 
 ## ✅ 已完成
 
+- [x] **使用者-群組指派 UI（群組 name 支援）** — commit `5c586bf6`
+  - 修復：/groups/:id/members API 原本只接受 UUID，前端傳入 group name 導致 pq error
+  - store.go: 新增 GetAuthGroupByName()，可依 name 查詢 auth group
+  - routes.go: resolveGroupID() 同時支援 UUID 或 name 解析
+  - QA: GET /groups/test-group/members → 200 ✅, PUT → 200 ✅, admin 成功加入 qa-group ✅
 - [x] **AuthGroups 群組成員管理（Backend + Frontend UI）** — commit `96c74dd9`
   - Backend: `user_auth_groups` table migration, `ListGroupMembers()`/`SetGroupMembers()` store methods, `GET/PUT /groups/:id/members` routes
   - Frontend: Groups.tsx tabbed modal（Permissions + Members tabs），`getGroupMembers()`/`setGroupMembers()` API calls
