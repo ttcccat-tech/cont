@@ -6,12 +6,7 @@
 
 ## 🟡 預計優化
 
-- [ ] **使用者管理精細化（RBAC 增強）** — 目前的 AuthGroups 群組管理已完整，但每個使用者的 workspace 存取權需要可從 UI 管理
-  - 前端：在 Users.tsx 新增「Workspace 指派」面板，admin 可指派使用者到特定 workspace
-  - 後端：GET /users/:id/workspaces（已存在），需驗證前端能正確呼叫並顯示
-  - 或改進 WorkspaceDetail 的成員列表：支援搜尋/篩選、新增多個成員、批次更新角色
-
-- [x] **使用者管理精細化（RBAC 增強）** — commit `673fc680` + `a3a6bd82`
+- [x] **使用者管理精細化（RBAC 增強）** — commit `673fc680` + `a3a6bd82` + `495c3455` + `846c8d1a`
   - kong.ts: 新增 `getUserWorkspaces()` 對應 GET /workspaces/users/:userId
   - Users.tsx: 新增「指派工作區」按鈕 + Drawer（Checkbox + 角色選擇 viewer/editor/admin）
   - store.go: `ListUserWorkspaces` 回傳 `[]WorkspaceUserAssignment`（含 role 欄位）
@@ -19,6 +14,8 @@
   - QA: PUT → 200 ✅, GET → 200 ✅ (含 role), DELETE → 204 ✅
   - Bug fix `a3a6bd82`: store.go Scan w.id→WorkspaceID (not UserID), models.go 新增 WorkspaceID 欄位，kong.ts WorkspaceUserAssignment 新增 workspace_id 欄位，Users.tsx openWsDrawer 直接使用 workspace_id
   - API 驗證：GET /workspaces/users/:userId → workspace_id ✅, user_id ✅, role ✅, DELETE → 204 ✅
+  - 批次更新角色 `846c8d1a`: WorkspaceDetail 成員表格支援 checkbox 多選、批次更新角色 Modal
+  - 批次新增成員 `495c3455`: 新增成員 Modal 改為 Select multiple，支援一次新增多位成員
 
 - [x] **Proxy Lua Plugin 鏈完善化** — commit `270ea8b1` + `fb15630c`
   - access.lua: JWT validation (validate_jwt), consumer auth (key-auth/basic-auth/hmac-auth via /internal/validate-cred), OPTIONS preflight, route matching, load balancing (roundrobin/leastconn/weighted-ip-hash)
