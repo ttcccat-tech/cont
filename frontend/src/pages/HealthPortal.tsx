@@ -81,28 +81,36 @@ export default function HealthPortal() {
 
   const fetchHealth = () => {
     setLoading(true)
-    Promise.all([
-      apiGet('/health/services').catch(() => []),
-      apiGet('/health/summary').catch(() => ({ total: 0, healthy: 0, unhealthy: 0, unreachable: 0, unknown: 0 }))
-    ]).then(([svcs, sums]) => {
-      setServices(svcs as ServiceHealth[])
-      setSummary(sums as typeof summary)
-    }).finally(() => setLoading(false))
+    apiGet('/services')
+      .then(data => {
+        const svcs = Array.isArray(data) ? data : (data?.data || [])
+        // Backend has no health tracking — show services with unknown status
+        const healthData: ServiceHealth[] = svcs.map((s: any) => ({
+          service_id: s.id,
+          service_name: s.name || s.id,
+          health_url: null,
+          doc_url: null,
+          status: 'unknown' as const,
+          latency_ms: 0,
+          error_message: null,
+          last_check_at: null,
+        }))
+        setServices(healthData)
+        setSummary({ total: healthData.length, healthy: 0, unhealthy: 0, unreachable: 0, unknown: healthData.length })
+      })
+      .catch(() => {
+        setServices([])
+        setSummary({ total: 0, healthy: 0, unhealthy: 0, unreachable: 0, unknown: 0 })
+      })
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => { fetchHealth() }, [])
 
   const handleCheck = async () => {
-    setChecking(true)
-    try {
-      await apiPost('/health/check', {})
-      message.success('健康檢查完成')
-      fetchHealth()
-    } catch (e: any) {
-      message.error('執行失敗: ' + (e.message || '未知錯誤'))
-    } finally {
-      setChecking(false)
-    }
+    // Backend has no /health/check endpoint — just refresh
+    message.info('健康檢查功能後端尚未實作，已刷新服務列表')
+    fetchHealth()
   }
 
   const openEdit = (svc: ServiceHealth) => {
@@ -117,22 +125,9 @@ export default function HealthPortal() {
   }
 
   const handleEditSave = async () => {
-    try {
-      const values = await form.validateFields()
-      setSaving(true)
-      await apiPut(`/health/services/${editing!.service_id}`, {
-        health_url: values.health_url || null,
-        doc_url: values.doc_url || null
-      })
-      message.success('設定已儲存')
-      setEditModal(false)
-      fetchHealth()
-    } catch (e: any) {
-      if (e.errorFields) return
-      message.error('儲存失敗: ' + (e.message || '未知錯誤'))
-    } finally {
-      setSaving(false)
-    }
+    // Backend has no /health/services endpoint — just close modal
+    message.info('健康檢查設定後端尚未實作')
+    setEditModal(false)
   }
 
   const columns: ColumnsType<ServiceHealth> = [
