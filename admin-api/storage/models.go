@@ -188,8 +188,8 @@ func (r *Route) UnmarshalJSON(data []byte) error {
 
 type Upstream struct {
 	ID           string `json:"id"`
-	Name         string `json:"name" binding:"required,max=255"`
-	Algorithm    string `json:"algorithm,omitempty" binding:"omitempty,oneof=round-robin consistent-hashing least-connections"`
+	Name         string `json:"name" binding:"omitempty,max=255"`
+	Algorithm    string `json:"algorithm,omitempty" binding:"omitempty,oneof=roundrobin leastconn weighted-ip-hash consistent-hashing"`
 	Slots        int    `json:"slots,omitempty" binding:"omitempty,min=10,max=65536"`
 	Healthchecks string `json:"healthchecks,omitempty"`
 	Enabled      bool   `json:"enabled"`
@@ -200,7 +200,7 @@ type Upstream struct {
 type Target struct {
 	ID         string `json:"id"`
 	UpstreamID string `json:"-"`
-	Target     string `json:"target,omitempty" binding:"required"`
+	Target     string `json:"target,omitempty" binding:"omitempty"`
 	Weight     int    `json:"weight,omitempty" binding:"omitempty,min=0,max=1000"`
 	Enabled    bool   `json:"enabled"`
 	CreatedAt  string `json:"created_at,omitempty"`

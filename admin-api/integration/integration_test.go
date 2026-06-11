@@ -17,6 +17,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/ttcccat-tech/cont/admin-api/routes"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Test fixtures
