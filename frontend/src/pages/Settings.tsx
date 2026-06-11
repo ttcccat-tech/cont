@@ -62,7 +62,7 @@ export default function SettingsPage() {
       // Kong 3.x settings via Admin API node-level config endpoint
       // Note: Many settings require restart. Here we save to localStorage as UI-level prefs.
       localStorage.setItem('cont_settings', JSON.stringify(values))
-      message.success('設定已儲存（部分設定需重啟 Kong 生效）')
+      message.success('設定已儲存')
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
@@ -151,7 +151,7 @@ export default function SettingsPage() {
                   {LOG_LEVELS.map(l => <Select.Option key={l} value={l}>{l.toUpperCase()}</Select.Option>)}
                 </Select>
               </Form.Item>
-              <Form.Item name="real_ip_header" label="真實客戶端 IP Header" extra="Kong 前面有代理時用於取得真實 IP">
+              <Form.Item name="real_ip_header" label="真實客戶端 IP Header" extra="前面有代理時用於取得真實 IP">
                 <Input placeholder="X-Forwarded-For" />
               </Form.Item>
               <Form.Item name="real_ip_recursive" label="遞迴解析 IP" valuePropName="checked">
