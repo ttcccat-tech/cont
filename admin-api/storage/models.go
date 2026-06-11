@@ -284,14 +284,15 @@ type WorkspaceUserAssignment struct {
 }
 
 type User struct {
-	ID          string `json:"id"`
-	Username    string `json:"username" binding:"required,max=255"`
+	ID        string `json:"id"`
+	Username  string `json:"username" binding:"required,max=255"`
 	DisplayName string `json:"display_name,omitempty" binding:"omitempty,max=255"`
-	Email       string `json:"email,omitempty" binding:"omitempty,email"`
-	Role        string `json:"role" binding:"required,oneof=admin editor viewer"`
-	Enabled     bool   `json:"enabled"`
-	CreatedAt   string `json:"created_at,omitempty"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
+	Email     string `json:"email,omitempty" binding:"omitempty,email"`
+	Role      string `json:"role" binding:"required,oneof=admin editor viewer"`
+	Enabled   bool   `json:"enabled"`
+	OrgID     string `json:"org_id,omitempty"` // Organization ID for multi-tenancy
+	CreatedAt string `json:"created_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 	// PasswordHash is never returned via JSON
 	PasswordHash string         `json:"-"`
 	Groups       []UserGroupRef `json:"groups,omitempty"`
@@ -301,6 +302,28 @@ type User struct {
 type UserGroupRef struct {
 	Name  string `json:"name"`
 	Label string `json:"label,omitempty"`
+}
+
+// ── Organizations (SaaS multi-tenancy) ────────────────────────────────────
+
+type Organization struct {
+	ID        string `json:"id"`
+	Name      string `json:"name" binding:"required,max=255"`
+	Plan      string `json:"plan,omitempty" binding:"omitempty,oneof=free pro enterprise"`
+	CreatedAt string `json:"created_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
+// ── OTP for email verification ──────────────────────────────────────────────
+
+type OTP struct {
+	ID        int64  `json:"id"`
+	Email     string `json:"email"`
+	Code      string `json:"code"`
+	Purpose   string `json:"purpose"` // "register", "reset-password"
+	ExpiresAt string `json:"expires_at"`
+	Verified  bool   `json:"verified"`
+	CreatedAt string `json:"created_at,omitempty"`
 }
 
 // ── /status response ────────────────────────────────────────────────────────

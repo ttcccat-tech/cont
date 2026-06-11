@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Form, Input, Button, Alert, Divider, message, Spin } from 'antd'
-import { UserOutlined, LockOutlined, GoogleOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { UserOutlined, LockOutlined, GoogleOutlined, SafetyCertificateOutlined, MailOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 
@@ -139,6 +139,14 @@ export default function Login() {
   const [oauthProviders, setOauthProviders] = useState<OAuth2Provider[]>([])
   const [loadingProviders, setLoadingProviders] = useState(true)
 
+  // Registration state
+  const [isRegister, setIsRegister] = useState(false)
+  const [regStep, setRegStep] = useState<1 | 2>(1) // 1=send-otp, 2=verify-otp
+  const [regEmail, setRegEmail] = useState('')
+  const [regLoading, setRegLoading] = useState(false)
+  const [regCountdown, setRegCountdown] = useState(0)
+  const [regError, setRegError] = useState('')
+
   // Fetch available OAuth providers on mount
   useEffect(() => {
     axios.get(`${API_BASE}/auth/oauth/providers`)
@@ -207,6 +215,250 @@ export default function Login() {
     }
   }
 
+  // ── Registration flow ─────────────────────────────────────────────────────
+
+  const handleSendOTP = async (values: { email: string }) => {
+    setRegLoading(true)
+    setRegError('')
+    try {
+      await axios.post(`${API_BASE}/auth/register/send-otp`, {
+        email: values.email,
+        purpose: 'register',
+      })
+      setRegEmail(values.email)
+      setRegStep(2)
+      setRegCountdown(600) // 10 minutes
+      message.success('驗證碼已發送至您的信箱')
+    } catch (err: any) {
+      setRegError(err?.response?.data?.error || '發送驗證碼失敗')
+    } finally {
+      setRegLoading(false)
+    }
+  }
+
+  const handleVerifyOTP = async (values: { code: string; username: string; password: string; display_name?: string }) => {
+    setRegLoading(true)
+    setRegError('')
+    try {
+      const res = await axios.post(`${API_BASE}/auth/register/verify-otp`, {
+        email: regEmail,
+        code: values.code,
+        purpose: 'register',
+        username: values.username,
+        password: values.password,
+        display_name: values.display_name || values.username,
+      })
+      const { token } = res.data
+      setToken(token)
+      setUserPerms(res.data.permissions || {})
+      message.success('帳戶註冊成功！即將跳轉至管理平台...')
+      setTimeout(() => navigate('/dashboard'), 1500)
+    } catch (err: any) {
+      setRegError(err?.response?.data?.error || '驗證失敗，請確認驗證碼是否正確')
+    } finally {
+      setRegLoading(false)
+    }
+  }
+
+  const handleResendOTP = async () => {
+    setRegCountdown(600)
+    setRegError('')
+    try {
+      await axios.post(`${API_BASE}/auth/register/send-otp`, {
+        email: regEmail,
+        purpose: 'register',
+      })
+      message.success('驗證碼已重新發送')
+    } catch (err: any) {
+      setRegError(err?.response?.data?.error || '發送失敗')
+    }
+  }
+
+  const switchToRegister = () => {
+    setIsRegister(true)
+    setRegStep(1)
+    setRegEmail('')
+    setRegError('')
+  }
+
+  const switchToLogin = () => {
+    setIsRegister(false)
+    setRegStep(1)
+    setRegEmail('')
+    setRegError('')
+  }
+
+  if (isRegister && regStep === 2) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'var(--primary)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <div style={{
+          background: 'var(--secondary)',
+          border: '1px solid var(--accent)',
+          borderRadius: 12,
+          padding: '40px 32px',
+          width: 360,
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, var(--highlight), var(--accent))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 24,
+              fontWeight: 700,
+              margin: '0 auto 12px',
+            }}>
+              K
+            </div>
+            <h2 style={{ color: 'var(--text)', margin: 0 }}>驗證您的信箱</h2>
+            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '4px 0 0' }}>
+              已發送驗證碼至 {regEmail}
+            </p>
+          </div>
+
+          {regError && <Alert type="error" message={regError} style={{ marginBottom: 16 }} />}
+
+          <Form
+            onFinish={handleVerifyOTP}
+            layout="vertical"
+            requiredMark={false}
+          >
+            <Form.Item
+              name="code"
+              rules={[{ required: true, message: '請輸入驗證碼' }, { len: 6, message: '驗證碼為 6 位數' }]}
+            >
+              <Input
+                placeholder="6 位驗證碼"
+                size="large"
+                maxLength={6}
+                style={{ textAlign: 'center', letterSpacing: 4, fontSize: 18 }}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="username"
+              rules={[{ required: true, message: '請輸入帳號' }, { min: 3, message: '帳號至少 3 個字元' }]}
+            >
+              <Input prefix={<UserOutlined />} placeholder="帳號" size="large" />
+            </Form.Item>
+
+            <Form.Item
+              name="password"
+              rules={[{ required: true, message: '請輸入密碼' }, { min: 6, message: '密碼至少 6 位' }]}
+            >
+              <Input.Password prefix={<LockOutlined />} placeholder="密碼" size="large" />
+            </Form.Item>
+
+            <Form.Item
+              name="display_name"
+            >
+              <Input prefix={<UserOutlined />} placeholder="顯示名稱（選填）" size="large" />
+            </Form.Item>
+
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button type="primary" htmlType="submit" size="large" loading={regLoading} block>
+                註冊並登入
+              </Button>
+            </Form.Item>
+          </Form>
+
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+            <Button type="link" size="small" onClick={() => setRegStep(1)} style={{ color: 'var(--muted)' }}>
+              重新輸入信箱
+            </Button>
+            <Button type="link" size="small" onClick={switchToLogin} style={{ color: 'var(--muted)' }}>
+              返回登入
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isRegister) {
+    // Step 1: enter email to receive OTP
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'var(--primary)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <div style={{
+          background: 'var(--secondary)',
+          border: '1px solid var(--accent)',
+          borderRadius: 12,
+          padding: '40px 32px',
+          width: 360,
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, var(--highlight), var(--accent))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 24,
+              fontWeight: 700,
+              margin: '0 auto 12px',
+            }}>
+              K
+            </div>
+            <h2 style={{ color: 'var(--text)', margin: 0 }}>建立新帳戶</h2>
+            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '4px 0 0' }}>
+              輸入 email 收取驗證碼
+            </p>
+          </div>
+
+          {regError && <Alert type="error" message={regError} style={{ marginBottom: 16 }} />}
+
+          <Form
+            onFinish={handleSendOTP}
+            layout="vertical"
+            requiredMark={false}
+          >
+            <Form.Item
+              name="email"
+              rules={[{ required: true, message: '請輸入 email' }, { type: 'email', message: '格式不正確' }]}
+            >
+              <Input
+                prefix={<MailOutlined style={{ color: 'var(--muted)' }} />}
+                placeholder="電子郵件"
+                size="large"
+                type="email"
+              />
+            </Form.Item>
+
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button type="primary" htmlType="submit" size="large" loading={regLoading} block>
+                發送驗證碼
+              </Button>
+            </Form.Item>
+          </Form>
+
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <Button type="link" onClick={switchToLogin} style={{ color: 'var(--muted)', fontSize: 12 }}>
+              已有帳戶？立即登入
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Login form (default)
   return (
     <div style={{
       minHeight: '100vh',
@@ -343,6 +595,12 @@ export default function Login() {
 
         <div style={{ marginTop: 24, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
           <p>Demo: admin / admin123 (full access) or user / user123 (limited)</p>
+          <p style={{ marginTop: 12 }}>
+            还没有帐户？{' '}
+            <Button type="link" size="small" onClick={switchToRegister} style={{ color: 'var(--highlight)', padding: 0, height: 'auto', fontSize: 12 }}>
+              立即注册
+            </Button>
+          </p>
         </div>
       </div>
     </div>

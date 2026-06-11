@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -1196,6 +1197,161 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 			},
 			Permissions: buildPermissions(user.Role),
 		})
+	}
+}
+
+// SendOTP sends a one-time password to the given email
+func SendOTP(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email   string `json:"email" binding:"required,email"`
+			Purpose string `json:"purpose" binding:"required,oneof=register reset-password"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request: " + err.Error()})
+			return
+		}
+
+		// Generate 6-digit OTP
+		code := ""
+		for i := 0; i < 6; i++ {
+			code += fmt.Sprintf("%d", (time.Now().UnixNano()/int64(i+1))%10)
+		}
+		// Simple 6-digit numeric code using crypto/rand
+		b := make([]byte, 3)
+		rand.Read(b)
+		code = fmt.Sprintf("%06d", int(b[0])*256+int(b[1])*16+int(b[2]))
+
+		// Store OTP (expires in 10 minutes)
+		otp, err := store.CreateOTP(req.Email, code, req.Purpose, 10)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to create OTP"})
+			return
+		}
+
+		// TODO: In production, send code via email/SMS. For now, log it.
+		// In dev mode, the code is returned so we can test easily.
+		log.Printf("[OTP] To %s (purpose=%s): %s", req.Email, req.Purpose, code)
+
+		c.JSON(200, gin.H{
+			"message":   "verification code sent",
+			"otp_id":    otp.ID,
+			"expires_in": 600, // seconds
+			// NOTE: In dev mode only — remove in production
+			"code": code,
+		})
+	}
+}
+
+// VerifyOTP verifies the OTP and creates user+organization if registration
+func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email       string `json:"email" binding:"required,email"`
+			Code        string `json:"code" binding:"required,len=6"`
+			Purpose     string `json:"purpose" binding:"required,oneof=register reset-password"`
+			Password    string `json:"password,omitempty"`  // required for register
+			Username    string `json:"username,omitempty"`  // required for register
+			DisplayName string `json:"display_name,omitempty"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request: " + err.Error()})
+			return
+		}
+
+		// Find and validate OTP
+		otp, err := store.GetOTP(req.Email, req.Code, req.Purpose)
+		if err != nil || otp == nil {
+			c.JSON(400, gin.H{"error": "invalid or expired verification code"})
+			return
+		}
+
+		if req.Purpose == "register" {
+			// Validate registration fields
+			if req.Username == "" || req.Password == "" {
+				c.JSON(400, gin.H{"error": "username and password are required for registration"})
+				return
+			}
+			if len(req.Password) < 6 {
+				c.JSON(400, gin.H{"error": "password must be at least 6 characters"})
+				return
+			}
+
+			// Check if username already exists
+			existing, _ := store.GetUserByUsername(req.Username)
+			if existing != nil {
+				c.JSON(409, gin.H{"error": "username already taken"})
+				return
+			}
+
+			// Create organization first
+			orgName := req.Username + "-org" // default org name
+			org := &storage.Organization{Name: orgName, Plan: "free"}
+			org, err = store.CreateOrganization(org)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "failed to create organization"})
+				return
+			}
+
+			// Hash password
+			hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "failed to hash password"})
+				return
+			}
+
+			// Create user
+			displayName := req.DisplayName
+			if displayName == "" {
+				displayName = req.Username
+			}
+			user := &storage.User{
+				Username:    req.Username,
+				PasswordHash: string(hash),
+				DisplayName: displayName,
+				Email:       req.Email,
+				Role:        "admin", // First user is admin of their org
+				OrgID:       org.ID,
+				Enabled:     true,
+			}
+			user, err = store.CreateUser(user)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "failed to create user: " + err.Error()})
+				return
+			}
+
+			// Mark OTP as verified
+			store.MarkOTPVerified(otp.ID)
+
+			// Generate JWT
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+				"sub":      user.ID,
+				"username": user.Username,
+				"role":     user.Role,
+				"exp":      time.Now().Add(24 * time.Hour).Unix(),
+				"iat":      time.Now().Unix(),
+			})
+			tokenStr, _ := token.SignedString([]byte(jwtSecret))
+
+			c.JSON(201, gin.H{
+				"token": tokenStr,
+				"user": gin.H{
+					"id":           user.ID,
+					"username":     user.Username,
+					"display_name": user.DisplayName,
+					"email":        user.Email,
+					"role":         user.Role,
+					"org_id":       user.OrgID,
+				},
+				"organization": gin.H{
+					"id":   org.ID,
+					"name": org.Name,
+					"plan": org.Plan,
+				},
+			})
+		} else {
+			c.JSON(400, gin.H{"error": "reset-password not yet implemented"})
+		}
 	}
 }
 

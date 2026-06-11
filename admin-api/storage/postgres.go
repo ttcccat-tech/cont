@@ -329,6 +329,31 @@ func RunMigrations(db *sql.DB) error {
 		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS scopes TEXT`,
 		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`,
 		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS key_value TEXT`,
+
+		// Organizations (SaaS multi-tenancy Phase 1)
+		`CREATE TABLE IF NOT EXISTS organizations (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			name TEXT UNIQUE NOT NULL,
+			plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'enterprise')),
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+
+		// OTP for email verification (registration flow)
+		`CREATE TABLE IF NOT EXISTS otps (
+			id SERIAL PRIMARY KEY,
+			email TEXT NOT NULL,
+			code TEXT NOT NULL,
+			purpose TEXT NOT NULL CHECK (purpose IN ('register', 'reset-password')),
+			expires_at TIMESTAMPTZ NOT NULL,
+			verified BOOLEAN DEFAULT false,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_otps_email ON otps(email, purpose)`,
+
+		// Add org_id to users for multi-tenancy
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_users_org ON users(org_id)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

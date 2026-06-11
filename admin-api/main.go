@@ -64,6 +64,8 @@ func main() {
 	auth := r.Group("/auth")
 	{
 		auth.POST("/login", routes.Login(store, jwtSecret))
+		auth.POST("/register/send-otp", routes.SendOTP(store))
+		auth.POST("/register/verify-otp", routes.VerifyOTP(store, jwtSecret))
 		auth.GET("/me", routes.AuthRequired(jwtSecret), routes.GetMe(jwtSecret))
 		// OAuth2/OIDC SSO
 		auth.GET("/oauth/providers", routes.ListOAuthProviders(store))

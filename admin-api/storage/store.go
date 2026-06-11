@@ -1173,6 +1173,115 @@ func (s *Store) UpdateUserPassword(id, passwordHash string) error {
 	return err
 }
 
+// ── Organizations (SaaS multi-tenancy) ───────────────────────────────────
+
+func (s *Store) CreateOrganization(org *Organization) (*Organization, error) {
+	err := s.db.QueryRow(`
+		INSERT INTO organizations (name, plan) VALUES ($1, $2)
+		RETURNING id, created_at, updated_at
+	`, org.Name, org.Plan).Scan(&org.ID, &org.CreatedAt, &org.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return org, nil
+}
+
+func (s *Store) GetOrganization(id string) (*Organization, error) {
+	row := s.db.QueryRow(`SELECT id, name, plan, created_at, updated_at FROM organizations WHERE id=$1`, id)
+	var org Organization
+	err := row.Scan(&org.ID, &org.Name, &org.Plan, &org.CreatedAt, &org.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &org, nil
+}
+
+func (s *Store) GetOrganizationByName(name string) (*Organization, error) {
+	row := s.db.QueryRow(`SELECT id, name, plan, created_at, updated_at FROM organizations WHERE name=$1`, name)
+	var org Organization
+	err := row.Scan(&org.ID, &org.Name, &org.Plan, &org.CreatedAt, &org.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &org, nil
+}
+
+func (s *Store) ListOrganizations() ([]Organization, error) {
+	rows, err := s.db.Query(`SELECT id, name, plan, created_at, updated_at FROM organizations ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Organization
+	for rows.Next() {
+		var o Organization
+		if err := rows.Scan(&o.ID, &o.Name, &o.Plan, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+// ── OTP for email verification ───────────────────────────────────────────
+
+func (s *Store) CreateOTP(email, code, purpose string, expiresInMinutes int) (*OTP, error) {
+	// Delete any existing unverified OTP for this email+purpose
+	s.db.Exec(`DELETE FROM otps WHERE email=$1 AND purpose=$2 AND verified=false`, email, purpose)
+
+	var otp OTP
+	err := s.db.QueryRow(`
+		INSERT INTO otps (email, code, purpose, expires_at)
+		VALUES ($1, $2, $3, NOW() + $4 * INTERVAL '1 minute')
+		RETURNING id, email, code, purpose, expires_at, verified, created_at
+	`, email, code, purpose, expiresInMinutes).Scan(
+		&otp.ID, &otp.Email, &otp.Code, &otp.Purpose, &otp.ExpiresAt, &otp.Verified, &otp.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &otp, nil
+}
+
+func (s *Store) GetOTP(email, code, purpose string) (*OTP, error) {
+	row := s.db.QueryRow(`
+		SELECT id, email, code, purpose, expires_at, verified, created_at
+		FROM otps
+		WHERE email=$1 AND purpose=$2 AND verified=false
+		AND expires_at > NOW()
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, email, purpose)
+	var otp OTP
+	err := row.Scan(&otp.ID, &otp.Email, &otp.Code, &otp.Purpose, &otp.ExpiresAt, &otp.Verified, &otp.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	// Verify code matches
+	if otp.Code != code {
+		return nil, nil
+	}
+	return &otp, nil
+}
+
+func (s *Store) MarkOTPVerified(id int64) error {
+	_, err := s.db.Exec(`UPDATE otps SET verified=true WHERE id=$1`, id)
+	return err
+}
+
+func (s *Store) DeleteOTP(id int64) error {
+	_, err := s.db.Exec(`DELETE FROM otps WHERE id=$1`, id)
+	return err
+}
+
 // ── Auth Groups ────────────────────────────────────────────────────────────
 
 func (s *Store) ListAuthGroups() ([]AuthGroup, error) {
