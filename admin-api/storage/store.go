@@ -25,7 +25,7 @@ func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error)
 		       connect_timeout, read_timeout, write_timeout, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM services
-		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
+		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -103,7 +103,7 @@ func (s *Store) GetService(id, orgID string) (*Service, error) {
 		SELECT id, name, protocol, host, port, path, url, retries,
 		       connect_timeout, read_timeout, write_timeout, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
-		FROM services WHERE id = $1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`, id, orgID))
+		FROM services WHERE id = $1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`, id, orgID))
 }
 
 func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) {
@@ -127,7 +127,7 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 }
 
 func (s *Store) DeleteService(id, orgID string) error {
-	_, err := s.db.Exec("DELETE FROM services WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)", id, orgID)
+	_, err := s.db.Exec("DELETE FROM services WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))", id, orgID)
 	return err
 }
 
@@ -181,7 +181,7 @@ func (s *Store) GetServiceByName(name, orgID string) (*Service, error) {
 		SELECT id, name, protocol, host, port, path, url, retries,
 		       connect_timeout, read_timeout, write_timeout, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
-		FROM services WHERE name=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`, name, orgID)
+		FROM services WHERE name=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`, name, orgID)
 	return s.getOneService(row)
 }
 
@@ -194,7 +194,7 @@ func (s *Store) ListRoutes(orgID string, limit, offset int) ([]Route, error) {
 		       https_redirect_status_code, connection_timeout, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM routes
-		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
+		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -270,7 +270,7 @@ func (s *Store) GetRoute(id, orgID string) (*Route, error) {
 		       strip_path, preserve_host, regex_priority,
 		       https_redirect_status_code, connection_timeout, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
-		FROM routes WHERE id = $1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`, id, orgID)
+		FROM routes WHERE id = $1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`, id, orgID)
 	var r Route
 	var name, serviceID sql.NullString
 	var protocols, hosts, paths, methods []byte
@@ -325,7 +325,7 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 }
 
 func (s *Store) DeleteRoute(id, orgID string) error {
-	_, err := s.db.Exec("DELETE FROM routes WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)", id, orgID)
+	_, err := s.db.Exec("DELETE FROM routes WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))", id, orgID)
 	return err
 }
 
@@ -336,7 +336,7 @@ func (s *Store) ListUpstreams(orgID string, limit, offset int) ([]Upstream, erro
 		SELECT id, name, algorithm, slots, healthchecks, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM upstreams
-		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
+		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -400,7 +400,7 @@ func (s *Store) GetUpstream(id, orgID string) (*Upstream, error) {
 	err := s.db.QueryRow(`
 		SELECT id, name, algorithm, slots, healthchecks, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
-		FROM upstreams WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`,
+		FROM upstreams WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`,
 		id, orgID).Scan(
 		&u.ID, &name, &algorithm, &slots, &healthchecks, &enabled, &u.OrgID, &created, &updated)
 	if err != nil {
@@ -433,7 +433,7 @@ func (s *Store) UpdateUpstream(id, orgID string, u *Upstream) (*Upstream, error)
 }
 
 func (s *Store) DeleteUpstream(id, orgID string) error {
-	_, err := s.db.Exec("DELETE FROM upstreams WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)", id, orgID)
+	_, err := s.db.Exec("DELETE FROM upstreams WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))", id, orgID)
 	return err
 }
 
@@ -515,7 +515,7 @@ func (s *Store) ListConsumers(orgID string, limit, offset int) ([]Consumer, erro
 		SELECT id, username, custom_id, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM consumers
-		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
+		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -573,7 +573,7 @@ func (s *Store) GetConsumer(id, orgID string) (*Consumer, error) {
 	err := s.db.QueryRow(`
 		SELECT id, username, custom_id, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
-		FROM consumers WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`,
+		FROM consumers WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`,
 		id, orgID).Scan(
 		&c.ID, &username, &customID, &enabled, &c.OrgID, &created, &updated)
 	if err != nil {
@@ -602,7 +602,7 @@ func (s *Store) UpdateConsumer(id, orgID string, c *Consumer) (*Consumer, error)
 }
 
 func (s *Store) DeleteConsumer(id, orgID string) error {
-	_, err := s.db.Exec("DELETE FROM consumers WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)", id, orgID)
+	_, err := s.db.Exec("DELETE FROM consumers WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))", id, orgID)
 	return err
 }
 
@@ -699,7 +699,7 @@ func (s *Store) ListPlugins(orgID string, limit, offset int) ([]Plugin, error) {
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM plugins
-		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
+		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -782,7 +782,7 @@ func (s *Store) GetPlugin(id, orgID string) (*Plugin, error) {
 	err := s.db.QueryRow(`
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
-		FROM plugins WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`,
+		FROM plugins WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`,
 		id, orgID).Scan(
 		&p.ID, &name, &routeID, &serviceID, &consumerID,
 		&config, &enabled, &p.OrgID, &created, &updated)
@@ -834,7 +834,7 @@ func (s *Store) UpdatePlugin(id, orgID string, p *Plugin) (*Plugin, error) {
 }
 
 func (s *Store) DeletePlugin(id, orgID string) error {
-	_, err := s.db.Exec("DELETE FROM plugins WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)", id, orgID)
+	_, err := s.db.Exec("DELETE FROM plugins WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))", id, orgID)
 	return err
 }
 
@@ -844,7 +844,7 @@ func (s *Store) ListWorkspaces(orgID string) ([]Workspace, error) {
 	query := `
 		SELECT id, name, COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at
 		FROM workspaces
-		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
+		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC`
 	rows, err := s.db.Query(query, orgID)
 	if err != nil {
@@ -889,7 +889,7 @@ func (s *Store) GetWorkspace(id string, orgID string) (*Workspace, error) {
 	query := `SELECT id, name, COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at FROM workspaces WHERE id=$1`
 	args := []interface{}{id}
 	if orgID != "" {
-		query += ` AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`
+		query += ` AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`
 		args = append(args, orgID)
 	}
 	err := s.db.QueryRow(query, args...).Scan(&w.ID, &name, &w.OrgID, &created)
@@ -916,7 +916,7 @@ func (s *Store) UpdateWorkspace(id string, w *Workspace, orgID string) (*Workspa
 }
 
 func (s *Store) DeleteWorkspace(id string, orgID string) error {
-	_, err := s.db.Exec(`DELETE FROM workspaces WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`, id, orgID)
+	_, err := s.db.Exec(`DELETE FROM workspaces WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`, id, orgID)
 	return err
 }
 
