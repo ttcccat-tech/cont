@@ -18,8 +18,8 @@ import (
 const (
 	baseURL       = "http://localhost:18081"
 	proxyURL      = "http://localhost:18000"
-	adminUser     = "e2e_admin"
-	adminPass     = "cont1234"
+	adminUser     = "admin"
+	adminPass     = "admin123"
 	editorUser    = "editor1"
 	editorPass    = "password123"
 	waitTimeout   = 30 * time.Second
@@ -130,6 +130,113 @@ func TestAuthMe(t *testing.T) {
 		t.Errorf("Expected username %s, got %v", adminUser, me["username"])
 	}
 	t.Logf("Auth /me OK: role=%v", me["role"])
+}
+
+func TestAuthInvalidCredentials(t *testing.T) {
+	checkServicesUp(t)
+
+	body := map[string]interface{}{"username": "admin", "password": "wrongpassword"}
+	resp, err := http.Post(baseURL+"/auth/login", "application/json", jsonBody(body))
+	if err != nil {
+		t.Fatalf("POST /auth/login failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Expected 401, got %d: %s", resp.StatusCode, string(b))
+	}
+	t.Log("Auth invalid credentials OK: 401")
+}
+
+func TestAuthEditorLogin(t *testing.T) {
+	checkServicesUp(t)
+
+	body := map[string]interface{}{"username": editorUser, "password": editorPass}
+	resp, err := http.Post(baseURL+"/auth/login", "application/json", jsonBody(body))
+	if err != nil {
+		t.Fatalf("POST /auth/login for editor failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Skipf("Editor login failed (user may not exist): %d: %s", resp.StatusCode, string(b))
+		return
+	}
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	token, ok := result["token"].(string)
+	if !ok || token == "" {
+		t.Fatal("No token in editor login response")
+	}
+	editorToken = token
+	t.Logf("Editor token obtained: %s...", token[:20])
+}
+
+func TestAuthUnauthorizedAccess(t *testing.T) {
+	checkServicesUp(t)
+
+	// GET without token
+	req, _ := http.NewRequest("GET", baseURL+"/services", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /services without token failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("Expected 401 without token, got %d", resp.StatusCode)
+	}
+	t.Log("Unauthorized access OK: 401 without token")
+
+	// GET with invalid token
+	req2, _ := http.NewRequest("GET", baseURL+"/services", nil)
+	req2.Header.Set("Authorization", "Bearer invalid-token-xyz")
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatalf("GET /services with invalid token failed: %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("Expected 401 with invalid token, got %d", resp2.StatusCode)
+	}
+	t.Log("Invalid token access OK: 401 with invalid token")
+}
+
+func TestAuthMePermissions(t *testing.T) {
+	if adminToken == "" {
+		t.Skip("No admin token")
+	}
+
+	req, _ := http.NewRequest("GET", baseURL+"/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /auth/me failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	var me map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&me)
+
+	// Check permissions structure
+	perms, ok := me["permissions"].(map[string]interface{})
+	if !ok {
+		t.Fatal("No permissions in /auth/me response")
+	}
+
+	// Admin should have full permissions
+	for _, entity := range []string{"services", "routes", "consumers", "plugins"} {
+		if _, ok := perms[entity]; !ok {
+			t.Errorf("Missing permissions for entity %s", entity)
+		}
+	}
+	t.Logf("Auth /me permissions OK: %d entities", len(perms))
 }
 
 // ---- Services CRUD ----
@@ -304,15 +411,14 @@ func TestRoutesCreate(t *testing.T) {
 	svcID, _ := svc["id"].(string)
 
 	routeBody := map[string]interface{}{
-		"name":             "e2e-test-route",
-		"service_id":       svcID,
-		"protocol":         "http",
-		"host":             "localhost",
-		"port":             8080,
+		"name":             fmt.Sprintf("e2e-route-%d", time.Now().UnixNano()),
+		"service":          map[string]interface{}{"id": svcID},
+		"protocols":         []string{"http"},
+		"hosts":            []string{"localhost"},
 		"paths":            []string{"/e2e-test"},
 		"strip_path":       true,
 		"preserve_host":    false,
-		"enabled":          true,
+		"enabled":         true,
 	}
 	resp, err := adminReq("POST", "/routes", adminToken, routeBody)
 	if err != nil {
