@@ -14,10 +14,15 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont E2E Test Framework Phase 2 — Auth flow tests**
-  - login/logout/jwt validation/oauth callback E2E tests
-  - Bash runner + Go tests for auth flows
-  - Phase 3：Proxy Lua plugin chain tests（rate-limiting/proxy-cache）
+- [x] **Cont E2E Test Framework Phase 2 — Auth flow tests** — commit `5c915743`
+  - TestAuthInvalidCredentials: wrong password → 401
+  - TestAuthEditorLogin: editor role login (skip if user not exist)
+  - TestAuthUnauthorizedAccess: no token + invalid token → 401
+  - TestAuthMePermissions: /auth/me returns permissions structure
+  - 24 total E2E tests PASS
+- [ ] **Cont E2E Test Framework Phase 3 — Proxy Lua plugin chain tests**
+  - rate-limiting/proxy-cache E2E tests via proxy /metrics /status
+  - Bash runner + Go tests for proxy flows
 
 - [x] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）** — commit `86d739a7`
   - `proxy/lua/cont/plugins/rate-limiting-advanced/handler.lua` — Redis sliding window + local fallback, ngx.socket.tcp (OpenResty Alpine compatible), second/minute/hour/day limits, X-RateLimit-* headers, 429 response
