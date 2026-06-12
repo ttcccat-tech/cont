@@ -88,6 +88,7 @@ export interface KongPlugin {
   id?: string; name: string; service?: { id: string }
   consumer?: { id: string }; route?: { id: string }
   config?: Record<string, unknown>; enabled?: boolean; created_at?: number
+  scope?: string // global, workspace, service, route, consumer
 }
 
 export interface KongConsumer {
