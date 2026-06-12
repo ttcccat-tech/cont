@@ -20,9 +20,10 @@
   - TestAuthUnauthorizedAccess: no token + invalid token → 401
   - TestAuthMePermissions: /auth/me returns permissions structure
   - 24 total E2E tests PASS
-- [ ] **Cont E2E Test Framework Phase 3 — Proxy Lua plugin chain tests**
-  - rate-limiting/proxy-cache E2E tests via proxy /metrics /status
-  - Bash runner + Go tests for proxy flows
+- [x] **Cont E2E Test Framework Phase 3 — Proxy Lua plugin chain tests** — commit `25492669`
+  - Bash runner: `test/e2e-proxy-plugins.sh` (20 tests) — /metrics, /status, proxy /, rate-limit/cache headers, /internal/plugins, service+plugins CRUD, consumer+key-auth CRUD, Prometheus format
+  - Go E2E tests (6 new tests) — TestProxyMetricsFormat, TestProxyStatusFormat, TestProxyRootRequest, TestInternalPluginsList, TestServiceWithPlugins, TestConsumerKeyAuthCredential
+  - 20 bash tests PASS, Go build OK
 
 - [x] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）** — commit `86d739a7`
   - `proxy/lua/cont/plugins/rate-limiting-advanced/handler.lua` — Redis sliding window + local fallback, ngx.socket.tcp (OpenResty Alpine compatible), second/minute/hour/day limits, X-RateLimit-* headers, 429 response
