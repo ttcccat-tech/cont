@@ -57,7 +57,7 @@ func ListPlans(store *storage.Store) gin.HandlerFunc {
 
 func GetSubscription(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		orgID := getOrgID(c)
+		orgID := c.GetString("org_id")
 		if orgID == "" {
 			// No org_id from context — look up via user
 			userID, _ := c.Get("sub")
@@ -98,7 +98,7 @@ func CreateCheckoutSession(store *storage.Store, frontendBaseURL string) gin.Han
 			return
 		}
 
-		orgID := getOrgID(c)
+		orgID := c.GetString("org_id")
 		if orgID == "" {
 			c.JSON(400, gin.H{"error": "organization ID required"})
 			return
