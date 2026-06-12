@@ -14,13 +14,12 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）**
-  - 現況：Plugin CRUD + sync 已完成，但 Lua handler 只有 rate-limiting（基本版），無 Redis 同步、sliding window、proxy cache
-  - 本輪開始實作：
-    - `proxy/lua/cont/plugins/rate-limiting-advanced.lua` — Redis sliding window、burst、local counter fallback
-    - `proxy/lua/cont/plugins/proxy-cache-advanced.lua` — Redis/Memory cache、TTL、content type filtering
-    - access.lua plugin chain 呼叫每個 plugin 的 `handler.access()` / `handler.header_filter()` / `handler.body_filter()`
-  - QA: curl 測試 rate-limit (Redis + local fallback), curl 測試 cache hit/miss header
+- [x] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）** — commit `86d739a7`
+  - `proxy/lua/cont/plugins/rate-limiting-advanced/handler.lua` — Redis sliding window + local fallback, ngx.socket.tcp (OpenResty Alpine compatible), second/minute/hour/day limits, X-RateLimit-* headers, 429 response
+  - `proxy/lua/cont/plugins/proxy-cache-advanced/handler.lua` — Redis/local cache, access phase cache lookup with nginx var routing, body_filter phase accumulation+storage, X-Cache-Status: HIT/MISS, content-type filtering, TTL, vary headers, status code filtering
+  - `proxy/lua/cont/plugins/rate-limiting/` → `rate-limiting-basic/` (rename for backward compat)
+  - `nginx.conf` — adds `cont_proxy_cache 50m` shared dict, `$cont_cache_key`/`$cont_cache_hit` variables
+  - QA: luac syntax OK ✅, nginx -t OK ✅, 15 Lua tests ✅, /metrics 200 ✅, /status 200 ✅, proxy / 200 ✅
 
 - [x] **Cont Auth 正式實作（JWT / OAuth2 / SSO）** — 登入頁面優化與現有用戶遷移
   - 本輪發現 testadmin 用戶密碼無法通過登入驗證（db 中無有效 bcrypt hash）
