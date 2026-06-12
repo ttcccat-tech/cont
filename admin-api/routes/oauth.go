@@ -31,10 +31,10 @@ type OAuthProvider struct {
 
 // OAuthState represents a temporary OAuth state for CSRF protection
 type OAuthState struct {
-	State       string `json:"state"`
-	Provider    string `json:"provider"`
-	RedirectURI string `json:"redirect_uri,omitempty"`
-	ExpiresAt   int64  `json:"expires_at"`
+	State       string    `json:"state"`
+	Provider    string    `json:"provider"`
+	RedirectURI string    `json:"redirect_uri,omitempty"`
+	ExpiresAt   time.Time `json:"expires_at"`
 }
 
 // OAuthUserInfo represents user info from the identity provider
@@ -205,7 +205,7 @@ func InitiateOAuth(store *storage.Store) gin.HandlerFunc {
 		state := base64.URLEncoding.EncodeToString(stateBytes)
 
 		// Store state in DB (expires in 10 minutes)
-		expiresAt := time.Now().Add(10 * time.Minute).Unix()
+		expiresAt := time.Now().Add(10 * time.Minute)
 		_, err = db.Exec(`
 			INSERT INTO oauth_states (state, provider, redirect_uri, expires_at)
 			VALUES ($1, $2, $3, $4) ON CONFLICT (state) DO UPDATE
@@ -269,7 +269,7 @@ func HandleOAuthCallback(store *storage.Store, jwtSecret string) gin.HandlerFunc
 			c.JSON(400, gin.H{"error": "invalid state"})
 			return
 		}
-		if time.Now().Unix() > storedState.ExpiresAt {
+		if time.Now().After(storedState.ExpiresAt) {
 			c.JSON(400, gin.H{"error": "state expired"})
 			return
 		}
