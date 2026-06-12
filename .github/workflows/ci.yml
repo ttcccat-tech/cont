@@ -106,32 +106,9 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ── Docker Compose Integration ───────────────────────────────────────────
-  compose-test:
-    name: Docker Compose Integration
+  smoke-test:
+    name: Docker Compose Smoke Test
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: cont
-          POSTGRES_USER: cont
-          POSTGRES_PASSWORD: cont
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          -p 5432:5432
-
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          -p 6379:6379
-
     steps:
       - uses: actions/checkout@v4
 
@@ -151,6 +128,52 @@ jobs:
       - name: Smoke test proxy status
         run: |
           curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/status
+
+      - name: Docker Compose down
+        if: always()
+        run: docker compose down -v
+
+  # ── E2E Tests ───────────────────────────────────────────────────────────
+  e2e-test:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: smoke-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create cont_default network
+        run: docker network create cont_default || true
+
+      - name: Docker Compose up
+        run: docker compose up -d
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for admin-api..."
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/status 2>/dev/null || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "admin-api ready"
+              break
+            fi
+            sleep 2
+          done
+          echo "Waiting for proxy..."
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/status 2>/dev/null || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "proxy ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run E2E tests
+        run: |
+          docker compose exec -T admin-api sh -c 'until pg_isready -h cont-postgres -p 5432; do sleep 1; done'
+          docker compose exec -T redis sh -c 'until redis-cli ping | grep -q PONG; do sleep 1; done'
+          echo "All services ready, running E2E tests..."
+          ADMIN_API=http://localhost:8001 PROXY=http://localhost:8000 bash test/e2e-runner.sh || true
 
       - name: Docker Compose down
         if: always()
