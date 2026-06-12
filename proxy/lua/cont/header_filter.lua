@@ -35,13 +35,6 @@ local function header_filter()
     ngx.header["Access-Control-Allow-Credentials"] = "true"
     ngx.header["Access-Control-Max-Age"] = "86400"
 
-    -- Rate limit headers (set by rate-limiting plugin access phase)
-    local upstream_limit = ngx.var.upstream_http_x_ratelimit_limit
-    if upstream_limit then
-        ngx.header["X-RateLimit-Limit"] = upstream_limit
-        ngx.header["X-RateLimit-Remaining"] = ngx.var.upstream_http_x_ratelimit_remaining or "0"
-    end
-
     -- Consumer info headers (set by access.lua)
     if ngx.ctx.authenticated_consumer_id then
         ngx.header["X-Consumer-ID"] = ngx.ctx.authenticated_consumer_id
