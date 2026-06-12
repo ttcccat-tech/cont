@@ -1,9 +1,6 @@
 -- cont.body_filter
 -- Response body transformation — JSON pretty-print, error wrapping, gzip handling
-
-local cont = require("init")
-
-local plugins = cont.plugins or {}
+-- NOTE: No init_by_lua context here; use _G.cont directly
 
 local function run_plugin_body_filter(plugin, eof)
     local plugin_name = plugin.name
@@ -83,7 +80,8 @@ local function wrap_error_response(chunk, eof)
 end
 
 -- Run plugin body filters
-for _, plugin in ipairs(plugins) do
+local cont = _G.cont or {}
+for _, plugin in ipairs(cont.plugins or {}) do
     run_plugin_body_filter(plugin, ngx.arg[2])
 end
 
