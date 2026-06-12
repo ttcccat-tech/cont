@@ -81,6 +81,7 @@ func main() {
 	// Internal endpoint for proxy auth validation (public, no auth)
 	r.GET("/internal/validate-cred/:type/:key", routes.ValidateCredential(store))
 	r.GET("/internal/validate-jwt/:token", routes.ValidateJWT(store, jwtSecret))
+	r.GET("/internal/plugins", routes.ListInternalPlugins(store))
 
 	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")

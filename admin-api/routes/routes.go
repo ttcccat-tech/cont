@@ -815,6 +815,56 @@ func ValidateJWT(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 	}
 }
 
+// ListInternalPlugins returns all enabled plugins for proxy runtime consumption.
+// Called by the Cont proxy's worker.lua during periodic config reload (no auth).
+func ListInternalPlugins(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Internal endpoint — no org filter (returns all orgs' plugins for proxy)
+		// Filter to enabled plugins only to keep payload small
+		plugins, err := store.ListPlugins("", 1000, 0) // "" = admin org, fetch all
+		if err != nil {
+			c.JSON(500, gin.H{"message": err.Error()})
+			return
+		}
+		// Filter to enabled only and strip bulky fields for proxy
+		type ProxyPlugin struct {
+			ID        string                 `json:"id"`
+			Name      string                 `json:"name"`
+			RouteID   string                 `json:"route_id,omitempty"`
+			ServiceID string                 `json:"service_id,omitempty"`
+			ConsumerID string                `json:"consumer_id,omitempty"`
+			Config    map[string]interface{} `json:"config,omitempty"`
+			Enabled   bool                   `json:"enabled"`
+		}
+		var out []ProxyPlugin
+		for _, p := range plugins {
+			if !p.Enabled {
+				continue
+			}
+			cfg := make(map[string]interface{})
+			if p.Config != nil {
+				json.Unmarshal(p.Config, &cfg)
+			}
+			var routeID, serviceID, consumerID string
+			if p.Route != nil {
+				routeID = p.Route.ID
+			}
+			if p.Service != nil {
+				serviceID = p.Service.ID
+			}
+			if p.Consumer != nil {
+				consumerID = p.Consumer.ID
+			}
+			out = append(out, ProxyPlugin{
+				ID: p.ID, Name: p.Name,
+				RouteID: routeID, ServiceID: serviceID, ConsumerID: consumerID,
+				Config: cfg, Enabled: p.Enabled,
+			})
+		}
+		c.JSON(200, gin.H{"plugins": out})
+	}
+}
+
 // ── Plugins ────────────────────────────────────────────────────────────────
 
 func ListPlugins(store *storage.Store) gin.HandlerFunc {
