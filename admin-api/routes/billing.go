@@ -417,7 +417,7 @@ func HandleStripeWebhook(store *storage.Store, webhookSecret string) gin.Handler
 			if err := json.Unmarshal(event.Data.Raw, &inv); err != nil {
 				break
 			}
-			log.Printf("Webhook: invoice payment failed for customer %s", inv.Customer)
+			log.Printf("Webhook: invoice payment failed for customer %s", inv.Customer.ID)
 
 		default:
 			log.Printf("Webhook: unhandled event type %s", event.Type)
