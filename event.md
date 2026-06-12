@@ -6,13 +6,20 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Resource-level RBAC 權限指派** — 待實作
-  - 現有 RBAC 僅支援 workspace-level roles（viewer/editor/admin），無法對特定 resource 做精細控制
-  - 提議：新增 `resource_permissions` table（user_id, auth_group_id, resource_type, resource_id, permission）
-  - 支援針對特定 service/route/upstream 的 viewer/editor/admin權限
-  - Backend: RequirePermission 升級，檢查 resource-level override > workspace-level default
-  - Frontend: 為 AuthGroups 頁面新增「Resource Permissions」tab，支援對特定資源指派權限
-  - QA: editor 對特定 service降為 viewer →該 service GET 可讀，其他 service 維持 editor權限
+- [ ] **Cont 使用者管理（RBAC 權限）** — 待實作
+  - 使用者管理精細化（Workspace 級 RBAC）已完成
+  - 下一階段：Resource-level RBAC UI（針對 service/route/upstream 的精細權限）
+
+- [x] **Cont Resource-level RBAC 權限指派** — commit `80d46e5e` + `5866a203`
+  - store.go: `ensureResourceEntry()` 在 CreateService/CreateRoute/CreateUpstream/CreateConsumer 時自動註冊 Resource
+  - `RequirePermission` 已具備 resource-level override 邏輯（lines 1562-1587）
+  - Backend: `ListUserResourcePermissions`/`SetUserResourcePermissions` 已實作（users/:id/resource-permissions）
+  - Backend: `ListGroupResourcePermissions`/`SetGroupResourcePermissions` 已實作（groups/:id/resource-permissions）
+  - Backend: `ListResources`/`GetResource`/`CreateResource`/`DeleteResource` CRUD 已完整
+  - Frontend: Groups.tsx 新增「資源權限」tab（针对 group 的资源权限覆写）
+  - Frontend: Users.tsx 新增「資源權限」按鈕 + Drawer（針對特定 service/route/upstream/consumer 的 deny/read/write 權限）
+  - QA: Create service → resource 自動創建 ✅, PUT resource-permissions → 200 ✅, GET → 200 ✅ (含 resource_name) ✅, DELETE service → 204 ✅
+  - QA: upstream/consumer 自動創建 Resource ✅
 
 - [x] **使用者管理精細化（RBAC 增強）** — commit `673fc680` + `a3a6bd82` + `495c3455` + `846c8d1a`
   - kong.ts: 新增 `getUserWorkspaces()` 對應 GET /workspaces/users/:userId
