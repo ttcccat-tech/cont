@@ -23,6 +23,5 @@ local lines = {
 -- Add upstream health from Redis
 -- TODO: read from Redis
 
-ngx.header["Content-Type"] = "text/plain; charset=utf-8"
 ngx.status = 200
 ngx.say(table.concat(lines, "\n"))
