@@ -320,6 +320,19 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_uw_user ON user_workspaces(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_uw_workspace ON user_workspaces(workspace_id)`,
 
+		// Resource-level RBAC (per-resource user/group permissions)
+		// subject_type: 'user' or 'group'; subject_id: the user_id or auth_group_id
+		`CREATE TABLE IF NOT EXISTS resource_permissions (
+			subject_type TEXT NOT NULL CHECK (subject_type IN ('user', 'group')),
+			subject_id TEXT NOT NULL,
+			resource_id TEXT NOT NULL,
+			permission TEXT NOT NULL DEFAULT 'read' CHECK (permission IN ('deny', 'read', 'write')),
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			PRIMARY KEY (subject_type, subject_id, resource_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_rp_subject ON resource_permissions(subject_type, subject_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_rp_resource ON resource_permissions(resource_id)`,
+
 		// API Key Request enhanced fields
 		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS reason TEXT`,
 		`ALTER TABLE api_key_requests ADD COLUMN IF NOT EXISTS scopes TEXT`,

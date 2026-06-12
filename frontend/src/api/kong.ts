@@ -102,6 +102,7 @@ export interface KongInfo { version: string; tagline: string; plugins?: { enable
 export type PermissionMode = 'deny' | 'read' | 'write'
 export interface PermissionEntry { resource_id: string; mode: PermissionMode }
 export interface Resource { id: string; name: string; path: string; type?: string }
+export interface ResourcePermission { subject_type?: string; subject_id?: string; resource_id: string; permission: string; resource_name?: string }
 export interface AuthGroup { id?: string; name: string; label: string; description?: string; permissions?: PermissionEntry[]; created_at?: number }
 export interface Workspace { id: string; name: string; label: string; description?: string; kong_workspace_id?: string; created_at?: number; group_ids?: string[] }
 export interface WorkspaceUserAssignment { workspace_id: string; workspace_name?: string; user_id: string; username: string; display_name?: string; email?: string; role: string; assigned_at?: string }
@@ -153,6 +154,10 @@ export const updateGroup = (id: string, data: Partial<AuthGroup>) => analyticsCl
 export const deleteGroup = (id: string) => analyticsClient.delete(`/groups/${id}`)
 export const getGroupMembers = (id: string) => analyticsClient.get<{members: {id:string;username:string;display_name:string;email:string;role:string}[]}>(`/groups/${id}/members`).then(r => r.data)
 export const setGroupMembers = (id: string, userIds: string[]) => analyticsClient.put(`/groups/${id}/members`, {user_ids: userIds}).then(r => r.data)
+export const getGroupResourcePermissions = (id: string) => analyticsClient.get<{permissions: ResourcePermission[]}>(`/groups/${id}/resource-permissions`).then(r => r.data?.permissions ?? [])
+export const setGroupResourcePermissions = (id: string, permissions: ResourcePermission[]) => analyticsClient.put(`/groups/${id}/resource-permissions`, permissions).then(r => r.data)
+export const getUserResourcePermissions = (id: string) => analyticsClient.get<{permissions: ResourcePermission[]}>(`/users/${id}/resource-permissions`).then(r => r.data?.permissions ?? [])
+export const setUserResourcePermissions = (id: string, permissions: ResourcePermission[]) => analyticsClient.put(`/users/${id}/resource-permissions`, permissions).then(r => r.data)
 
 export const listWorkspaces = () => analyticsClient.get<Workspace[]>('/workspaces').then(r => r.data)
 export const listMyWorkspaces = () => analyticsClient.get<Workspace[]>('/workspaces/mine').then(r => r.data)

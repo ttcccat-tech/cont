@@ -31,6 +31,16 @@ type Resource struct {
 	Type string `json:"type,omitempty"`
 }
 
+// ResourcePermission represents a per-resource permission override for a user or group
+type ResourcePermission struct {
+	SubjectType  string `json:"subject_type,omitempty"` // 'user' or 'group'
+	SubjectID    string `json:"subject_id,omitempty"`
+	ResourceID   string `json:"resource_id"`
+	Permission   string `json:"permission"` // deny, read, write
+	CreatedAt    string `json:"created_at,omitempty"`
+	ResourceName string `json:"resource_name,omitempty"` // joined from resources table
+}
+
 // ── Audit Log ──────────────────────────────────────────────────────────────
 
 type AuditLog struct {

@@ -82,7 +82,20 @@ func (s *Store) CreateService(svc *Service) (*Service, error) {
 	}
 	svc.ID = id
 	svc.OrgID = orgID
+	// Auto-create a Resource entry for this service (for resource-level RBAC)
+	s.ensureResourceEntry(id, svc.Name, "service")
 	return svc, nil
+}
+
+func (s *Store) ensureResourceEntry(id, name, resourceType string) {
+	if name == "" {
+		name = id
+	}
+	_, _ = s.db.Exec(`
+		INSERT INTO resources (id, name, path, type)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type`,
+		id, name, "/"+resourceType+"/"+id, resourceType)
 }
 
 func (s *Store) GetService(id, orgID string) (*Service, error) {
@@ -246,6 +259,8 @@ func (s *Store) CreateRoute(r *Route) (*Route, error) {
 		return nil, err
 	}
 	r.OrgID = orgID
+	// Auto-create a Resource entry for this route (for resource-level RBAC)
+	s.ensureResourceEntry(r.ID, r.Name, "route")
 	return r, nil
 }
 
@@ -371,6 +386,8 @@ func (s *Store) CreateUpstream(u *Upstream) (*Upstream, error) {
 	if orgID != "" {
 		u.OrgID = orgID
 	}
+	// Auto-create a Resource entry for this upstream (for resource-level RBAC)
+	s.ensureResourceEntry(u.ID, u.Name, "upstream")
 	return u, nil
 }
 
@@ -543,6 +560,8 @@ func (s *Store) CreateConsumer(c *Consumer) (*Consumer, error) {
 	if orgID != "" {
 		c.OrgID = orgID
 	}
+	// Auto-create a Resource entry for this consumer (for resource-level RBAC)
+	s.ensureResourceEntry(c.ID, c.Username, "consumer")
 	return c, nil
 }
 
@@ -2054,4 +2073,192 @@ func (s *Store) GetLoginAttemptsByIP(ipAddress string, windowSeconds int) (int, 
 		return 0, err
 	}
 	return count, nil
+}
+
+// ── Resource Permissions ────────────────────────────────────────────────────
+
+// ListUserResourcePermissions returns all resource permissions for a user (with resource names)
+func (s *Store) ListUserResourcePermissions(userID string) ([]ResourcePermission, error) {
+	rows, err := s.db.Query(`
+		SELECT rp.subject_type, rp.subject_id, rp.resource_id, rp.permission, rp.created_at, r.name
+		FROM resource_permissions rp
+		JOIN resources r ON r.id = rp.resource_id
+		WHERE rp.subject_type = 'user' AND rp.subject_id = $1
+		ORDER BY r.name`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var perms []ResourcePermission
+	for rows.Next() {
+		var p ResourcePermission
+		var createdAt sql.NullString
+		var resourceName sql.NullString
+		if err := rows.Scan(&p.SubjectType, &p.SubjectID, &p.ResourceID, &p.Permission, &createdAt, &resourceName); err != nil {
+			return nil, err
+		}
+		if createdAt.Valid {
+			p.CreatedAt = createdAt.String
+		}
+		if resourceName.Valid {
+			p.ResourceName = resourceName.String
+		}
+		perms = append(perms, p)
+	}
+	return perms, rows.Err()
+}
+
+// SetUserResourcePermission upserts a resource permission for a user (empty permission = delete)
+func (s *Store) SetUserResourcePermission(userID, resourceID, permission string) error {
+	if permission == "" {
+		_, err := s.db.Exec(`DELETE FROM resource_permissions WHERE subject_type='user' AND subject_id=$1 AND resource_id=$2`, userID, resourceID)
+		return err
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO resource_permissions (subject_type, subject_id, resource_id, permission)
+		VALUES ('user', $1, $2, $3)
+		ON CONFLICT (subject_type, subject_id, resource_id) DO UPDATE SET permission = $3`,
+		userID, resourceID, permission)
+	return err
+}
+
+// ListGroupResourcePermissions returns all resource permissions for an auth group (with resource names)
+func (s *Store) ListGroupResourcePermissions(authGroupID string) ([]ResourcePermission, error) {
+	rows, err := s.db.Query(`
+		SELECT rp.subject_type, rp.subject_id, rp.resource_id, rp.permission, rp.created_at, r.name
+		FROM resource_permissions rp
+		JOIN resources r ON r.id = rp.resource_id
+		WHERE rp.subject_type = 'group' AND rp.subject_id = $1
+		ORDER BY r.name`, authGroupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var perms []ResourcePermission
+	for rows.Next() {
+		var p ResourcePermission
+		var createdAt sql.NullString
+		var resourceName sql.NullString
+		if err := rows.Scan(&p.SubjectType, &p.SubjectID, &p.ResourceID, &p.Permission, &createdAt, &resourceName); err != nil {
+			return nil, err
+		}
+		if createdAt.Valid {
+			p.CreatedAt = createdAt.String
+		}
+		if resourceName.Valid {
+			p.ResourceName = resourceName.String
+		}
+		perms = append(perms, p)
+	}
+	return perms, rows.Err()
+}
+
+// SetGroupResourcePermission upserts a resource permission for an auth group (empty permission = delete)
+func (s *Store) SetGroupResourcePermission(authGroupID, resourceID, permission string) error {
+	if permission == "" {
+		_, err := s.db.Exec(`DELETE FROM resource_permissions WHERE subject_type='group' AND subject_id=$1 AND resource_id=$2`, authGroupID, resourceID)
+		return err
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO resource_permissions (subject_type, subject_id, resource_id, permission)
+		VALUES ('group', $1, $2, $3)
+		ON CONFLICT (subject_type, subject_id, resource_id) DO UPDATE SET permission = $3`,
+		authGroupID, resourceID, permission)
+	return err
+}
+
+// ── Resources (full CRUD for resource-level RBAC) ────────────────────────
+
+func (s *Store) GetResource(id string) (*Resource, error) {
+	var r Resource
+	var typ sql.NullString
+	err := s.db.QueryRow(`SELECT id, name, path, type FROM resources WHERE id = $1`, id).
+		Scan(&r.ID, &r.Name, &r.Path, &typ)
+	if err != nil {
+		return nil, err
+	}
+	if typ.Valid {
+		r.Type = typ.String
+	}
+	return &r, nil
+}
+
+func (s *Store) CreateResource(r *Resource) (*Resource, error) {
+	var typ sql.NullString
+	err := s.db.QueryRow(`
+		INSERT INTO resources (id, name, path, type)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, name, path, type`,
+		r.ID, r.Name, r.Path, sql.NullString{String: r.Type, Valid: r.Type != ""},
+	).Scan(&r.ID, &r.Name, &r.Path, &typ)
+	if err != nil {
+		return nil, err
+	}
+	if typ.Valid {
+		r.Type = typ.String
+	}
+	return r, nil
+}
+
+func (s *Store) DeleteResource(id string) error {
+	_, err := s.db.Exec(`DELETE FROM resources WHERE id = $1`, id)
+	return err
+}
+
+// ListAllTargets returns all targets (across all upstreams) for resource enumeration
+func (s *Store) ListAllTargets() ([]Target, error) {
+	rows, err := s.db.Query(`SELECT id, upstream_id, target, weight, enabled FROM targets ORDER BY upstream_id, target`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var targets []Target
+	for rows.Next() {
+		var t Target
+		var enabled sql.NullBool
+		if err := rows.Scan(&t.ID, &t.UpstreamID, &t.Target, &t.Weight, &enabled); err != nil {
+			return nil, err
+		}
+		if enabled.Valid {
+			t.Enabled = enabled.Bool
+		}
+		targets = append(targets, t)
+	}
+	return targets, nil
+}
+
+// GetResourcePermissionsForUser returns effective permissions for a user on a specific resource
+// It checks both user-level and group-level resource permissions
+func (s *Store) GetResourcePermissionsForUser(userID, resourceID string) (string, error) {
+	// First check direct user permissions
+	row := s.db.QueryRow(`SELECT permission FROM resource_permissions
+		WHERE subject_type='user' AND subject_id=$1 AND resource_id=$2`, userID, resourceID)
+	var perm string
+	if err := row.Scan(&perm); err == nil {
+		return perm, nil
+	}
+	// Then check group memberships
+	rows, err := s.db.Query(`SELECT rp.permission FROM resource_permissions rp
+		JOIN user_auth_groups uag ON rp.subject_id = uag.auth_group_id
+		WHERE rp.subject_type='group' AND uag.user_id=$1 AND rp.resource_id=$2`, userID, resourceID)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var perm string
+		if err := rows.Scan(&perm); err == nil && perm != "" {
+			return perm, nil
+		}
+	}
+	return "", nil
+}
+
+// GetResourcePermissionsForGroup returns effective permissions for an auth group on a specific resource
+func (s *Store) GetResourcePermissionsForGroup(authGroupID, resourceID string) (string, error) {
+	row := s.db.QueryRow(`SELECT permission FROM resource_permissions
+		WHERE subject_type='group' AND subject_id=$1 AND resource_id=$2`, authGroupID, resourceID)
+	var perm string
+	err := row.Scan(&perm)
+	return perm, err
 }

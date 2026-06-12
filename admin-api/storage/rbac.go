@@ -29,6 +29,7 @@ var PermissionMatrix = map[string]RolePermissions{
 		"api_keys":          Permission{Read: true, Write: true, Delete: true},
 		"config_snapshots":  Permission{Read: true, Write: true, Delete: true},
 		"audit_logs":        Permission{Read: true, Write: true, Delete: true},
+		"resources":         Permission{Read: true, Write: true, Delete: true},
 	},
 	"editor": {
 		"services":          Permission{Read: true, Write: true, Delete: true},
@@ -43,6 +44,7 @@ var PermissionMatrix = map[string]RolePermissions{
 		"api_keys":          Permission{Read: true, Write: false, Delete: false},
 		"config_snapshots":  Permission{Read: true, Write: false, Delete: false},
 		"audit_logs":        Permission{Read: true, Write: false, Delete: false},
+		"resources":         Permission{Read: true, Write: true, Delete: true},
 	},
 	"viewer": {
 		"services":          Permission{Read: true, Write: false, Delete: false},
@@ -57,6 +59,7 @@ var PermissionMatrix = map[string]RolePermissions{
 		"api_keys":          Permission{Read: true, Write: false, Delete: false},
 		"config_snapshots":  Permission{Read: true, Write: false, Delete: false},
 		"audit_logs":        Permission{Read: true, Write: false, Delete: false},
+		"resources":         Permission{Read: true, Write: false, Delete: false},
 	},
 }
 

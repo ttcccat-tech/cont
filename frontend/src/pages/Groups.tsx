@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Checkbox, Select, Tabs } from 'antd'
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, LockOutlined, UserOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { AuthGroup, Resource, PermissionEntry, PermissionMode, getGroups, listResources, createGroup, updateGroup, deleteGroup, getGroupMembers, setGroupMembers, getUsers } from '../api/kong'
+import { AuthGroup, Resource, PermissionEntry, PermissionMode, ResourcePermission, getGroups, listResources, createGroup, updateGroup, deleteGroup, getGroupMembers, setGroupMembers, getGroupResourcePermissions, setGroupResourcePermissions, getUsers } from '../api/kong'
 
 // ===== Permission Matrix Component =====
 
@@ -100,6 +100,8 @@ export default function GroupsPage() {
   const [membersLoading, setMembersLoading] = useState(false)
   const [allUsers, setAllUsers] = useState<{id:string;username:string;display_name:string;email:string;role:string}[]>([])
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [resPerms, setResPerms] = useState<ResourcePermission[]>([])
+  const [resPermsLoading, setResPermsLoading] = useState(false)
 
   const fetchGroups = () => {
     setLoading(true)
@@ -138,6 +140,11 @@ export default function GroupsPage() {
           setMembers(r.members || [])
           setSelectedUserIds((r.members || []).map((m: any) => m.id))
         }).catch(() => {}).finally(() => setMembersLoading(false))
+        // Load resource permissions
+        setResPermsLoading(true)
+        getGroupResourcePermissions(group.id).then(r => {
+          setResPerms(Array.isArray(r) ? r : [])
+        }).catch(() => setResPerms([])).finally(() => setResPermsLoading(false))
       }
     } else {
       setEditingGroup(null)
@@ -145,6 +152,7 @@ export default function GroupsPage() {
       setPermissions([])
       setMembers([])
       setSelectedUserIds([])
+      setResPerms([])
     }
     setActiveTab('permissions')
     setModalOpen(true)
@@ -171,6 +179,8 @@ export default function GroupsPage() {
         await updateGroup(editingGroup.id, payload)
         // Save members
         await setGroupMembers(editingGroup.id, selectedUserIds)
+        // Save resource permissions
+        await setGroupResourcePermissions(editingGroup.id, resPerms)
         message.success('群組更新成功')
       } else {
         await createGroup(payload)
@@ -376,6 +386,71 @@ export default function GroupsPage() {
                           </Tag>
                         ))}
                       </div>
+                    </div>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: 'resource-permissions',
+              label: '資源權限',
+              children: (
+                <div>
+                  <div style={{ marginBottom: 12, color: 'var(--muted)', fontSize: 13 }}>
+                    針對特定資源（service/route/upstream）設定群組層級的權限覆寫：</div>
+                  {resPermsLoading ? (
+                    <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 20 }}>載入中...</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--accent)' }}>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text)' }}>資源</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text)' }}>路徑</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text)', width: 90 }}>拒絕</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text)', width: 90 }}>讀取</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text)', width: 90 }}>寫入</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resources.map((r, i) => {
+                          const current = resPerms.find(p => p.resource_id === r.id)
+                          return (
+                            <tr key={r.id} style={{ background: i % 2 === 0 ? 'var(--secondary)' : 'transparent' }}>
+                              <td style={{ padding: '8px 12px' }}>
+                                <Space>
+                                  <LockOutlined style={{ color: 'var(--muted)', fontSize: 11 }} />
+                                  <span style={{ color: 'var(--highlight)' }}>{r.name}</span>
+                                </Space>
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <code style={{ color: 'var(--muted)', fontSize: 11 }}>{r.path}</code>
+                              </td>
+                              {(['deny', 'read', 'write'] as const).map(perm => (
+                                <td key={perm} style={{ textAlign: 'center', padding: '8px 12px' }}>
+                                  <Checkbox
+                                    checked={current?.permission === perm}
+                                    disabled={submitting}
+                                    onChange={() => {
+                                      if (current?.permission === perm) {
+                                        setResPerms(resPerms.filter(p => p.resource_id !== r.id))
+                                      } else {
+                                        const filtered = resPerms.filter(p => p.resource_id !== r.id)
+                                        setResPerms([...filtered, { resource_id: r.id, permission: perm }])
+                                      }
+                                    }}
+                                    aria-label={`${r.name} - ${perm}`}
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                  {resPerms.length > 0 && (
+                    <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>
+                      已設定 {resPerms.length} 項資源權限覆寫
                     </div>
                   )}
                 </div>

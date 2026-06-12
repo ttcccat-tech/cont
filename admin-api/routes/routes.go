@@ -1536,8 +1536,10 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 	}
 }
 
-// RequirePermission returns a gin middleware that checks if user has permission for an entity
-func RequirePermission(entity string, write bool) gin.HandlerFunc {
+// RequirePermission returns a gin middleware that checks if user has permission for an entity.
+// For editor/viewer roles, it checks resource-level permission overrides from resource_permissions table.
+// Store is required to look up per-resource overrides for non-admin users.
+func RequirePermission(store *storage.Store, entity string, write bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole, exists := c.Get("role")
 		if !exists {
@@ -1549,6 +1551,42 @@ func RequirePermission(entity string, write bool) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "invalid role format"})
 			return
 		}
+		// Global admin bypasses all resource-level checks
+		if roleStr == "admin" {
+			c.Next()
+			return
+		}
+
+		// For editor/viewer, check resource-level permission overrides
+		// Resource-level override takes precedence over workspace-level default
+		resourceID := c.Param("id")
+		if resourceID == "" {
+			resourceID = c.Query("resource_id")
+		}
+		if (roleStr == "editor" || roleStr == "viewer") && resourceID != "" {
+			userID, _ := c.Get("user_id")
+			perm, err := store.GetResourcePermissionsForUser(userID.(string), resourceID)
+			if err != nil && err != sql.ErrNoRows {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to check resource permissions"})
+				return
+			}
+			if perm == "deny" {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "resource access denied"})
+				return
+			}
+			if perm == "write" {
+				// Full access granted via resource-level override
+				c.Next()
+				return
+			}
+			if perm == "read" && write {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "write permission denied for resource"})
+				return
+			}
+			// perm == "" or perm == "read" with read op → fall through to role check
+		}
+
+		// Fall back to role-based permission check
 		if write {
 			if !storage.CanWrite(roleStr, entity) {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "write permission denied for " + entity})
@@ -1560,6 +1598,7 @@ func RequirePermission(entity string, write bool) gin.HandlerFunc {
 				return
 			}
 		}
+
 		c.Next()
 	}
 }
@@ -1795,6 +1834,67 @@ func DeleteUser(store *storage.Store) gin.HandlerFunc {
 			Description:   "Deleted user: " + existing.Username,
 		})
 		c.JSON(204, nil)
+	}
+}
+
+// ── User Resource Permissions ───────────────────────────────────────────────
+
+type UserResourcePermissionRequest struct {
+	ResourceID string `json:"resource_id" binding:"required"`
+	Permission string `json:"permission" binding:"omitempty,oneof=deny read write"`
+}
+
+func ListUserResourcePermissions(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		perms, err := store.ListUserResourcePermissions(id)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"permissions": perms})
+	}
+}
+
+func SetUserResourcePermissions(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var req []UserResourcePermissionRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request"})
+			return
+		}
+		// Get all current permissions for this user
+		current, err := store.ListUserResourcePermissions(id)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		currentMap := make(map[string]string)
+		for _, p := range current {
+			currentMap[p.ResourceID] = p.Permission
+		}
+		newMap := make(map[string]string)
+		for _, p := range req {
+			newMap[p.ResourceID] = p.Permission
+		}
+		// Upsert new/changed permissions
+		for resourceID, perm := range newMap {
+			if err := store.SetUserResourcePermission(id, resourceID, perm); err != nil {
+				c.JSON(500, gin.H{"error": err.Error()})
+				return
+			}
+		}
+		// Remove any permissions no longer in the request (set to "")
+		for resourceID := range currentMap {
+			if _, exists := newMap[resourceID]; !exists {
+				if err := store.SetUserResourcePermission(id, resourceID, ""); err != nil {
+					c.JSON(500, gin.H{"error": err.Error()})
+					return
+				}
+			}
+		}
+		c.JSON(200, gin.H{"message": "resource permissions updated"})
 	}
 }
 
@@ -2036,6 +2136,66 @@ func SetGroupMembers(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// ── Group Resource Permissions ─────────────────────────────────────────────
+
+type GroupResourcePermissionRequest struct {
+	ResourceID string `json:"resource_id" binding:"required"`
+	Permission string `json:"permission" binding:"omitempty,oneof=deny read write"`
+}
+
+func ListGroupResourcePermissions(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		groupID := resolveGroupID(store, id)
+		perms, err := store.ListGroupResourcePermissions(groupID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"permissions": perms})
+	}
+}
+
+func SetGroupResourcePermissions(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		groupID := resolveGroupID(store, id)
+		var req []GroupResourcePermissionRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request"})
+			return
+		}
+		current, err := store.ListGroupResourcePermissions(groupID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		currentMap := make(map[string]string)
+		for _, p := range current {
+			currentMap[p.ResourceID] = p.Permission
+		}
+		newMap := make(map[string]string)
+		for _, p := range req {
+			newMap[p.ResourceID] = p.Permission
+		}
+		for resourceID, perm := range newMap {
+			if err := store.SetGroupResourcePermission(groupID, resourceID, perm); err != nil {
+				c.JSON(500, gin.H{"error": err.Error()})
+				return
+			}
+		}
+		for resourceID := range currentMap {
+			if _, exists := newMap[resourceID]; !exists {
+				if err := store.SetGroupResourcePermission(groupID, resourceID, ""); err != nil {
+					c.JSON(500, gin.H{"error": err.Error()})
+					return
+				}
+			}
+		}
+		c.JSON(200, gin.H{"message": "resource permissions updated"})
+	}
+}
+
 // ── Resources ───────────────────────────────────────────────────────────────
 
 func ListResources(store *storage.Store) gin.HandlerFunc {
@@ -2049,6 +2209,55 @@ func ListResources(store *storage.Store) gin.HandlerFunc {
 			resources = []storage.Resource{}
 		}
 		c.JSON(200, gin.H{"resources": resources})
+	}
+}
+
+func GetResource(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		r, err := store.GetResource(c.Param("id"))
+		if err == sql.ErrNoRows {
+			c.JSON(404, gin.H{"error": "resource not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, r)
+	}
+}
+
+func CreateResource(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var r storage.Resource
+		if err := c.ShouldBindJSON(&r); err != nil {
+			badRequest(c, err)
+			return
+		}
+		if r.ID == "" {
+			c.JSON(400, gin.H{"error": "id is required"})
+			return
+		}
+		created, err := store.CreateResource(&r)
+		if err != nil {
+			if isUniqueViolation(err) {
+				c.JSON(409, gin.H{"error": "resource already exists"})
+				return
+			}
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(201, created)
+	}
+}
+
+func DeleteResource(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := store.DeleteResource(c.Param("id")); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
 	}
 }
 
