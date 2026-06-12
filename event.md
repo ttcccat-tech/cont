@@ -42,9 +42,12 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Frontend Plugins.tsx Scope Selector UI** — Backend scope field implemented, FE needs selector (Global/Workspace/Service/Route/Consumer radio buttons in Create/Edit modal)
+- [x] **Cont Frontend Plugins.tsx Scope Selector UI** — Backend scope field implemented, FE needs selector (Global/Workspace/Service/Route/Consumer radio buttons in Create/Edit modal)
   - Backend is fully functional — scope values: global, workspace, service, route, consumer
   - Frontend needs: scope Radio.Group in Plugins Create/Edit modal, scope column in plugin table, filter by scope
+  - **Implemented in this session**: KongPlugin interface missing `scope` field → added `scope?: string` to frontend TypeScript interface
+  - QA: Create→scope:global ✅, PATCH→scope:workspace ✅, GET→scope returned ✅, DELETE→204 ✅
+  - commit `ba074657`
 
 - [x] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）** — commit `86d739a7`
   - `proxy/lua/cont/plugins/rate-limiting-advanced/handler.lua` — Redis sliding window + local fallback, ngx.socket.tcp (OpenResty Alpine compatible), second/minute/hour/day limits, X-RateLimit-* headers, 429 response
