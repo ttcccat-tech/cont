@@ -1472,8 +1472,33 @@ func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 					"plan": org.Plan,
 				},
 			})
+		} else if req.Purpose == "reset-password" {
+			// Find user by email
+			user, err := store.GetUserByEmail(req.Email)
+			if err != nil || user == nil {
+				c.JSON(400, gin.H{"error": "no account found with this email"})
+				return
+			}
+
+			// Hash new password
+			hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "failed to hash password"})
+				return
+			}
+
+			// Update password
+			if err := store.UpdateUserPassword(user.ID, string(hash)); err != nil {
+				c.JSON(500, gin.H{"error": "failed to update password"})
+				return
+			}
+
+			// Mark OTP as verified
+			store.MarkOTPVerified(otp.ID)
+
+			c.JSON(200, gin.H{"message": "password reset successful"})
 		} else {
-			c.JSON(400, gin.H{"error": "reset-password not yet implemented"})
+			c.JSON(400, gin.H{"error": "invalid purpose"})
 		}
 	}
 }
