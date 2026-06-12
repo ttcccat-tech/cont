@@ -155,3 +155,55 @@ jobs:
       - name: Docker Compose down
         if: always()
         run: docker compose down -v
+
+  # ── Go Integration Tests ─────────────────────────────────────────────────
+  integration-test:
+    name: Go Integration Tests
+    runs-on: ubuntu-latest
+    needs: go-test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cont_integration_test
+          POSTGRES_USER: kong
+          POSTGRES_PASSWORD: kongpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          -p 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          -p 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Create cont_default network
+        run: docker network create cont_default || true
+
+      - name: Run integration tests
+        working-directory: ./admin-api
+        run: |
+          # Wait for postgres to be ready
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 && break
+            sleep 1
+          done
+          go test -v -race -timeout 120s ./integration/...
+        env:
+          POSTGRES_URL: "postgres://kong:kongpass@localhost:5432/cont_integration_test?sslmode=disable"
