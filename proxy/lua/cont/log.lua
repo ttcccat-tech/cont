@@ -141,7 +141,8 @@ end
 
 -- ── Run Plugin log() Chains ─────────────────────────────────────────────────
 local function run_plugin_logs()
-    if not cont or not cont.plugins then
+    local cont = _G.cont or {}
+    if not cont.plugins then
         return
     end
 

@@ -2,6 +2,13 @@
 
 ## 🔴 未完成（進行中）
 
+- [ ] **Proxy Lua Plugin 鏈完善化** — develop 分支
+  - header_filter.lua: `_G.cont` 取代 `require("cont.init")` ✅, CORS headers 簡化為永遠啟用 ✅
+  - log.lua: `cont` 未定義 bug 修復 ✅
+  - access.lua: rate-limit + JWT 驗證整合（待完成）
+  - header_filter.lua: CORS + rate-limit headers（待完成）
+  - log.lua: access log + upstream latency（待完成）
+
 - [ ] **行事曆認證問題** — Debug 模式發現 GetUserByUsername 回傳 nil（COALESCE UUID bug），已修復，rebuild 中
 
 ## 🟡 預計優化
