@@ -100,8 +100,9 @@ type APIKeyRequest struct {
 // ── Config Snapshots ───────────────────────────────────────────────────────
 
 type ConfigSnapshot struct {
-	ID           int64   `json:"id"`
-	VersionLabel string  `json:"version_label"`
+	ID            int64   `json:"id"`
+	VersionLabel  string  `json:"version_label"`
+	ConfigData   *string `json:"config_data,omitempty"`
 	DiffFromPrev *string `json:"diff_from_prev,omitempty"`
 	ActorUserID  string  `json:"actor_user_id"`
 	ActorUsername string `json:"actor_username"`

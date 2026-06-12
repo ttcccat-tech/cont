@@ -266,7 +266,7 @@ export default function PluginsPage() {
 
   const openCreate = () => {
     form.resetFields()
-    form.setFieldsValue({ enabled: true, scope: 'global' })
+    form.setFieldsValue({ enabled: true, scope: 'service' })
     setEditingPlugin(null)
     setModalOpen(true)
   }
@@ -290,11 +290,12 @@ export default function PluginsPage() {
     try {
       const values = await form.validateFields()
       setSubmitting(true)
-      const payload: any = { name: values.name, enabled: values.enabled }
+      const payload: any = { name: values.name, enabled: values.enabled, scope: values.scope }
       if (values.config) payload.config = values.config
       if (values.scope === 'service' && values.service_id) payload.service = { id: values.service_id }
       else if (values.scope === 'route' && values.route_id) payload.route = { id: values.route_id }
       else if (values.scope === 'consumer' && values.consumer_id) payload.consumer = { id: values.consumer_id }
+      // global and workspace scope: no entity attachment, only scope field
 
       if (editingPlugin?.id) {
         await api.updatePlugin(editingPlugin.id, payload)
@@ -329,16 +330,44 @@ export default function PluginsPage() {
     }
   }
 
-  const pluginScopes = (p: KongPlugin) => {
-    if (p.service?.id) return 'Service'
-    if (p.route?.id) return 'Route'
-    if (p.consumer?.id) return 'Consumer'
-    return 'Global'
+  const pluginScopeDisplay = (p: KongPlugin) => {
+    // Use actual scope field from backend
+    if (p.scope) return p.scope
+    // Fallback: infer from entity IDs for legacy data
+    if (p.service?.id) return 'service'
+    if (p.route?.id) return 'route'
+    if (p.consumer?.id) return 'consumer'
+    return 'global'
+  }
+
+  const scopeTagColor = (scope: string) => {
+    switch (scope) {
+      case 'global': return 'gold'
+      case 'workspace': return 'blue'
+      case 'service': return 'cyan'
+      case 'route': return 'green'
+      case 'consumer': return 'orange'
+      default: return 'default'
+    }
+  }
+
+  const scopeLabel = (scope: string) => {
+    switch (scope) {
+      case 'global': return '全域'
+      case 'workspace': return '工作區'
+      case 'service': return '服務'
+      case 'route': return '路由'
+      case 'consumer': return '消費者'
+      default: return scope
+    }
   }
 
   const columns: ColumnsType<KongPlugin> = [
     { title: '插件名', dataIndex: 'name', key: 'name', render: v => <Tag color="purple">{v}</Tag> },
-    { title: '範圍', key: 'scope', render: (_, p) => <Tag color={pluginScopes(p) === 'Global' ? 'gold' : 'cyan'}>{pluginScopes(p)}</Tag> },
+    { title: '範圍', key: 'scope', render: (_, p) => {
+      const scope = pluginScopeDisplay(p)
+      return <Tag color={scopeTagColor(scope)}>{scopeLabel(scope)}</Tag>
+    } },
     { title: '已啟用', dataIndex: 'enabled', key: 'enabled', render: v => <Tag color={v ? 'green' : 'red'}>{v ? '是' : '否'}</Tag> },
     {
       title: '操作', key: 'action', width: 280,
@@ -409,9 +438,10 @@ export default function PluginsPage() {
               </Select>
             </Form.Item>
           )}
-          <Form.Item name="scope" label="應用範圍" initialValue="global">
+          <Form.Item name="scope" label="應用範圍" initialValue="service">
             <Select>
               <Select.Option value="global">全域（全所有流量）</Select.Option>
+              <Select.Option value="workspace">工作區（單一工作區）</Select.Option>
               <Select.Option value="service">指定服務</Select.Option>
               <Select.Option value="route">指定路由</Select.Option>
               <Select.Option value="consumer">指定消費者</Select.Option>

@@ -230,15 +230,16 @@ func RunMigrations(db *sql.DB) error {
 			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
 
-		// Config Snapshots
-		`CREATE TABLE IF NOT EXISTS config_snapshots (
-			id SERIAL PRIMARY KEY,
-			version_label TEXT NOT NULL,
-			diff_from_prev TEXT,
-			actor_user_id TEXT,
-			actor_username TEXT,
-			created_at TIMESTAMPTZ DEFAULT NOW()
-		)`,
+	// Config Snapshots
+	`CREATE TABLE IF NOT EXISTS config_snapshots (
+		id SERIAL PRIMARY KEY,
+		version_label TEXT NOT NULL,
+		config_data TEXT,
+		diff_from_prev TEXT,
+		actor_user_id TEXT,
+		actor_username TEXT,
+		created_at TIMESTAMPTZ DEFAULT NOW()
+	)`,
 
 		// OAuth2 Providers
 		`CREATE TABLE IF NOT EXISTS oauth_providers (

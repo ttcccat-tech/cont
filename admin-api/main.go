@@ -238,9 +238,12 @@ func main() {
 		}
 
 		// Config Snapshots
-		admin.GET("/snapshots", routes.ListConfigSnapshots(store))
-		admin.POST("/snapshots", routes.CreateConfigSnapshot(store))
-		admin.DELETE("/snapshots/:id", routes.DeleteConfigSnapshot(store))
+		admin.GET("/config/snapshots", routes.ListConfigSnapshots(store))
+		admin.POST("/config/snapshots", routes.CreateConfigSnapshot(store))
+		admin.GET("/config/snapshots/:id", routes.GetConfigSnapshot(store))
+		admin.DELETE("/config/snapshots/:id", routes.DeleteConfigSnapshot(store))
+		admin.GET("/config/snapshots/diff", routes.DiffConfigSnapshots(store))
+		admin.POST("/config/snapshots/:id/rollback", routes.RollbackConfigSnapshot(store))
 
 	// Health & Config Check (public, no auth)
 	r.GET("/health-check", routes.HealthCheck(store))

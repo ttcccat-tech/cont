@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -1909,7 +1910,7 @@ func (s *Store) DeleteAPIKeyRequest(id string) error {
 
 func (s *Store) ListConfigSnapshots() ([]ConfigSnapshot, error) {
 	rows, err := s.db.Query(
-		`SELECT id, version_label, diff_from_prev, actor_user_id, actor_username, created_at
+		`SELECT id, version_label, config_data, diff_from_prev, actor_user_id, actor_username, created_at
 		 FROM config_snapshots ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -1918,11 +1919,14 @@ func (s *Store) ListConfigSnapshots() ([]ConfigSnapshot, error) {
 	var snaps []ConfigSnapshot
 	for rows.Next() {
 		var sn ConfigSnapshot
-		var diffFromPrev sql.NullString
+		var configData, diffFromPrev sql.NullString
 		var actorUID, actorUname sql.NullString
 		var createdAt sql.NullString
-		if err := rows.Scan(&sn.ID, &sn.VersionLabel, &diffFromPrev, &actorUID, &actorUname, &createdAt); err != nil {
+		if err := rows.Scan(&sn.ID, &sn.VersionLabel, &configData, &diffFromPrev, &actorUID, &actorUname, &createdAt); err != nil {
 			return nil, err
+		}
+		if configData.Valid {
+			sn.ConfigData = &configData.String
 		}
 		if diffFromPrev.Valid {
 			sn.DiffFromPrev = &diffFromPrev.String
@@ -1942,30 +1946,282 @@ func (s *Store) ListConfigSnapshots() ([]ConfigSnapshot, error) {
 }
 
 func (s *Store) CreateConfigSnapshot(sn *ConfigSnapshot) (*ConfigSnapshot, error) {
+	// Capture current Kong config (services, routes, plugins, consumers)
+	// as JSON config_data for rollback
+	configData, err := s.captureCurrentConfig()
+	if err != nil {
+		configData = "{}" // non-fatal, continue without
+	}
+
+	// Compute diff_from_prev by comparing with most recent snapshot
+	var diffFromPrev *string
+	prevSnaps, err := s.ListConfigSnapshots()
+	if err == nil && len(prevSnaps) > 0 && prevSnaps[0].ConfigData != nil {
+		diff := ComputeConfigDiff(*prevSnaps[0].ConfigData, configData)
+		if diff != "{}" {
+			diffFromPrev = &diff
+		}
+	}
+
 	var outID int64
-	err := s.db.QueryRow(
-		`INSERT INTO config_snapshots (version_label, diff_from_prev, actor_user_id, actor_username)
-		 VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
-		sn.VersionLabel, nullString(stringVal(sn.DiffFromPrev)), nullString(sn.ActorUserID), nullString(sn.ActorUsername),
+	err = s.db.QueryRow(
+		`INSERT INTO config_snapshots (version_label, config_data, diff_from_prev, actor_user_id, actor_username)
+		 VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at`,
+		sn.VersionLabel, configData, nullString(diffFromPrev), nullString(sn.ActorUserID), nullString(sn.ActorUsername),
 	).Scan(&outID, &sn.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	sn.ID = outID
+	sn.ConfigData = &configData
+	sn.DiffFromPrev = diffFromPrev
 	return sn, nil
+}
+
+// captureCurrentConfig grabs all current services/routes/plugins/consumers from DB
+func (s *Store) captureCurrentConfig() (string, error) {
+	type cfg struct {
+		Services  []map[string]interface{} `json:"services"`
+		Routes    []map[string]interface{} `json:"routes"`
+		Plugins   []map[string]interface{} `json:"plugins"`
+		Consumers []map[string]interface{} `json:"consumers"`
+	}
+
+	// Services
+	svcs, err := s.ListServices("", true)
+	if err != nil {
+		return "{}", err
+	}
+	svcMaps := make([]map[string]interface{}, 0, len(svcs))
+	for _, svc := range svcs {
+		svcMaps = append(svcMaps, map[string]interface{}{
+			"id":   svc.ID,
+			"name": svc.Name,
+			"host": svc.Host,
+			"port": svc.Port,
+			"path": svc.Path,
+			"protocol": svc.Protocol,
+		})
+	}
+
+	// Routes (admin only, no org filter)
+	routes, err := s.ListRoutes("", true)
+	if err != nil {
+		return "{}", err
+	}
+	routeMaps := make([]map[string]interface{}, 0, len(routes))
+	for _, r := range routes {
+		routeMaps = append(routeMaps, map[string]interface{}{
+			"id":   r.ID,
+			"name": r.Name,
+			"service_id": r.ServiceID,
+			"hosts": r.Hosts,
+			"paths": r.Paths,
+		})
+	}
+
+	// Plugins (admin only)
+	plugins, err := s.ListPlugins("")
+	if err != nil {
+		return "{}", err
+	}
+	pluginMaps := make([]map[string]interface{}, 0, len(plugins))
+	for _, p := range plugins {
+		pluginMaps = append(pluginMaps, map[string]interface{}{
+			"id":   p.ID,
+			"name": p.Name,
+			"scope": p.Scope,
+			"enabled": p.Enabled,
+		})
+	}
+
+	// Consumers (admin only)
+	consumers, err := s.ListConsumers("")
+	if err != nil {
+		return "{}", err
+	}
+	consMaps := make([]map[string]interface{}, 0, len(consumers))
+	for _, c := range consumers {
+		consMaps = append(consMaps, map[string]interface{}{
+			"id":   c.ID,
+			"username": c.Username,
+		})
+	}
+
+	c := cfg{
+		Services:  svcMaps,
+		Routes:   routeMaps,
+		Plugins:  pluginMaps,
+		Consumers: consMaps,
+	}
+	out, err := json.Marshal(c)
+	if err != nil {
+		return "{}", err
+	}
+	return string(out), nil
+}
+
+// ComputeConfigDiff returns a JSON string describing changes between two config JSON strings
+func ComputeConfigDiff(prev, current string) string {
+	type item struct {
+		ID   string `json:"id,omitempty"`
+		Name string `json:"name,omitempty"`
+	}
+	type change struct {
+		Op    string                 `json:"op"`
+		Name  string                 `json:"name"`
+		Item  map[string]interface{}  `json:"item,omitempty"`
+		Changes map[string]struct { From, To interface{} } `json:"changes,omitempty"`
+	}
+
+	var p, cur struct {
+		Services  []map[string]interface{} `json:"services"`
+		Routes    []map[string]interface{} `json:"routes"`
+		Plugins   []map[string]interface{} `json:"plugins"`
+		Consumers []map[string]interface{} `json:"consumers"`
+	}
+	if err := json.Unmarshal([]byte(prev), &p); err != nil {
+		return "{}"
+	}
+	if err := json.Unmarshal([]byte(current), &cur); err != nil {
+		return "{}"
+	}
+
+	result := struct {
+		Services  []change `json:"services"`
+		Routes    []change `json:"routes"`
+		Plugins   []change `json:"plugins"`
+		Consumers []change `json:"consumers"`
+	}{}
+
+	// Services diff
+	prevSvc := map[string]map[string]interface{}{}
+	for _, s := range p.Services {
+		if id, ok := s["id"].(string); ok {
+			prevSvc[id] = s
+		}
+	}
+	for _, s := range cur.Services {
+		id, _ := s["id"].(string)
+		name, _ := s["name"].(string)
+		if name == "" {
+			name = id
+		}
+		if old, exists := prevSvc[id]; !exists {
+			result.Services = append(result.Services, change{Op: "add", Name: name, Item: s})
+		} else {
+			changes := map[string]struct{ From, To interface{} }{}
+			for k, v := range s {
+				if k == "id" {
+					continue
+				}
+				if ov, ok := old[k]; ok && !reflect.DeepEqual(ov, v) {
+					changes[k] = struct{ From, To interface{} }{From: ov, To: v}
+				}
+			}
+			if len(changes) > 0 {
+				result.Services = append(result.Services, change{Op: "update", Name: name, Changes: changes})
+			}
+			delete(prevSvc, id)
+		}
+	}
+	for _, s := range prevSvc {
+		name, _ := s["name"].(string)
+		id, _ := s["id"].(string)
+		if name == "" {
+			name = id
+		}
+		result.Services = append(result.Services, change{Op: "delete", Name: name})
+	}
+
+	// Routes diff (similar pattern)
+	prevR := map[string]map[string]interface{}{}
+	for _, r := range p.Routes {
+		if id, ok := r["id"].(string); ok {
+			prevR[id] = r
+		}
+	}
+	for _, r := range cur.Routes {
+		id, _ := r["id"].(string)
+		name, _ := r["name"].(string)
+		if name == "" {
+			name = id
+		}
+		if _, exists := prevR[id]; !exists {
+			result.Routes = append(result.Routes, change{Op: "add", Name: name, Item: r})
+		} else {
+			delete(prevR, id)
+		}
+	}
+	for _, r := range prevR {
+		name, _ := r["name"].(string)
+		id, _ := r["id"].(string)
+		if name == "" {
+			name = id
+		}
+		result.Routes = append(result.Routes, change{Op: "delete", Name: name})
+	}
+
+	// Plugins diff
+	prevPl := map[string]map[string]interface{}{}
+	for _, pl := range p.Plugins {
+		if id, ok := pl["id"].(string); ok {
+			prevPl[id] = pl
+		}
+	}
+	for _, pl := range cur.Plugins {
+		id, _ := pl["id"].(string)
+		name, _ := pl["name"].(string)
+		if _, exists := prevPl[id]; !exists {
+			result.Plugins = append(result.Plugins, change{Op: "add", Name: name, Item: pl})
+		} else {
+			delete(prevPl, id)
+		}
+	}
+	for _, pl := range prevPl {
+		name, _ := pl["name"].(string)
+		result.Plugins = append(result.Plugins, change{Op: "delete", Name: name})
+	}
+
+	// Consumers diff
+	prevC := map[string]map[string]interface{}{}
+	for _, c := range p.Consumers {
+		if id, ok := c["id"].(string); ok {
+			prevC[id] = c
+		}
+	}
+	for _, c := range cur.Consumers {
+		id, _ := c["id"].(string)
+		name, _ := c["username"].(string)
+		if _, exists := prevC[id]; !exists {
+			result.Consumers = append(result.Consumers, change{Op: "add", Name: name, Item: c})
+		} else {
+			delete(prevC, id)
+		}
+	}
+	for _, c := range prevC {
+		name, _ := c["username"].(string)
+		result.Consumers = append(result.Consumers, change{Op: "delete", Name: name})
+	}
+
+	out, _ := json.Marshal(result)
+	return string(out)
 }
 
 func (s *Store) GetConfigSnapshot(id string) (*ConfigSnapshot, error) {
 	var sn ConfigSnapshot
-	var diffFromPrev sql.NullString
+	var configData, diffFromPrev sql.NullString
 	var actorUID, actorUname sql.NullString
 	var createdAt sql.NullString
 	err := s.db.QueryRow(
-		`SELECT id, version_label, diff_from_prev, actor_user_id, actor_username, created_at
+		`SELECT id, version_label, config_data, diff_from_prev, actor_user_id, actor_username, created_at
 		 FROM config_snapshots WHERE id=$1`, id,
-	).Scan(&sn.ID, &sn.VersionLabel, &diffFromPrev, &actorUID, &actorUname, &createdAt)
+	).Scan(&sn.ID, &sn.VersionLabel, &configData, &diffFromPrev, &actorUID, &actorUname, &createdAt)
 	if err != nil {
 		return nil, err
+	}
+	if configData.Valid {
+		sn.ConfigData = &configData.String
 	}
 	if diffFromPrev.Valid {
 		sn.DiffFromPrev = &diffFromPrev.String
@@ -1985,6 +2241,151 @@ func (s *Store) GetConfigSnapshot(id string) (*ConfigSnapshot, error) {
 func (s *Store) DeleteConfigSnapshot(id string) error {
 	_, err := s.db.Exec(`DELETE FROM config_snapshots WHERE id=$1`, id)
 	return err
+}
+
+// DiffConfigSnapshots returns a diff between two snapshots by ID
+func (s *Store) DiffConfigSnapshots(id1, id2 string) (string, error) {
+	s1, err := s.GetConfigSnapshot(id1)
+	if err != nil {
+		return "{}", fmt.Errorf("snapshot %s not found: %w", id1, err)
+	}
+	s2, err := s.GetConfigSnapshot(id2)
+	if err != nil {
+		return "{}", fmt.Errorf("snapshot %s not found: %w", id2, err)
+	}
+	if s1.ConfigData == nil || s2.ConfigData == nil {
+		return "{}", fmt.Errorf("snapshot config data not available")
+	}
+	return ComputeConfigDiff(*s1.ConfigData, *s2.ConfigData), nil
+}
+
+// RollbackConfigSnapshot restores Kong config from a snapshot
+// Returns a list of errors encountered during restore
+func (s *Store) RollbackConfigSnapshot(id string) (map[string][]string, error) {
+	snap, err := s.GetConfigSnapshot(id)
+	if err != nil {
+		return nil, fmt.Errorf("snapshot not found: %w", err)
+	}
+	if snap.ConfigData == nil {
+		return nil, fmt.Errorf("snapshot has no config data to restore")
+	}
+
+	var cfg struct {
+		Services  []map[string]interface{} `json:"services"`
+		Routes    []map[string]interface{} `json:"routes"`
+		Plugins   []map[string]interface{} `json:"plugins"`
+		Consumers []map[string]interface{} `json:"consumers"`
+	}
+	if err := json.Unmarshal([]byte(*snap.ConfigData), &cfg); err != nil {
+		return nil, fmt.Errorf("invalid config data: %w", err)
+	}
+
+	errors := map[string][]string{}
+
+	// Restore services: delete current, re-create from snapshot
+	currentSvcs, _ := s.ListServices("", true)
+	for _, svc := range currentSvcs {
+		if err := s.DeleteService(svc.ID); err != nil {
+			errors["services"] = append(errors["services"], fmt.Sprintf("delete %s: %v", svc.ID, err))
+		}
+	}
+	for _, svc := range cfg.Services {
+		s := Service{
+			Name:     getStr(svc, "name"),
+			Host:     getStr(svc, "host"),
+			Port:     getInt(svc, "port"),
+			Path:     getStr(svc, "path"),
+			Protocol: getStr(svc, "protocol"),
+		}
+		if _, err := s.CreateService(&s, ""); err != nil {
+			errors["services"] = append(errors["services"], fmt.Sprintf("create %s: %v", s.Name, err))
+		}
+	}
+
+	// Restore consumers
+	currentCons, _ := s.ListConsumers("")
+	for _, c := range currentCons {
+		if err := s.DeleteConsumer(c.ID); err != nil {
+			errors["consumers"] = append(errors["consumers"], fmt.Sprintf("delete %s: %v", c.ID, err))
+		}
+	}
+	for _, c := range cfg.Consumers {
+		cu := Consumer{Username: getStr(c, "username")}
+		if _, err := s.CreateConsumer(&cu, ""); err != nil {
+			errors["consumers"] = append(errors["consumers"], fmt.Sprintf("create %s: %v", cu.Username, err))
+		}
+	}
+
+	// Restore routes
+	currentRoutes, _ := s.ListRoutes("", true)
+	for _, r := range currentRoutes {
+		if err := s.DeleteRoute(r.ID); err != nil {
+			errors["routes"] = append(errors["routes"], fmt.Sprintf("delete %s: %v", r.ID, err))
+		}
+	}
+	for _, r := range cfg.Routes {
+		route := Route{
+			Name:     getStr(r, "name"),
+			ServiceID: getStr(r, "service_id"),
+			Hosts:    getStrArr(r, "hosts"),
+			Paths:    getStrArr(r, "paths"),
+		}
+		if _, err := s.CreateRoute(&route, ""); err != nil {
+			errors["routes"] = append(errors["routes"], fmt.Sprintf("create %s: %v", route.Name, err))
+		}
+	}
+
+	// Restore plugins
+	currentPlugins, _ := s.ListPlugins("")
+	for _, p := range currentPlugins {
+		if err := s.DeletePlugin(p.ID); err != nil {
+			errors["plugins"] = append(errors["plugins"], fmt.Sprintf("delete %s: %v", p.ID, err))
+		}
+	}
+	for _, p := range cfg.Plugins {
+		pl := Plugin{
+			Name:    getStr(p, "name"),
+			Enabled: getBool(p, "enabled"),
+			Scope:   getStr(p, "scope"),
+		}
+		if _, err := s.CreatePlugin(&pl, ""); err != nil {
+			errors["plugins"] = append(errors["plugins"], fmt.Sprintf("create %s: %v", pl.Name, err))
+		}
+	}
+
+	return errors, nil
+}
+
+// Helpers
+func getStr(m map[string]interface{}, k string) string {
+	if v, ok := m[k].(string); ok {
+		return v
+	}
+	return ""
+}
+func getInt(m map[string]interface{}, k string) int {
+	if v, ok := m[k].(float64); ok {
+		return int(v)
+	}
+	return 0
+}
+func getBool(m map[string]interface{}, k string) bool {
+	if v, ok := m[k].(bool); ok {
+		return v
+	}
+	return false
+}
+func getStrArr(m map[string]interface{}, k string) []string {
+	if v, ok := m[k].([]interface{}); ok {
+		r := make([]string, 0, len(v))
+		for _, i := range v {
+			if s, ok := i.(string); ok {
+				r = append(r, s)
+			}
+		}
+		return r
+	}
+	return nil
 }
 
 func (s *Store) SeedDefaultUsers() error {

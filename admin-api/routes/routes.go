@@ -2803,6 +2803,51 @@ func DeleteConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+func DiffConfigSnapshots(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id1 := c.Query("id1")
+		id2 := c.Query("id2")
+		if id1 == "" || id2 == "" {
+			c.JSON(400, gin.H{"error": "id1 and id2 query parameters required"})
+			return
+		}
+		diff, err := store.DiffConfigSnapshots(id1, id2)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"diff": diff})
+	}
+}
+
+func RollbackConfigSnapshot(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		errors, err := store.RollbackConfigSnapshot(id)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		if len(errors) > 0 {
+			c.JSON(200, gin.H{"success": true, "errors": errors})
+			return
+		}
+		c.JSON(200, gin.H{"success": true})
+	}
+}
+
+func GetConfigSnapshot(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		snap, err := store.GetConfigSnapshot(id)
+		if err != nil {
+			c.JSON(404, gin.H{"message": "snapshot not found"})
+			return
+		}
+		c.JSON(200, snap)
+	}
+}
+
 // ── Health & Config Check ───────────────────────────────────────────────────
 
 func HealthCheck(store *storage.Store) gin.HandlerFunc {
