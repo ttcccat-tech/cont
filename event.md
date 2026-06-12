@@ -403,10 +403,11 @@
 
 ## 🟡 預計優化
 
-- [x] **Cont E2E Billing/Stripe Flow Tests** — commit `69c7ded3`
-  - 新增 `test/e2e-billing.sh` — 20 個 E2E 測試：Plans list/auth、Subscription auth flow、Checkout/Portal auth+validation、Stripe webhook error handling、Subscriptions list/auth
-  - Bug fix: `/webhooks/stripe` 原本在 auth 保護的 admin group 內，Stripe 無法在無 JWT 的情況下呼叫 → 移到 auth group 外（Stripe signature 驗證替代 auth）
-  - QA: 20/20 tests PASS（Plans/Subscription/Checkout/Portal/Webhook/Subscriptions CRUD）
+- [x] **Cont E2E Tests 接入 GitHub Actions CI** — commit `fdcd1b5f`
+  - `test/e2e-runner.sh` 已完整（e2e-services.sh + e2e-proxy-plugins.sh + e2e-billing.sh），共 60+ E2E tests
+  - CI 新增 `e2e-test` job，順序在 `smoke-test` 之後（smoke-test 先啟動 docker compose + 基本服務驗證，e2e-test 再執行完整 `test/e2e-runner.sh`）
+  - `smoke-test`: 輕量 smoke test（admin-api status + proxy status），快速回饋迴圈
+  - QA: 20/20 billing E2E tests PASS（本地驗證）
 
 ## 完整開發流程（開發守護遵循）
 
