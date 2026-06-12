@@ -53,6 +53,13 @@ services:
       REDIS_URL: "cont-redis:6379"
       JWT_SECRET: ${JWT_SECRET:-cont-dev-jwt-secret-change-in-prod}
       CONT_URL: ${CONT_URL:-}
+      # Stripe Billing (required for paid plans)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO_MONTHLY: ${STRIPE_PRICE_PRO_MONTHLY:-}
+      STRIPE_PRICE_PRO_YEARLY: ${STRIPE_PRICE_PRO_YEARLY:-}
+      STRIPE_PRICE_ENTERPRISE_MONTHLY: ${STRIPE_PRICE_ENTERPRISE_MONTHLY:-}
+      STRIPE_PRICE_ENTERPRISE_YEARLY: ${STRIPE_PRICE_ENTERPRISE_YEARLY:-}
     ports:
       - "18081:8001"
     depends_on:
