@@ -2,7 +2,7 @@
 
 ## 🔴 未完成（進行中）
 
-（已全部修復，見下方 ✅）
+- [ ] **行事曆認證問題** — Debug 模式發現 GetUserByUsername 回傳 nil（COALESCE UUID bug），已修復，rebuild 中
 
 ## 🟡 預計優化
 
