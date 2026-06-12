@@ -1099,8 +1099,12 @@ func (s *Store) GetUserByUsername(username string) (*User, error) {
 }
 
 func (s *Store) CreateUser(u *User) (*User, error) {
+	orgID := u.OrgID
+	if orgID == "" {
+		orgID = "00000000-0000-0000-0000-000000000000"
+	}
 	err := s.db.QueryRow(`INSERT INTO users (username, password_hash, display_name, email, role, org_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at`,
-		u.Username, u.PasswordHash, u.DisplayName, u.Email, u.Role, u.OrgID).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
+		u.Username, u.PasswordHash, u.DisplayName, u.Email, u.Role, orgID).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
