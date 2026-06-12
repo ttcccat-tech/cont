@@ -2,19 +2,19 @@
 
 ## ✅ 已完成
 
+- [x] **Cont Plugin Management System** — 動態啟用/停用/設定 Plugin
+  - Backend: `GET /internal/plugins` — 無認證，返回所有 enabled plugins（stripped for proxy）
+  - Proxy: `worker.lua` 每10s 呼叫 `/__cont_api_internal__/internal/plugins` 同步 `_G.cont.plugins`
+  - Frontend: Plugins.tsx — 列表/建立/啟用/停用/刪除/配置 CRUD 完整
+  - QA: GET /internal/plugins → 200 ✅ (5 enabled plugins), CRUD → 200/204 ✅
+  - commit `b22568f4` + `52a9a2f8` + `57efa8e3` + `7daad27a`
+  - **Bug fix `7daad27a`**: OpenResty 1.29+ subrequest handling — location exact-match→prefix, 移除 'internal' directive（ngx.location.capture 不觸發 nginx internal redirect），Lua path stripping 取代 rewrite+proxy_pass，URI prefix guard 取代 ngx.req.is_subrequest()
+
 - [x] **Proxy Lua Plugin 鏈完善化** — commit `270ea8b1` + `fb15630c` + `fc8ee4f4` + `23a13478` + `01d31bc5`
 
 ## 🟡 預計優化
 
-- [ ] **Cont Plugin Management System** — 動態啟用/停用/設定 Plugin
-  - 現況：Plugin model + CRUD routes 已存在，rate-limiting handler 已實作，access.lua 有 plugin chain
-  - 缺口：Proxy 無 `/internal/plugins` 端點（worker reload 時 plugins 無法同步）、無 Plugin Management Frontend UI
-  - **本輪已完成第一層（Backend Internal Endpoint）**：
-    - `GET /internal/plugins` — 無認證，返回所有 enabled plugins（stripped for proxy）
-    - `worker.lua` 每10s 呼叫 `/cont-admin-api/internal/plugins` 同步 `_G.cont.plugins`
-    - commit `b22568f4` + `52a9a2f8`
-  - 下一階段：Frontend Plugin Management UI（列表/建立/啟用/停用）
-  - QA: GET /internal/plugins → 200 ✅ (6 enabled plugins), CRUD → 200/204 ✅
+(空 — 暂无新提案)
 
 - [x] **Cont Auth 正式實作（JWT / OAuth2 / SSO）** — 登入頁面優化與現有用戶遷移
   - 本輪發現 testadmin 用戶密碼無法通過登入驗證（db 中無有效 bcrypt hash）
