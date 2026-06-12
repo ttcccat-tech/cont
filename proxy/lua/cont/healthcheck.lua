@@ -3,7 +3,7 @@
 -- Probes targets via TCP connect, logs healthy/unhealthy status
 -- TODO: write health status back to Redis for shared state
 
-local cont = require("cont.init")
+local cont = require("init")
 local http = require("resty.http")
 
 local function parse_target(target_str)

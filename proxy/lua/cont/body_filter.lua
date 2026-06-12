@@ -1,13 +1,13 @@
 -- cont.body_filter
 -- Response body transformation — JSON pretty-print, error wrapping, gzip handling
 
-local cont = require("cont.init")
+local cont = require("init")
 
 local plugins = cont.plugins or {}
 
 local function run_plugin_body_filter(plugin, eof)
     local plugin_name = plugin.name
-    local ok, mod = pcall(require, "cont.plugins." .. plugin_name .. ".handler")
+    local ok, mod = pcall(require, "plugins." .. plugin_name .. ".handler")
     if not ok or not mod then return end
     local handler = mod.new()
     if handler.body_filter then

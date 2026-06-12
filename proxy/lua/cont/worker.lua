@@ -24,7 +24,7 @@ end
 -- Healthcheck timer (every 5 seconds)
 local function start_healthcheck()
     local ok, err = ngx.timer.every(5, function()
-        local ok2, err2 = pcall(require, "cont.healthcheck")
+        local ok2, err2 = pcall(require, "healthcheck")
         if not ok2 then
             ngx.log(ngx.ERR, "cont: healthcheck error: ", err2)
         end

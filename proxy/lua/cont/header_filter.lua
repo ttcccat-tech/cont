@@ -3,7 +3,7 @@
 
 local function run_plugin_header_filter(plugin)
     local plugin_name = plugin.name
-    local ok, mod = pcall(require, "cont.plugins." .. plugin_name .. ".handler")
+    local ok, mod = pcall(require, "plugins." .. plugin_name .. ".handler")
     if not ok or not mod then return end
     local handler = mod.new()
     if handler.header_filter then
