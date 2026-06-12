@@ -25,7 +25,7 @@ func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error)
 		       connect_timeout, read_timeout, write_timeout, enabled,
 		       COALESCE(org_id, '') as org_id, created_at, updated_at
 		FROM services
-		WHERE (($1 = '' AND org_id IS NULL) OR org_id::text = $1)
+		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -112,7 +112,7 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 			name=$2, protocol=$3, host=$4, port=$5, path=$6, url=$7,
 			retries=$8, connect_timeout=$9, read_timeout=$10,
 			write_timeout=$11, enabled=$12, updated_at=NOW()
-		WHERE id=$1 AND ($13 = '' OR org_id::text = $13) RETURNING updated_at`,
+		WHERE id=$1 AND ($13 = '' OR ($13 != '' AND org_id::text = $13)) RETURNING updated_at`,
 		id, svc.Name, orString(svc.Protocol, "http"), svc.Host,
 		orInt(svc.Port, 80), svc.Path, svc.URL, orInt(svc.Retries, 5),
 		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
@@ -194,7 +194,7 @@ func (s *Store) ListRoutes(orgID string, limit, offset int) ([]Route, error) {
 		       https_redirect_status_code, connection_timeout, enabled,
 		       COALESCE(org_id, '') as org_id, created_at, updated_at
 		FROM routes
-		WHERE (($1 = '' AND org_id IS NULL) OR org_id::text = $1)
+		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -314,7 +314,7 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 		args = append([]interface{}{svcID}, args...)
 	}
 	args = append(args, orgID)
-	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($14 = '' OR org_id::text = $14) RETURNING updated_at"
+	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($14 = '' OR ($14 != '' AND org_id::text = $14)) RETURNING updated_at"
 
 	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
 	if err != nil {
@@ -336,7 +336,7 @@ func (s *Store) ListUpstreams(orgID string, limit, offset int) ([]Upstream, erro
 		SELECT id, name, algorithm, slots, healthchecks, enabled,
 		       COALESCE(org_id, '') as org_id, created_at, updated_at
 		FROM upstreams
-		WHERE (($1 = '' AND org_id IS NULL) OR org_id::text = $1)
+		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -515,7 +515,7 @@ func (s *Store) ListConsumers(orgID string, limit, offset int) ([]Consumer, erro
 		SELECT id, username, custom_id, enabled,
 		       COALESCE(org_id, '') as org_id, created_at, updated_at
 		FROM consumers
-		WHERE (($1 = '' AND org_id IS NULL) OR org_id::text = $1)
+		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -699,7 +699,7 @@ func (s *Store) ListPlugins(orgID string, limit, offset int) ([]Plugin, error) {
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
 		       COALESCE(org_id, '') as org_id, created_at, updated_at
 		FROM plugins
-		WHERE (($1 = '' AND org_id IS NULL) OR org_id::text = $1)
+		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
@@ -844,7 +844,7 @@ func (s *Store) ListWorkspaces(orgID string) ([]Workspace, error) {
 	query := `
 		SELECT id, name, COALESCE(org_id, '') as org_id, created_at
 		FROM workspaces
-		WHERE (($1 = '' AND org_id IS NULL) OR org_id::text = $1)
+		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC`
 	rows, err := s.db.Query(query, orgID)
 	if err != nil {
@@ -1083,10 +1083,10 @@ func firstLine(s string) string {
 // User methods
 
 func (s *Store) GetUserByUsername(username string) (*User, error) {
-	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at FROM users WHERE username = $1 AND enabled = true`, username)
+	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at, COALESCE(org_id, '') FROM users WHERE username = $1 AND enabled = true`, username)
 	var u User
 	var displayName, email sql.NullString
-	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &displayName, &email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &displayName, &email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt, &u.OrgID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
