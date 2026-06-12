@@ -209,6 +209,41 @@ export const deleteConfigSnapshot = (id: number) => analyticsClient.delete(`/con
 export const generateRSAKeyPair = () => analyticsClient.post<{ publicKey: string; privateKey: string }>('/crypto/rsa-keypair').then(r => r.data)
 export const getCurrentConfig = () => analyticsClient.get('/config/current').then(r => r.data)
 
+// ── Billing / Stripe ───────────────────────────────────────
+export interface Plan {
+  id: string
+  name: string
+  display_name: string
+  price_monthly: number
+  price_yearly: number
+  features: string
+  workspace_limit: number
+  user_limit: number
+  request_limit: number
+}
+
+export interface Subscription {
+  id: string
+  org_id: string
+  plan_name: string
+  stripe_customer_id: string
+  stripe_subscription_id: string
+  stripe_price_id: string
+  status: string
+  billing_cycle: string
+  current_period_start: string
+  current_period_end: string
+  cancel_at_period_end: boolean
+  trial_end?: string
+}
+
+export const getPlans = () => analyticsClient.get<Plan[]>('/billing/plans').then(r => r.data)
+export const getSubscription = () => analyticsClient.get<Subscription>('/billing/subscription').then(r => r.data)
+export const createCheckoutSession = (planName: string, billingCycle: string) =>
+  analyticsClient.post<{ url: string }>('/billing/checkout', { plan_name: planName, billing_cycle: billingCycle }).then(r => r.data)
+export const createPortalSession = () =>
+  analyticsClient.post<{ url: string }>('/billing/portal').then(r => r.data)
+
 export const getStatus = () => kongClient.get<KongStatus>(wsPrefix('/status')).then(r => r.data)
 export const getInfo = () => kongClient.get<KongInfo>(wsPrefix('/')).then(r => r.data)
 export const getMetrics = () => kongClient.get(wsPrefix('/metrics'), { transformResponse: [(d) => d] }).then(r => {

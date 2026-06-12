@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Card, Form, Input, Switch, Select, Button, Space, Tag, message, Divider, Row, Col, InputNumber, Alert } from 'antd'
+import { Card, Form, Input, Switch, Select, Button, Space, Tag, message, Divider, Row, Col, InputNumber, Alert, Tabs } from 'antd'
 import { SaveOutlined, ReloadOutlined } from '@ant-design/icons'
+import BillingPortal from '../components/BillingPortal'
 import api from '../api/kong'
 
 interface KongConfig {
@@ -84,109 +85,122 @@ export default function SettingsPage() {
         </Space>
       </div>
 
-      <Row gutter={[16, 16]}>
-        {/* Listening Ports */}
-        <Col xs={24} lg={12}>
-          <Card title="監聽端口" style={{ background:'var(--secondary)', border:'none' }}>
-            <Form form={form} layout="vertical">
-              <Form.Item name="proxy_listen" label="Proxy 監聽（對外流量）" extra="Kong 代理接收客戶端請求的端口">
-                <Input placeholder="0.0.0.0:8000" />
-              </Form.Item>
-              <Form.Item name="admin_listen" label="Admin API 監聽" extra="Kong 管理介面的監聽端口">
-                <Input placeholder="0.0.0.0:8001" />
-              </Form.Item>
-            </Form>
-          </Card>
-        </Col>
-
-        {/* Timeouts */}
-        <Col xs={24} lg={12}>
-          <Card title="連線逾時設定（毫秒）" style={{ background:'var(--secondary)', border:'none' }}>
-            <Form form={form} layout="vertical">
-              <Row gutter={8}>
-                <Col span={12}>
-                  <Form.Item name="proxy_connect_timeout" label="Proxy 連線逾時" extra="建立連線後，發請求的逾時（ms）">
-                    <InputNumber style={{width:'100%'}} min={0} step={1000} />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name="proxy_read_timeout" label="Proxy 讀取逾時">
-                    <InputNumber style={{width:'100%'}} min={0} step={1000} />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={8}>
-                <Col span={12}>
-                  <Form.Item name="proxy_send_timeout" label="Proxy 傳送逾時">
-                    <InputNumber style={{width:'100%'}} min={0} step={1000} />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name="admin_read_timeout" label="Admin 讀取逾時">
-                    <InputNumber style={{width:'100%'}} min={0} step={1000} />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Form>
-          </Card>
-        </Col>
-
-        {/* Request & Log */}
-        <Col xs={24} lg={12}>
-          <Card title="請求限制" style={{ background:'var(--secondary)', border:'none' }}>
-            <Form form={form} layout="vertical">
-              <Form.Item name="client_max_body_size" label="客戶端請求 Body 上限" extra="例如：10m = 10MB，0 = 不限制">
-                <Input placeholder="10m" />
-              </Form.Item>
-            </Form>
-          </Card>
-        </Col>
-
-        {/* Log & IP */}
-        <Col xs={24} lg={12}>
-          <Card title="日誌與安全" style={{ background:'var(--secondary)', border:'none' }}>
-            <Form form={form} layout="vertical">
-              <Form.Item name="log_level" label="日誌等級">
-                <Select>
-                  {LOG_LEVELS.map(l => <Select.Option key={l} value={l}>{l.toUpperCase()}</Select.Option>)}
-                </Select>
-              </Form.Item>
-              <Form.Item name="real_ip_header" label="真實客戶端 IP Header" extra="前面有代理時用於取得真實 IP">
-                <Input placeholder="X-Forwarded-For" />
-              </Form.Item>
-              <Form.Item name="real_ip_recursive" label="遞迴解析 IP" valuePropName="checked">
-                <Switch checkedChildren="開" unCheckedChildren="關" />
-              </Form.Item>
-            </Form>
-          </Card>
-        </Col>
-
-        {/* Cont System Info */}
-        <Col xs={24}>
-          <Card title="系統資訊" style={{ background:'var(--secondary)', border:'none' }}>
-            <Row gutter={[16,8]}>
-              <Col xs={24} sm={8}>
-                <Space direction="vertical">
-                  <span style={{color:'var(--muted)', fontSize:12}}>版本</span>
-                  <Tag color="green" style={{fontSize:14}}>Cont v2.0</Tag>
-                </Space>
+      <Tabs defaultActiveKey="system" items={[
+        {
+          key: 'system',
+          label: '系統設定',
+          children: (
+            <Row gutter={[16, 16]}>
+              {/* Listening Ports */}
+              <Col xs={24} lg={12}>
+                <Card title="監聽端口" style={{ background:'var(--secondary)', border:'none' }}>
+                  <Form form={form} layout="vertical">
+                    <Form.Item name="proxy_listen" label="Proxy 監聽（對外流量）" extra="Kong 代理接收客戶端請求的端口">
+                      <Input placeholder="0.0.0.0:8000" />
+                    </Form.Item>
+                    <Form.Item name="admin_listen" label="Admin API 監聽" extra="Kong 管理介面的監聽端口">
+                      <Input placeholder="0.0.0.0:8001" />
+                    </Form.Item>
+                  </Form>
+                </Card>
               </Col>
-              <Col xs={24} sm={8}>
-                <Space direction="vertical">
-                  <span style={{color:'var(--muted)', fontSize:12}}>資料庫</span>
-                  <Tag color="blue">PostgreSQL 15</Tag>
-                </Space>
+
+              {/* Timeouts */}
+              <Col xs={24} lg={12}>
+                <Card title="連線逾時設定（毫秒）" style={{ background:'var(--secondary)', border:'none' }}>
+                  <Form form={form} layout="vertical">
+                    <Row gutter={8}>
+                      <Col span={12}>
+                        <Form.Item name="proxy_connect_timeout" label="Proxy 連線逾時" extra="建立連線後，發請求的逾時（ms）">
+                          <InputNumber style={{width:'100%'}} min={0} step={1000} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item name="proxy_read_timeout" label="Proxy 讀取逾時">
+                          <InputNumber style={{width:'100%'}} min={0} step={1000} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={8}>
+                      <Col span={12}>
+                        <Form.Item name="proxy_send_timeout" label="Proxy 傳送逾時">
+                          <InputNumber style={{width:'100%'}} min={0} step={1000} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item name="admin_read_timeout" label="Admin 讀取逾時">
+                          <InputNumber style={{width:'100%'}} min={0} step={1000} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  </Form>
+                </Card>
               </Col>
-              <Col xs={24} sm={8}>
-                <Space direction="vertical">
-                  <span style={{color:'var(--muted)', fontSize:12}}>API Gateway</span>
-                  <Tag color="purple">Cont Proxy</Tag>
-                </Space>
+
+              {/* Request& Log */}
+              <Col xs={24} lg={12}>
+                <Card title="請求限制" style={{ background:'var(--secondary)', border:'none' }}>
+                  <Form form={form} layout="vertical">
+                    <Form.Item name="client_max_body_size" label="客戶端請求 Body 上限" extra="例如：10m = 10MB，0 = 不限制">
+                      <Input placeholder="10m" />
+                    </Form.Item>
+                  </Form>
+                </Card>
+              </Col>
+
+              {/* Log & IP */}
+              <Col xs={24} lg={12}>
+                <Card title="日誌與安全" style={{ background:'var(--secondary)', border:'none' }}>
+                  <Form form={form} layout="vertical">
+                    <Form.Item name="log_level" label="日誌等級">
+                      <Select>
+                        {LOG_LEVELS.map(l => <Select.Option key={l} value={l}>{l.toUpperCase()}</Select.Option>)}
+                      </Select>
+                    </Form.Item>
+                    <Form.Item name="real_ip_header" label="真實客戶端 IP Header" extra="前面有代理時用於取得真實 IP">
+                      <Input placeholder="X-Forwarded-For" />
+                    </Form.Item>
+                    <Form.Item name="real_ip_recursive" label="遞迴解析 IP" valuePropName="checked">
+                      <Switch checkedChildren="開" unCheckedChildren="關" />
+                    </Form.Item>
+                  </Form>
+                </Card>
+              </Col>
+
+              {/* Cont System Info */}
+              <Col xs={24}>
+                <Card title="系統資訊" style={{ background:'var(--secondary)', border:'none' }}>
+                  <Row gutter={[16,8]}>
+                    <Col xs={24} sm={8}>
+                      <Space direction="vertical">
+                        <span style={{color:'var(--muted)', fontSize:12}}>版本</span>
+                        <Tag color="green" style={{fontSize:14}}>Cont v2.0</Tag>
+                      </Space>
+                    </Col>
+                    <Col xs={24} sm={8}>
+                      <Space direction="vertical">
+                        <span style={{color:'var(--muted)', fontSize:12}}>資料庫</span>
+                        <Tag color="blue">PostgreSQL 15</Tag>
+                      </Space>
+                    </Col>
+                    <Col xs={24} sm={8}>
+                      <Space direction="vertical">
+                        <span style={{color:'var(--muted)', fontSize:12}}>API Gateway</span>
+                        <Tag color="purple">Cont Proxy</Tag>
+                      </Space>
+                    </Col>
+                  </Row>
+                </Card>
               </Col>
             </Row>
-          </Card>
-        </Col>
-      </Row>
+          ),
+        },
+        {
+          key: 'billing',
+          label: '方案與計費',
+          children: <BillingPortal />,
+        },
+      ]} />
     </div>
   )
 }
