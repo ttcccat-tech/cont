@@ -261,9 +261,11 @@ func main() {
 		admin.GET("/billing/subscription", routes.GetSubscription(store))
 		admin.POST("/billing/checkout", routes.CreateCheckoutSession(store, frontendBaseURL))
 		admin.POST("/billing/portal", routes.CreatePortalSession(store, frontendBaseURL))
-		admin.POST("/webhooks/stripe", routes.HandleStripeWebhook(store, os.Getenv("STRIPE_WEBHOOK_SECRET")))
 		admin.GET("/billing/subscriptions", routes.ListSubscriptions(store))
 	}
+
+	// Stripe Webhook — public (Stripe signs with secret, no JWT auth)
+	r.POST("/webhooks/stripe", routes.HandleStripeWebhook(store, os.Getenv("STRIPE_WEBHOOK_SECRET")))
 
 	port := os.Getenv("ADMIN_PORT")
 	if port == "" {

@@ -403,11 +403,12 @@
 
 ## 🟡 預計優化
 
-- [x] **Cont CI 整合測試接入（Go integration tests → GitHub Actions）** — commit `4b8f0a8b`
-  - admin-api/integration/integration_test.go 已有完整測試套件（31 tests: Services/Routes/Upstreams/Targets/Consumers/Plugins/Workspaces/Users/AuthGroups/APIKeys/ConfigSnapshots/AuditLogs/ConsumerCredentials/ RBAC CRUD）
-  - CI workflow 新增 `integration-test` job，順序在 go-test 之後（依賴 go-test），使用相同 postgres/redis services，build admin-api image 注入後執行整合測試
-  - `needs: go-test` 確保測試依賴通過後才執行，POSTGRES_URL 環境變數注入測試資料庫連線
-  - QA: CI job 執行 31 個整合測試
+- [ ] **Cont E2E Billing/Stripe Flow Tests**
+  - 現有 E2E 測試覆蓋 Auth flow、Proxy Lua plugin chain、Services CRUD
+  - 缺口：Billing/Plan Stripe 流程（Plans list、Checkout session、Portal session、Webhook events）完全無測試覆蓋
+  - 需要：新增 `test/e2e-billing.sh` — Plans API smoke、Checkout URL generation、Portal URL generation、subscription status check
+  - Frontend BillingPortal.tsx 互動流程（plan selection → checkout → success redirect）也需要覆蓋
+  - 預計產出：4+ E2E billing tests，納入 `test/e2e-runner.sh`
 
 ## 完整開發流程（開發守護遵循）
 
