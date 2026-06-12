@@ -76,6 +76,9 @@ func main() {
 		auth.POST("/login", routes.Login(store, jwtSecret))
 		auth.POST("/register/send-otp", routes.SendOTP(store))
 		auth.POST("/register/verify-otp", routes.VerifyOTP(store, jwtSecret))
+		// Password reset — aliases using same OTP handlers with purpose=reset-password
+		auth.POST("/password-reset/send", routes.SendOTP(store))
+		auth.POST("/password-reset/verify", routes.VerifyOTP(store, jwtSecret))
 		auth.GET("/me", routes.AuthRequired(jwtSecret), routes.GetMe(jwtSecret))
 	// OAuth2/OIDC SSO
 	auth.GET("/oauth/providers", routes.ListOAuthProviders(store))
