@@ -1,20 +1,16 @@
 # Cont 開發待辦
 
-## 🔴 未完成（進行中）
+## ✅ 已完成
 
-- [ ] **Proxy Lua Plugin 鏈完善化** — develop 分支
-  - access.lua: rate-limit + JWT 驗證整合（待完成）
-  - header_filter.lua: CORS + rate-limit headers（待完成）
-  - log.lua: access log + upstream latency（待完成）
+- [x] **Proxy Lua Plugin 鏈完善化** — commit `270ea8b1` + `fb15630c` + `fc8ee4f4` + `23a13478` + `01d31bc5`
 
 ## 🟡 預計優化
 
-- [ ] **Cont 使用者管理（RBAC 權限）** — 待實作
-  - 使用者管理精細化（Workspace 級 RBAC）已完成
-  - 下一階段：Resource-level RBAC UI（針對 service/route/upstream 的精細權限）
-
-## ✅ 已完成
-
+- [ ] **Cont Auth 正式實作（JWT / OAuth2 / SSO）** — 登入頁面優化與現有用戶遷移
+  - 本輪發現 testadmin 用戶密碼無法通過登入驗證（db 中無有效 bcrypt hash）
+  - 需要：確認 SeedDefaultUsers 是否成功執行、修復管理後台建立用戶的密碼雜湊流程
+  - 下一階段：完整 SSO 流程整合（Google OAuth2）
+  - access.lua: JWT validation (validate_jwt), consumer auth (key-auth/basic-auth/hmac-auth via /internal/validate-cred), OPTIONS preflight, route matching, load balancing (roundrobin/leastconn/weighted-ip-hash)
 - [x] **nginx.conf /status 和 /metrics location blocks 結構錯誤**（本輪發現並修復）
   - `/status` 的 `log_by_lua_block` 內層嵌套了多餘的 `content_by_lua_block`，導致 status handler 在 log phase 執行
   - `/metrics` 有兩個 `header_filter_by_lua_block`，第二個試圖執行 `ngx.exit(ngx.OK)` 會阻斷 content 輸出
