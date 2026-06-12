@@ -28,6 +28,20 @@
   - 前端按鈕：動態從 `/auth/oauth/providers` 讀取 enabled providers，渲染 OAuth 登入按鈕
   - 測試：完整 OAuth2 flow（ initiation → callback → JWT → 登入成功）
 
+- [x] **Cont OAuth Provider CRUD Management** — commit `33e8a1af`
+  - Backend: ListOAuthProviders/GetOAuthProvider/CreateOAuthProvider/UpdateOAuthProvider/DeleteOAuthProvider in store.go + routes/oauth.go
+  - Backend: SeedGoogleOAuthProvider() seeds Google OAuth placeholder on startup
+  - Frontend: OAuth Settings tab in Settings.tsx (list/create/edit/delete providers)
+  - Frontend: kong.ts adds OAuth2Provider interface + CRUD API functions
+  - Routes: GET/POST/PUT/DELETE /auth/oauth/providers/:provider
+  - QA: List→200 ✅, Create→201 ✅, Read→200 ✅, Update→200 ✅, Delete→204 ✅
+
+- [x] **Cont 密碼重設 Flow（Password Reset）** — commit `fc4a643b`
+  - VerifyOTP handler now handles purpose=reset-password
+  - SendOTP: generates 6-digit code, stores with 10min expiry
+  - VerifyOTP (reset-password): finds user by email, hashes new password with bcrypt, updates via UpdateUserPassword(), marks OTP verified
+  - QA: SendOTP → 200 ✅, VerifyOTP reset → 200 ✅, Login with new password → 200 ✅
+
 - [x] **Cont E2E Test Framework Phase 2 — Auth flow tests** — commit `5c915743`
   - TestAuthInvalidCredentials: wrong password → 401
   - TestAuthEditorLogin: editor role login (skip if user not exist)
