@@ -2,10 +2,6 @@
 
 ## 🔴 未完成（進行中）
 
-- [ ] **行事曆認證問題** — Debug 模式發現 GetUserByUsername 回傳 nil（COALESCE UUID bug），已修復，rebuild 中
-
-## 🟡 預計優化
-
 - [ ] **Cont Billing/Plan Stripe 整合** — 立即啟動
   - Phase 3 of Cont SaaS multi-tenant roadmap（Phase 1: Organization 資料模型、Phase 2: Workspace org_id 隔離已完成）
   - 目標：Plan（Free/Pro/Enterprise）、Subscription、Stripe Checkout/Portal、Webhook 處理
@@ -14,6 +10,8 @@
 - [ ] **Cont 使用者管理（RBAC 權限）** — 待實作
   - 使用者管理精細化（Workspace 級 RBAC）已完成
   - 下一階段：Resource-level RBAC UI（針對 service/route/upstream 的精細權限）
+
+## 🟡 預計優化
 
 - [x] **Cont Resource-level RBAC 權限指派** — commit `80d46e5e` + `5866a203`
   - store.go: `ensureResourceEntry()` 在 CreateService/CreateRoute/CreateUpstream/CreateConsumer 時自動註冊 Resource
@@ -86,6 +84,12 @@
   - Phase 3 待做：plan/billing/Stripe 整合
 
 ## ✅ 已完成
+
+- [x] **行事曆認證問題（COALESCE UUID bug）** — commit `95be3fc8`
+  - store.go: 所有 COALESCE(org_id, '') → COALESCE(org_id, '00000000-0000-0000-0000-000000000000')
+  - UUID columns cannot COALESCE with empty string in PostgreSQL
+  - GetUserByUsername Login handler debug fields 增強
+  - QA: Login → 200 ✅, /auth/me → 200 ✅ (含正確 permissions)
 
 - [x] **Workspace 使用者管理 UI（Workspace 級 RBAC）** — commit `b2544b7b` + `1d74dfb3` + `3f97b2d3`
   - Backend: `ListWorkspaceUsers` store method + `ListWorkspaceUsers` handler (GET /workspaces/:id/users)
