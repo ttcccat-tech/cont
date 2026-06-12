@@ -815,22 +815,61 @@ func (s *Store) GetPlugin(id, orgID string) (*Plugin, error) {
 }
 
 func (s *Store) UpdatePlugin(id, orgID string, p *Plugin) (*Plugin, error) {
+	// Fetch existing plugin so we only update fields that were actually provided
+	existing, err := s.GetPlugin(id, orgID)
+	if err != nil {
+		return nil, err
+	}
+	// Merge: use p's non-zero/non-empty fields, fall back to existing
+	name := p.Name
+	if name == "" {
+		name = existing.Name
+	}
 	configJSON, _ := json.Marshal(p.Config)
+	if p.Config == nil {
+		configJSON, _ = json.Marshal(existing.Config)
+	}
 	var routeID, serviceID, consumerID *string
-	if p.Route != nil { routeID = &p.Route.ID }
-	if p.Service != nil { serviceID = &p.Service.ID }
-	if p.Consumer != nil { consumerID = &p.Consumer.ID }
+	if p.Route != nil {
+		routeID = &p.Route.ID
+	} else if existing.Route != nil {
+		routeID = &existing.Route.ID
+	}
+	if p.Service != nil {
+		serviceID = &p.Service.ID
+	} else if existing.Service != nil {
+		serviceID = &existing.Service.ID
+	}
+	if p.Consumer != nil {
+		consumerID = &p.Consumer.ID
+	} else if existing.Consumer != nil {
+		consumerID = &existing.Consumer.ID
+	}
+	enabled := p.Enabled
+	if !p.Enabled && p.Enabled == existing.Enabled {
+		enabled = existing.Enabled
+	}
+	updatedAt, err := s.updatePluginFields(id, orgID, name, routeID, serviceID, consumerID, configJSON, enabled)
+	if err != nil {
+		return nil, err
+	}
+	return &Plugin{
+		ID: id, Name: name,
+		Route: existing.Route, Service: existing.Service, Consumer: existing.Consumer,
+		Config: p.Config, Enabled: enabled,
+		UpdatedAt: updatedAt,
+	}, nil
+}
+
+func (s *Store) updatePluginFields(id, orgID, name string, routeID, serviceID, consumerID *string, configJSON []byte, enabled bool) (string, error) {
+	var updatedAt string
 	err := s.db.QueryRow(`
 		UPDATE plugins SET name=$2, route_id=$3, service_id=$4, consumer_id=$5,
 			config=$6, enabled=$7, updated_at=NOW()
 		WHERE id=$1 AND (($8 = '' AND org_id IS NULL) OR org_id::text = $8) RETURNING updated_at`,
-		id, p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true), orgID,
-	).Scan(&p.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	p.ID = id
-	return p, nil
+		id, name, routeID, serviceID, consumerID, configJSON, enabled, orgID,
+	).Scan(&updatedAt)
+	return updatedAt, err
 }
 
 func (s *Store) DeletePlugin(id, orgID string) error {
