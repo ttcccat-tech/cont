@@ -59,8 +59,28 @@ func GetSubscription(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
 		if orgID == "" {
-			c.JSON(400, gin.H{"error": "organization ID required"})
-			return
+			// Admin with no org: auto-get or create a default org for this user
+			if role, _ := c.Get("role"); role != nil && fmt.Sprintf("%v", role) == "admin" {
+				userID, _ := c.Get("sub")
+				if uid, ok := userID.(string); ok {
+					org, err := store.GetOrganizationByUserID(uid)
+					if err == nil && org != nil {
+						orgID = org.ID
+					} else {
+						// create default org for this admin
+						username, _ := c.Get("username")
+						newOrg := &storage.Organization{Name: fmt.Sprintf("%v's Organization", username)}
+						if _, err := store.CreateOrganization(newOrg); err == nil {
+							store.SetUserOrganization(uid, newOrg.ID)
+							orgID = newOrg.ID
+						}
+					}
+				}
+			}
+			if orgID == "" {
+				c.JSON(400, gin.H{"error": "organization ID required"})
+				return
+			}
 		}
 
 		subscr, err := store.GetSubscriptionByOrg(orgID)

@@ -1238,6 +1238,30 @@ func (s *Store) ListOrganizations() ([]Organization, error) {
 	return out, rows.Err()
 }
 
+// GetOrganizationByUserID returns the organization for a given user (via org_id column)
+func (s *Store) GetOrganizationByUserID(userID string) (*Organization, error) {
+	row := s.db.QueryRow(`
+		SELECT o.id, o.name, o.plan, o.created_at, o.updated_at
+		FROM organizations o
+		JOIN users u ON u.org_id = o.id
+		WHERE u.id = $1`, userID)
+	var org Organization
+	err := row.Scan(&org.ID, &org.Name, &org.Plan, &org.CreatedAt, &org.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &org, nil
+}
+
+// SetUserOrganization updates a user's org_id
+func (s *Store) SetUserOrganization(userID, orgID string) error {
+	_, err := s.db.Exec(`UPDATE users SET org_id=$1, updated_at=NOW() WHERE id=$2`, orgID, userID)
+	return err
+}
+
 // ── OTP for email verification ───────────────────────────────────────────
 
 func (s *Store) CreateOTP(email, code, purpose string, expiresInMinutes int) (*OTP, error) {
