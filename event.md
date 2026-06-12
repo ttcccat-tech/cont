@@ -72,11 +72,12 @@
   - QA: Prometheus scrape ✅ (cont-admin-api: up), Grafana ✅ (HTTP 200), dashboard provisioned ✅
   - 使用方式：`docker compose -f monitoring/docker-compose.monitoring.yml up -d`
 
-- [x] **API Key 申請 Flow 完整化** — commit `8345bcd6`
+- [x] **API Key 申請 Flow 完整化** — commit `8345bcd6` + `8acf9e71`
   - ApiKeyRequests.tsx：申請表單（reason、scope、expire）、狀態追蹤（pending/approved/rejected）
   - 後端：核發後自動產生 key，寄送 email / Slack 通知
   - Admin：審批介面支援批次核准/拒絕多筆
   - Bug fix: GetAPIKeyRequest SQL scan 漏掉 key_value 欄位賦值，導致核准後 API 回傳 key_value: null
+  - **Bug fix `8acf9e71`**: nginx 缺少 `/api/` proxy block，前端 `/api/auth/login` → 404；新增 `location ~ ^/api/(?<api_path>.*)` → `cont-admin-api:8001/$api_path`；Admin API 在根路徑（非 `/api/`）；QA: Login→200 ✅, Create→201 ✅, Approve→key_value ✅, GET /api-keys/mine→6筆 ✅
 
 - [x] **Cont 單元測試覆蓋率提升（admin-api HTTP handlers integration tests）** — commit `a85f2072` + `fa236442`
   - integration/integration_test.go: 完整 HTTP 測試套件（Services/Routes/Upstreams/Targets/Consumers/Plugins/Workspaces/Users/AuthGroups/APIKeys/ConfigSnapshots/AuditLogs CRUD）
