@@ -170,11 +170,12 @@ func (r *Route) GetServiceName() string {
 	return r.Service.Name
 }
 
-// UnmarshalJSON converts {"service":"uuid"} or {"service":{"id":"uuid"}} to ServiceRef
+// UnmarshalJSON converts {"service":"uuid"} or {"service":{"id":"uuid"}} or {"service_id":"uuid"} to ServiceRef
 func (r *Route) UnmarshalJSON(data []byte) error {
 	type routeAlias Route
 	aux := struct {
-		Service interface{} `json:"service"`
+		Service   interface{} `json:"service"`
+		ServiceID string      `json:"service_id"`
 		*routeAlias
 	}{
 		routeAlias: (*routeAlias)(r),
@@ -193,7 +194,10 @@ func (r *Route) UnmarshalJSON(data []byte) error {
 			r.Service = &ServiceRef{Name: name}
 		}
 	case nil:
-		r.Service = nil
+		// Fallback: use service_id if provided
+		if aux.ServiceID != "" {
+			r.Service = &ServiceRef{ID: aux.ServiceID}
+		}
 	}
 	return nil
 }

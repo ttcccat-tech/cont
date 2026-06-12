@@ -14,6 +14,16 @@
 
 ## 🟡 預計優化
 
+- [ ] **Cont E2E Test Framework（Playwright + HTTP API integration tests）**
+  - 目標：建立自動化 E2E 測試框架，覆蓋 admin-api HTTP handlers + proxy Lua plugins + frontend 關鍵 flows
+  - 候選技術：Playwright（瀏覽器自動化）+ godog（BDD/Gherkin for Go）+ 自定義 bash test runner
+  - 覆蓋範圍：Services/Routes/Upstreams/Consumers/Plugins/Workspaces CRUD API、Auth flow、Plugin sync、healthcheck
+  - 現有 integration tests 可作為參考，逐步迁移到 E2E runner
+  - Phase 1：建立 test runner + 基本 API CRUD tests（POST/GET/PUT/PATCH/DELETE）
+  - Phase 2：Auth flow tests（login/logout/jwt validation/oauth callback）
+  - Phase 3：Proxy Lua plugin chain tests（rate-limiting/proxy-cache）
+  - 本輪啟動：Phase 1 — 建立 test runner + Services CRUD E2E test
+
 - [x] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）** — commit `86d739a7`
   - `proxy/lua/cont/plugins/rate-limiting-advanced/handler.lua` — Redis sliding window + local fallback, ngx.socket.tcp (OpenResty Alpine compatible), second/minute/hour/day limits, X-RateLimit-* headers, 429 response
   - `proxy/lua/cont/plugins/proxy-cache-advanced/handler.lua` — Redis/local cache, access phase cache lookup with nginx var routing, body_filter phase accumulation+storage, X-Cache-Status: HIT/MISS, content-type filtering, TTL, vary headers, status code filtering

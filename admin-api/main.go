@@ -242,11 +242,11 @@ func main() {
 		admin.POST("/snapshots", routes.CreateConfigSnapshot(store))
 		admin.DELETE("/snapshots/:id", routes.DeleteConfigSnapshot(store))
 
-		// Health & Config Check (for HealthPortal)
-		admin.GET("/health-check", routes.HealthCheck(store))
-		admin.GET("/config-check", routes.ConfigCheck())
+	// Health & Config Check (public, no auth)
+	r.GET("/health-check", routes.HealthCheck(store))
+	r.GET("/config-check", routes.ConfigCheck())
 
-		// Crypto utilities
+	// Admin API — Kong-compatible (auth protected)
 		admin.POST("/crypto/rsa-keypair", routes.GenerateRSAKeyPair)
 
 		// Billing / Stripe
