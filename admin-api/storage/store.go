@@ -1988,7 +1988,7 @@ func (s *Store) captureCurrentConfig() (string, error) {
 	}
 
 	// Services
-	svcs, err := s.ListServices("", 0, 0)
+	svcs, err := s.ListServices("00000000-0000-0000-0000-000000000000", 0, 0)
 	if err != nil {
 		return "{}", err
 	}
@@ -2005,7 +2005,7 @@ func (s *Store) captureCurrentConfig() (string, error) {
 	}
 
 	// Routes (admin only, no org filter)
-	routes, err := s.ListRoutes("", 0, 0)
+	routes, err := s.ListRoutes("00000000-0000-0000-0000-000000000000", 0, 0)
 	if err != nil {
 		return "{}", err
 	}
@@ -2021,7 +2021,7 @@ func (s *Store) captureCurrentConfig() (string, error) {
 	}
 
 	// Plugins (admin only)
-	plugins, err := s.ListPlugins("", 0, 0)
+	plugins, err := s.ListPlugins("00000000-0000-0000-0000-000000000000", 0, 0)
 	if err != nil {
 		return "{}", err
 	}
@@ -2036,7 +2036,7 @@ func (s *Store) captureCurrentConfig() (string, error) {
 	}
 
 	// Consumers (admin only)
-	consumers, err := s.ListConsumers("", 0, 0)
+	consumers, err := s.ListConsumers("00000000-0000-0000-0000-000000000000", 0, 0)
 	if err != nil {
 		return "{}", err
 	}
@@ -2283,7 +2283,7 @@ func (s *Store) RollbackConfigSnapshot(id string) (map[string][]string, error) {
 	errors := map[string][]string{}
 
 	// Restore services: delete current, re-create from snapshot
-	currentSvcs, _ := s.ListServices("", 0, 0)
+	currentSvcs, _ := s.ListServices("00000000-0000-0000-0000-000000000000", 0, 0)
 	for _, svc := range currentSvcs {
 		if err := s.DeleteService(svc.ID, ""); err != nil {
 			errors["services"] = append(errors["services"], fmt.Sprintf("delete %s: %v", svc.ID, err))
@@ -2303,7 +2303,7 @@ func (s *Store) RollbackConfigSnapshot(id string) (map[string][]string, error) {
 	}
 
 	// Restore consumers
-	currentCons, _ := s.ListConsumers("", 0, 0)
+	currentCons, _ := s.ListConsumers("00000000-0000-0000-0000-000000000000", 0, 0)
 	for _, c := range currentCons {
 		if err := s.DeleteConsumer(c.ID, ""); err != nil {
 			errors["consumers"] = append(errors["consumers"], fmt.Sprintf("delete %s: %v", c.ID, err))
@@ -2317,7 +2317,7 @@ func (s *Store) RollbackConfigSnapshot(id string) (map[string][]string, error) {
 	}
 
 	// Restore routes
-	currentRoutes, _ := s.ListRoutes("", 0, 0)
+	currentRoutes, _ := s.ListRoutes("00000000-0000-0000-0000-000000000000", 0, 0)
 	for _, r := range currentRoutes {
 		if err := s.DeleteRoute(r.ID, ""); err != nil {
 			errors["routes"] = append(errors["routes"], fmt.Sprintf("delete %s: %v", r.ID, err))
@@ -2336,7 +2336,7 @@ func (s *Store) RollbackConfigSnapshot(id string) (map[string][]string, error) {
 	}
 
 	// Restore plugins
-	currentPlugins, _ := s.ListPlugins("", 0, 0)
+	currentPlugins, _ := s.ListPlugins("00000000-0000-0000-0000-000000000000", 0, 0)
 	for _, p := range currentPlugins {
 		if err := s.DeletePlugin(p.ID, ""); err != nil {
 			errors["plugins"] = append(errors["plugins"], fmt.Sprintf("delete %s: %v", p.ID, err))
