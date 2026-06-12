@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Select, Drawer, Checkbox, List, Divider, Alert } from 'antd'
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, GroupOutlined, TeamOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm, Select, Drawer, Checkbox, List, Divider, Alert, Tabs } from 'antd'
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined, GroupOutlined, TeamOutlined, LockOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { Workspace, listWorkspaces, getUsers, createUser, updateUser, deleteUser, getGroups, getGroupMembers, setGroupMembers, getUserWorkspaces, setWorkspaceUser, removeWorkspaceUser, AuthGroup } from '../api/kong'
+import { Workspace, listWorkspaces, getUsers, createUser, updateUser, deleteUser, getGroups, getGroupMembers, setGroupMembers, getUserWorkspaces, setWorkspaceUser, removeWorkspaceUser, AuthGroup, Resource, ResourcePermission, getUserResourcePermissions, setUserResourcePermissions, listResources } from '../api/kong'
 
 interface User {
   id: string
@@ -38,6 +38,14 @@ export default function Users() {
   const [userWorkspaces, setUserWorkspaces] = useState<{ id: string; name: string; role: string }[]>([])
   const [wsLoading, setWsLoading] = useState(false)
   const [wsSaving, setWsSaving] = useState(false)
+
+  // Resource Permissions assignment
+  const [resPermDrawerOpen, setResPermDrawerOpen] = useState(false)
+  const [resPermUser, setResPermUser] = useState<User | null>(null)
+  const [allResources, setAllResources] = useState<Resource[]>([])
+  const [userResPerms, setUserResPerms] = useState<ResourcePermission[]>([])
+  const [resPermLoading, setResPermLoading] = useState(false)
+  const [resPermSaving, setResPermSaving] = useState(false)
 
   const fetchUsers = () => {
     setLoading(true)
@@ -214,6 +222,39 @@ export default function Users() {
     }
   }
 
+  // ── Resource Permissions ──────────────────────────────────
+  const openResPermDrawer = async (user: User) => {
+    setResPermUser(user)
+    setResPermDrawerOpen(true)
+    setResPermLoading(true)
+    try {
+      const [resources, perms] = await Promise.all([
+        listResources(),
+        getUserResourcePermissions(user.id),
+      ])
+      setAllResources(Array.isArray(resources) ? resources : [])
+      setUserResPerms(Array.isArray(perms) ? perms : [])
+    } catch (e) {
+      message.error('無法載入資源權限')
+    } finally {
+      setResPermLoading(false)
+    }
+  }
+
+  const handleSaveResPerms = async () => {
+    if (!resPermUser?.id) return
+    setResPermSaving(true)
+    try {
+      await setUserResourcePermissions(resPermUser.id, userResPerms)
+      message.success('資源權限已更新')
+      setResPermDrawerOpen(false)
+    } catch (e: any) {
+      message.error('儲存失敗: ' + (e?.message || ''))
+    } finally {
+      setResPermSaving(false)
+    }
+  }
+
   const columns: ColumnsType<User> = [
     {
       title: 'Username',
@@ -271,6 +312,7 @@ export default function Users() {
       width: 220,
       render: (_, r) => (
         <Space>
+          <Button size="small" icon={<LockOutlined />} onClick={() => openResPermDrawer(r)}>資源權限</Button>
           <Button size="small" icon={<TeamOutlined />} onClick={() => openWsDrawer(r)}>指派工作區</Button>
           <Button size="small" icon={<GroupOutlined />} onClick={() => openGroupDrawer(r)}>指派群組</Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openModal(r)}>編輯</Button>
@@ -463,6 +505,80 @@ export default function Users() {
               }}
               locale={{ emptyText: '尚無可用工作區' }}
             />
+          </>
+        )}
+      </Drawer>
+
+      {/* Resource Permissions Drawer */}
+      <Drawer
+        title={<Space><LockOutlined /> 資源權限：<Tag color="blue">{resPermUser?.username}</Tag></Space>}
+        open={resPermDrawerOpen}
+        onClose={() => setResPermDrawerOpen(false)}
+        width={560}
+        extra={
+          <Button type="primary" loading={resPermSaving} onClick={handleSaveResPerms}>
+            儲存
+          </Button>
+        }
+      >
+        {resPermLoading ? (
+          <div style={{ textAlign: 'center', padding: 32 }}>載入中...</div>
+        ) : (
+          <>
+            <Alert
+              message="針對特定資源（service/route/upstream/consumer）設定使用者的精細權限。覆寫 workspace-level 預設角色。"
+              type="info"
+              style={{ marginBottom: 16 }}
+            />
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: 'var(--accent)' }}>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text)' }}>資源</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text)' }}>類型</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text)', width: 80 }}>拒絕</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text)', width: 80 }}>讀取</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text)', width: 80 }}>寫入</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allResources.map((r, i) => {
+                  const current = userResPerms.find(p => p.resource_id === r.id)
+                  return (
+                    <tr key={r.id} style={{ background: i % 2 === 0 ? 'var(--secondary)' : 'transparent' }}>
+                      <td style={{ padding: '8px 12px' }}>
+                        <Space>
+                          <LockOutlined style={{ color: 'var(--muted)', fontSize: 11 }} />
+                          <span style={{ color: 'var(--highlight)' }}>{r.name}</span>
+                        </Space>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--muted)', textTransform: 'capitalize' }}>{r.type || '—'}</td>
+                      {(['deny', 'read', 'write'] as const).map(perm => (
+                        <td key={perm} style={{ textAlign: 'center', padding: '8px 12px' }}>
+                          <Checkbox
+                            checked={current?.permission === perm}
+                            disabled={resPermSaving}
+                            onChange={() => {
+                              if (current?.permission === perm) {
+                                setUserResPerms(userResPerms.filter(p => p.resource_id !== r.id))
+                              } else {
+                                const filtered = userResPerms.filter(p => p.resource_id !== r.id)
+                                setUserResPerms([...filtered, { resource_id: r.id, permission: perm }])
+                              }
+                            }}
+                            aria-label={`${r.name} - ${perm}`}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {userResPerms.length > 0 && (
+              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>
+                已設定 {userResPerms.length} 項資源權限覆寫
+              </div>
+            )}
           </>
         )}
       </Drawer>
