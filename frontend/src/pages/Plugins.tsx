@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Table, Button, Space, Tag, message, Modal, Form, Input, Select, Switch, Popconfirm, InputNumber, Divider } from 'antd'
+import { Table, Button, Space, Tag, message, Modal, Form, Input, Select, Switch, Popconfirm, InputNumber, Divider, Radio } from 'antd'
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import api, { KongPlugin, KongService, KongRoute, KongConsumer } from '../api/kong'
 import { useAuth } from '../context/AuthContext'
+
+type EnabledFilter = 'all' | 'enabled' | 'disabled'
 
 // Plugin configuration schemas
 interface PluginField {
@@ -228,6 +230,7 @@ export default function PluginsPage() {
   const [form] = Form.useForm()
   const [configForm] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all')
   const { canWrite, canDelete } = useAuth()
 
   const fetchAll = () => {
@@ -244,6 +247,22 @@ export default function PluginsPage() {
   }
 
   useEffect(() => { fetchAll() }, [])
+
+  const filteredPlugins = plugins.filter(p => {
+    if (enabledFilter === 'enabled') return p.enabled === true
+    if (enabledFilter === 'disabled') return p.enabled === false
+    return true
+  })
+
+  const handleToggleEnabled = async (plugin: KongPlugin) => {
+    try {
+      await api.updatePlugin(plugin.id!, { enabled: !plugin.enabled })
+      message.success(plugin.enabled ? '插件已停用' : '插件已啟用')
+      fetchAll()
+    } catch {
+      message.error('操作失敗')
+    }
+  }
 
   const openCreate = () => {
     form.resetFields()
@@ -322,9 +341,16 @@ export default function PluginsPage() {
     { title: '範圍', key: 'scope', render: (_, p) => <Tag color={pluginScopes(p) === 'Global' ? 'gold' : 'cyan'}>{pluginScopes(p)}</Tag> },
     { title: '已啟用', dataIndex: 'enabled', key: 'enabled', render: v => <Tag color={v ? 'green' : 'red'}>{v ? '是' : '否'}</Tag> },
     {
-      title: '操作', key: 'action', width: 180,
+      title: '操作', key: 'action', width: 280,
       render: (_, record) => (
         <Space>
+          <Switch
+            size="small"
+            checked={record.enabled}
+            onChange={() => record.id && handleToggleEnabled(record)}
+            checkedChildren="開"
+            unCheckedChildren="關"
+          />
           <Button size="small" icon={<SettingOutlined />} onClick={() => openConfig(record)}>配置</Button>
           {canDelete('plugins') && (
             <Popconfirm title="確認刪除此插件？" onConfirm={() => record.id && handleDelete(record.id)}>
@@ -344,6 +370,11 @@ export default function PluginsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h1>插件管理</h1>
         <Space>
+          <Radio.Group value={enabledFilter} onChange={e => setEnabledFilter(e.target.value)} size="small">
+            <Radio.Button value="all">全部</Radio.Button>
+            <Radio.Button value="enabled">已啟用</Radio.Button>
+            <Radio.Button value="disabled">已停用</Radio.Button>
+          </Radio.Group>
           <Button icon={<ReloadOutlined />} onClick={fetchAll}>刷新</Button>
           {canWrite('plugins') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增插件</Button>
@@ -353,7 +384,7 @@ export default function PluginsPage() {
 
       <Table
         columns={columns}
-        dataSource={plugins as any}
+        dataSource={filteredPlugins as any}
         rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
