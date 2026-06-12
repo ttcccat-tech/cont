@@ -621,6 +621,230 @@ func TestStatus(t *testing.T) {
 	t.Log("Status OK")
 }
 
+// ---- Proxy Plugin Chain Tests (Phase 3) ----
+
+func TestProxyMetricsFormat(t *testing.T) {
+	checkServicesUp(t)
+
+	resp, err := http.Get(proxyURL + "/metrics")
+	if err != nil {
+		t.Fatalf("GET /metrics failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := string(body)
+	if !strings.Contains(bodyStr, "cont_") {
+		t.Errorf("Metrics should contain cont_ prefix, got: %s", bodyStr[:200])
+	}
+	t.Logf("Proxy metrics format OK: %d bytes", len(bodyStr))
+}
+
+func TestProxyStatusFormat(t *testing.T) {
+	checkServicesUp(t)
+
+	resp, err := http.Get(proxyURL + "/status")
+	if err != nil {
+		t.Fatalf("GET /status failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var status map[string]interface{}
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&status); err != nil {
+		t.Fatalf("Failed to decode status JSON: %v", err)
+	}
+
+	if _, ok := status["uptime"]; !ok {
+		t.Errorf("Status should contain uptime field")
+	}
+	t.Logf("Proxy status OK: uptime=%v", status["uptime"])
+}
+
+func TestProxyRootRequest(t *testing.T) {
+	checkServicesUp(t)
+
+	resp, err := http.Get(proxyURL + "/")
+	if err != nil {
+		t.Fatalf("GET / via proxy failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Accept 2xx, 4xx, or 5xx (502 when no upstream configured)
+	if resp.StatusCode >= 600 || resp.StatusCode < 200 {
+		t.Errorf("Expected 2xx/4xx/5xx, got %d", resp.StatusCode)
+	}
+	t.Logf("Proxy root request OK: %d", resp.StatusCode)
+}
+
+func TestInternalPluginsList(t *testing.T) {
+	checkServicesUp(t)
+	if adminToken == "" {
+		t.Skip("No admin token")
+	}
+
+	req, _ := http.NewRequest("GET", baseURL+"/internal/plugins", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /internal/plugins failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), "rate-limiting") {
+		t.Errorf("internal/plugins should contain rate-limiting plugin")
+	}
+	t.Logf("Internal plugins list OK")
+}
+
+func TestServiceWithPlugins(t *testing.T) {
+	checkServicesUp(t)
+	if adminToken == "" {
+		t.Skip("No admin token")
+	}
+
+	// Create service
+	svcBody := map[string]interface{}{
+		"name":     "e2e-plugin-svc-" + fmt.Sprintf("%d", time.Now().Unix()),
+		"host":     "httpbin.org",
+		"port":     80,
+		"protocol": "http",
+	}
+	resp, err := adminReq("POST", "/services", adminToken, svcBody)
+	if err != nil {
+		t.Fatalf("POST /services failed: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected 201, got %d: %s", resp.StatusCode, string(body))
+	}
+
+	var svc map[string]interface{}
+	json.NewDecoder(bytes.NewReader(body)).Decode(&svc)
+	svcID, _ := svc["id"].(string)
+	if svcID == "" {
+		t.Fatal("No service ID returned")
+	}
+	defer adminReq("DELETE", "/services/"+svcID, adminToken, nil)
+
+	// Attach rate-limiting plugin
+	pluginBody := map[string]interface{}{
+		"name":       "rate-limiting",
+		"service_id": svcID,
+		"config":     map[string]interface{}{"minute": 100, "policy": "local"},
+	}
+	pResp, err := adminReq("POST", "/plugins", adminToken, pluginBody)
+	if err != nil {
+		t.Fatalf("POST /plugins (rate-limiting) failed: %v", err)
+	}
+	pBody, _ := io.ReadAll(pResp.Body)
+	pResp.Body.Close()
+
+	if pResp.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for rate-limiting plugin, got %d: %s", pResp.StatusCode, string(pBody))
+	} else {
+		t.Log("Rate-limiting plugin attached OK")
+	}
+
+	// Attach proxy-cache plugin
+	cacheBody := map[string]interface{}{
+		"name":       "proxy-cache",
+		"service_id": svcID,
+		"config":     map[string]interface{}{"response_code": []int{200}, "request_method": []string{"GET", "HEAD"}, "ttl": 60},
+	}
+	cResp, err := adminReq("POST", "/plugins", adminToken, cacheBody)
+	cBody, _ := io.ReadAll(cResp.Body)
+	cResp.Body.Close()
+
+	if cResp.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for proxy-cache plugin, got %d: %s", cResp.StatusCode, string(cBody))
+	} else {
+		t.Log("Proxy-cache plugin attached OK")
+	}
+
+	// List plugins
+	listResp, err := adminReq("GET", "/plugins", adminToken, nil)
+	if err != nil {
+		t.Fatalf("GET /plugins failed: %v", err)
+	}
+	defer listResp.Body.Close()
+
+	if listResp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200, got %d", listResp.StatusCode)
+	}
+	t.Log("Service + Plugins CRUD OK")
+}
+
+func TestConsumerKeyAuthCredential(t *testing.T) {
+	checkServicesUp(t)
+	if adminToken == "" {
+		t.Skip("No admin token")
+	}
+
+	// Create consumer
+	consumerBody := map[string]interface{}{
+		"username": "e2e-consumer-" + fmt.Sprintf("%d", time.Now().Unix()),
+	}
+	resp, err := adminReq("POST", "/consumers", adminToken, consumerBody)
+	if err != nil {
+		t.Fatalf("POST /consumers failed: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected 201, got %d: %s", resp.StatusCode, string(body))
+	}
+
+	var consumer map[string]interface{}
+	json.NewDecoder(bytes.NewReader(body)).Decode(&consumer)
+	consumerID, _ := consumer["id"].(string)
+	if consumerID == "" {
+		t.Fatal("No consumer ID returned")
+	}
+	defer adminReq("DELETE", "/consumers/"+consumerID, adminToken, nil)
+
+	// Create key-auth credential
+	keyBody := map[string]interface{}{
+		"key": fmt.Sprintf("e2e-test-key-%d", time.Now().Unix()),
+	}
+	kResp, err := adminReq("POST", "/consumers/"+consumerID+"/key-auth/credentials", adminToken, keyBody)
+	kBody, _ := io.ReadAll(kResp.Body)
+	kResp.Body.Close()
+
+	if kResp.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for key-auth credential, got %d: %s", kResp.StatusCode, string(kBody))
+	} else {
+		t.Log("Key-auth credential created OK")
+	}
+
+	// List credentials
+	lResp, err := adminReq("GET", "/consumers/"+consumerID+"/key-auth/credentials", adminToken, nil)
+	if err != nil {
+		t.Fatalf("GET /consumers/:id/key-auth/credentials failed: %v", err)
+	}
+	defer lResp.Body.Close()
+
+	if lResp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200, got %d", lResp.StatusCode)
+	}
+	t.Log("Consumer key-auth credential CRUD OK")
+}
+
 // ---- Helper functions ----
 
 func jsonBody(body map[string]interface{}) io.Reader {
