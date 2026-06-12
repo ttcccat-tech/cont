@@ -42,6 +42,7 @@
   - header_filter.lua: Kong-compatible headers (Via, X-Kong-Proxy-Latency, X-Kong-Upstream-Latency), CORS env support, consumer info headers (X-Consumer-ID, X-Credential-Identifier)
   - body_filter.lua: JSON pretty-print (CONT_JSON_PRETTY), error wrapping (CONT_WRAP_ERRORS)
   - log.lua: structured JSON/text access logging (CONT_LOG_FORMAT/CONT_LOG_LEVEL), Prometheus metrics (nginx_requests_total, nginx_request_latency_ms, route/consumer labels), plugin log() chains
+  - **Bug fix `23a13478`**: OpenResty Alpine 無 resty.http，移除並改用 ngx.location.capture 子請求；修復 `require("cont.status")` → `require("status")` 路徑問題（package.path 已含 cont/ 前綴）；init_by_lua_block 直接初始化 `_G.cont` 避免 module 載入 loop
 
 - [x] **Upstreams 健康檢查 UI** — commit `177ed99b`
   - Backend: GET /upstreams/:id/health endpoint reading from Redis health keys (cont:health:{upstream}:*)
