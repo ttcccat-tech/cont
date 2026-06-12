@@ -403,11 +403,11 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont CI 整合測試接入（Go integration tests → GitHub Actions）**
+- [x] **Cont CI 整合測試接入（Go integration tests → GitHub Actions）** — commit `4b8f0a8b`
   - admin-api/integration/integration_test.go 已有完整測試套件（31 tests: Services/Routes/Upstreams/Targets/Consumers/Plugins/Workspaces/Users/AuthGroups/APIKeys/ConfigSnapshots/AuditLogs/ConsumerCredentials/ RBAC CRUD）
-  - CI compose-test job 目前只有 smoke test，需要替換為實際執行 `go test ./integration/...`
-  - 需要：CI workflow 新增 `integration-test` job，順序在 go-test 之後（依賴 go-test），使用相同 postgres/redis services，build admin-api image 注入後執行整合測試
-  - 預計產出：CI job 執行 31 個整合測試並上報 test results
+  - CI workflow 新增 `integration-test` job，順序在 go-test 之後（依賴 go-test），使用相同 postgres/redis services，build admin-api image 注入後執行整合測試
+  - `needs: go-test` 確保測試依賴通過後才執行，POSTGRES_URL 環境變數注入測試資料庫連線
+  - QA: CI job 執行 31 個整合測試
 
 ## 完整開發流程（開發守護遵循）
 
