@@ -697,7 +697,7 @@ func (s *Store) DeleteConsumerCredential(consumerID, credentialType, credentialI
 func (s *Store) ListPlugins(orgID string, limit, offset int) ([]Plugin, error) {
 	query := `
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
-		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, scope, created_at, updated_at
 		FROM plugins
 		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
@@ -713,14 +713,15 @@ func (s *Store) ListPlugins(orgID string, limit, offset int) ([]Plugin, error) {
 		var routeID, serviceID, consumerID sql.NullString
 		var config []byte
 		var enabled sql.NullBool
+		var scope sql.NullString
 		var created, updated sql.NullString
 		if err := rows.Scan(&p.ID, &name, &routeID, &serviceID, &consumerID,
-			&config, &enabled, &p.OrgID, &created, &updated); err != nil {
+			&config, &enabled, &p.OrgID, &scope, &created, &updated); err != nil {
 			return nil, err
 		}
 		p.Name = name.String
 		if routeID.Valid {
-			p.Route =&PluginScope{ID: routeID.String}
+			p.Route = &PluginScope{ID: routeID.String}
 		}
 		if serviceID.Valid {
 			p.Service = &PluginScope{ID: serviceID.String}
@@ -733,6 +734,9 @@ func (s *Store) ListPlugins(orgID string, limit, offset int) ([]Plugin, error) {
 		}
 		if enabled.Valid {
 			p.Enabled = enabled.Bool
+		}
+		if scope.Valid {
+			p.Scope = scope.String
 		}
 		if created.Valid {
 			p.CreatedAt = created.String
@@ -758,10 +762,15 @@ func (s *Store) CreatePlugin(p *Plugin) (*Plugin, error) {
 	if p.Route != nil { routeID = &p.Route.ID }
 	if p.Service != nil { serviceID = &p.Service.ID }
 	if p.Consumer != nil { consumerID = &p.Consumer.ID }
+	// Default scope to 'service' if not specified
+	scope := p.Scope
+	if scope == "" {
+		scope = "service"
+	}
 	err := s.db.QueryRow(`
-		INSERT INTO plugins (name, route_id, service_id, consumer_id, config, enabled, org_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at, updated_at`,
-		p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true), orgIDArg,
+		INSERT INTO plugins (name, route_id, service_id, consumer_id, config, enabled, org_id, scope)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, created_at, updated_at`,
+		p.Name, routeID, serviceID, consumerID, configJSON, orBool(p.Enabled, true), orgIDArg, scope,
 	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -769,6 +778,7 @@ func (s *Store) CreatePlugin(p *Plugin) (*Plugin, error) {
 	if orgID != "" {
 		p.OrgID = orgID
 	}
+	p.Scope = scope
 	return p, nil
 }
 
@@ -778,20 +788,21 @@ func (s *Store) GetPlugin(id, orgID string) (*Plugin, error) {
 	var routeID, serviceID, consumerID sql.NullString
 	var config []byte
 	var enabled sql.NullBool
+	var scope sql.NullString
 	var created, updated sql.NullString
 	err := s.db.QueryRow(`
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
-		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, scope, created_at, updated_at
 		FROM plugins WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`,
 		id, orgID).Scan(
 		&p.ID, &name, &routeID, &serviceID, &consumerID,
-		&config, &enabled, &p.OrgID, &created, &updated)
+		&config, &enabled, &p.OrgID, &scope, &created, &updated)
 	if err != nil {
 		return nil, err
 	}
 	p.Name = name.String
 	if routeID.Valid {
-		p.Route =&PluginScope{ID: routeID.String}
+		p.Route = &PluginScope{ID: routeID.String}
 	}
 	if serviceID.Valid {
 		p.Service = &PluginScope{ID: serviceID.String}
@@ -804,6 +815,9 @@ func (s *Store) GetPlugin(id, orgID string) (*Plugin, error) {
 	}
 	if enabled.Valid {
 		p.Enabled = enabled.Bool
+	}
+	if scope.Valid {
+		p.Scope = scope.String
 	}
 	if created.Valid {
 		p.CreatedAt = created.String
@@ -849,25 +863,29 @@ func (s *Store) UpdatePlugin(id, orgID string, p *Plugin) (*Plugin, error) {
 	if !p.Enabled && p.Enabled == existing.Enabled {
 		enabled = existing.Enabled
 	}
-	updatedAt, err := s.updatePluginFields(id, orgID, name, routeID, serviceID, consumerID, configJSON, enabled)
+	scope := p.Scope
+	if scope == "" {
+		scope = existing.Scope
+	}
+	updatedAt, err := s.updatePluginFields(id, orgID, name, routeID, serviceID, consumerID, configJSON, enabled, scope)
 	if err != nil {
 		return nil, err
 	}
 	return &Plugin{
 		ID: id, Name: name,
 		Route: existing.Route, Service: existing.Service, Consumer: existing.Consumer,
-		Config: p.Config, Enabled: enabled,
+		Config: p.Config, Enabled: enabled, Scope: scope,
 		UpdatedAt: updatedAt,
 	}, nil
 }
 
-func (s *Store) updatePluginFields(id, orgID, name string, routeID, serviceID, consumerID *string, configJSON []byte, enabled bool) (string, error) {
+func (s *Store) updatePluginFields(id, orgID, name string, routeID, serviceID, consumerID *string, configJSON []byte, enabled bool, scope string) (string, error) {
 	var updatedAt string
 	err := s.db.QueryRow(`
 		UPDATE plugins SET name=$2, route_id=$3, service_id=$4, consumer_id=$5,
-			config=$6, enabled=$7, updated_at=NOW()
-		WHERE id=$1 AND (($8 = '' AND org_id IS NULL) OR org_id::text = $8) RETURNING updated_at`,
-		id, name, routeID, serviceID, consumerID, configJSON, enabled, orgID,
+			config=$6, enabled=$7, scope=$8, updated_at=NOW()
+		WHERE id=$1 AND (($9 = '' AND org_id IS NULL) OR org_id::text = $9) RETURNING updated_at`,
+		id, name, routeID, serviceID, consumerID, configJSON, enabled, scope, orgID,
 	).Scan(&updatedAt)
 	return updatedAt, err
 }

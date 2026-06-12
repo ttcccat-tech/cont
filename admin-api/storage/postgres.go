@@ -380,6 +380,10 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_plugins_org    ON plugins(org_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_workspaces_org ON workspaces(org_id)`,
 
+		// Phase 4: Plugin Global/Workspace Scoping
+		`ALTER TABLE plugins ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'service' CHECK (scope IN ('global','workspace','service','route','consumer'))`,
+		`CREATE INDEX IF NOT EXISTS idx_plugins_scope ON plugins(scope)`,
+
 		// Phase 3: Billing/Plan (Stripe integration)
 		`CREATE TABLE IF NOT EXISTS plans (
 			id TEXT PRIMARY KEY,

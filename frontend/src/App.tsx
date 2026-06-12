@@ -17,6 +17,7 @@ import HealthPortal from './pages/HealthPortal'
 import AlertRules from './pages/AlertRules'
 import ApiKeyRequests from './pages/ApiKeyRequests'
 import ApiDocs from './pages/ApiDocs'
+import Upstreams from './pages/Upstreams'
 import Users from './pages/Users'
 import Groups from './pages/Groups'
 import WorkspaceDetail from './pages/WorkspaceDetail'
@@ -107,6 +108,7 @@ export default function App() {
                   <Route path="/routes" element={<RoutesPage />} />
                   <Route path="/plugins" element={<Plugins />} />
                   <Route path="/consumers" element={<Consumers />} />
+                  <Route path="/upstreams" element={<Upstreams />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/audit" element={<AuditLog />} />

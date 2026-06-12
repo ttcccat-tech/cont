@@ -281,6 +281,7 @@ type Plugin struct {
 	Config     json.RawMessage `json:"config,omitempty"`
 	Enabled    bool            `json:"enabled"`
 	OrgID      string          `json:"org_id,omitempty"`
+	Scope      string          `json:"scope,omitempty"` // global, workspace, service, route, consumer
 	CreatedAt  string          `json:"created_at,omitempty"`
 	UpdatedAt  string          `json:"updated_at,omitempty"`
 }

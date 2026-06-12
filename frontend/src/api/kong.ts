@@ -61,6 +61,11 @@ export interface TargetHealth {
   healthy: boolean; port: number; host: string
 }
 
+export interface KongTarget {
+  id?: string; target?: string; weight?: number; enabled?: boolean; upstream_id?: string
+  created_at?: string
+}
+
 export interface UpstreamHealth {
   upstream_id: string; upstream_name: string; algorithm: string
   enabled: boolean; targets: TargetHealth[]
@@ -258,6 +263,21 @@ export const api = {
   listUpstreams: () => analyticsClient.get<KongUpstream[]>(wsPrefix('/upstreams')).then(r => r.data?.data ?? []),
   getUpstream: (id: string) => analyticsClient.get<KongUpstream>(wsPrefix(`/upstreams/${id}`)).then(r => r.data),
   getUpstreamHealth: (id: string) => analyticsClient.get<UpstreamHealth>(wsPrefix(`/upstreams/${id}/health`)).then(r => r.data),
+  createUpstream: (data: Partial<KongUpstream>) =>
+    analyticsClient.post<KongUpstream>(wsPrefix('/upstreams'), data).then(r => r.data),
+  updateUpstream: (id: string, data: Partial<KongUpstream>) =>
+    analyticsClient.patch<KongUpstream>(wsPrefix(`/upstreams/${id}`), data).then(r => r.data),
+  deleteUpstream: (id: string) =>
+    analyticsClient.delete(wsPrefix(`/upstreams/${id}`)),
+
+  listUpstreamTargets: (upstreamId: string) =>
+    analyticsClient.get<KongTarget[]>(wsPrefix(`/upstreams/${upstreamId}/targets`)).then(r => r.data?.data ?? []),
+  createUpstreamTarget: (upstreamId: string, data: Partial<KongTarget>) =>
+    analyticsClient.post<KongTarget>(wsPrefix(`/upstreams/${upstreamId}/targets`), data).then(r => r.data),
+  updateUpstreamTarget: (upstreamId: string, targetId: string, data: Partial<KongTarget>) =>
+    analyticsClient.patch<KongTarget>(wsPrefix(`/upstreams/${upstreamId}/targets/${targetId}`), data).then(r => r.data),
+  deleteUpstreamTarget: (upstreamId: string, targetId: string) =>
+    analyticsClient.delete(wsPrefix(`/upstreams/${upstreamId}/targets/${targetId}`)),
 
   listServices: () => analyticsClient.get<KongService[]>(wsPrefix('/services')).then(r => r.data?.data ?? []),
   getService: (id: string) => analyticsClient.get<KongService>(wsPrefix(`/services/${id}`)).then(r => r.data),

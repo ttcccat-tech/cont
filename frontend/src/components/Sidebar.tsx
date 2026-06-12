@@ -15,6 +15,7 @@ import {
   FileTextOutlined,
   BellOutlined,
   BookOutlined,
+  NodeIndexOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getUserPerms } from '../api/kong'
@@ -34,6 +35,7 @@ export default function Sidebar() {
     { key: '/routes', icon: <ThunderboltOutlined />, label: 'routes 路由' },
     { key: '/plugins', icon: <KeyOutlined />, label: 'plugins 插件' },
     { key: '/consumers', icon: <UserOutlined />, label: 'consumers 消費者' },
+    { key: '/upstreams', icon: <NodeIndexOutlined />, label: 'upstreams 上游' },
     { key: '/analytics', icon: <BarChartOutlined />, label: 'analytics 統計報告' },
     { key: '/audit', icon: <AuditOutlined />, label: 'audit 審計日誌' },
     { key: '/config-versioning', icon: <HistoryOutlined />, label: 'versions 設定版本' },

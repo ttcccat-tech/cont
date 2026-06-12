@@ -25,6 +25,17 @@
   - Go E2E tests (6 new tests) — TestProxyMetricsFormat, TestProxyStatusFormat, TestProxyRootRequest, TestInternalPluginsList, TestServiceWithPlugins, TestConsumerKeyAuthCredential
   - 20 bash tests PASS, Go build OK
 
+- [ ] **Cont Upstream Target Management UI** — Frontend read-only HealthPortal but no target CRUD UI
+  - Backend: GET /upstreams/:id/targets (ListTargets), POST /upstreams/:id/targets (CreateTarget), DELETE /upstreams/:id/targets/:target_id
+  - Frontend: Upstreams.tsx (list upstreams), UpstreamDetail.tsx (target management: add/remove/enable/disable target with weight/health)
+  - QA: Create→Read→Update→Delete targets CRUD
+
+- [ ] **Cont Global/Workspace-Level Plugin Scoping** — Plugins only attachable per-service today, not global
+  - Backend: Plugin model add `org_id` + `scope` field (global/service/route/workspace), Extend CreatePlugin to accept scope
+  - Proxy: access.lua read `scope` to determine if plugin applies globally or per-workspace
+  - Frontend: Plugins.tsx scope selector (Global/Workspace/Service), list shows scope
+  - QA: Global plugin applies to all routes, workspace-scoped only to that workspace
+
 - [x] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）** — commit `86d739a7`
   - `proxy/lua/cont/plugins/rate-limiting-advanced/handler.lua` — Redis sliding window + local fallback, ngx.socket.tcp (OpenResty Alpine compatible), second/minute/hour/day limits, X-RateLimit-* headers, 429 response
   - `proxy/lua/cont/plugins/proxy-cache-advanced/handler.lua` — Redis/local cache, access phase cache lookup with nginx var routing, body_filter phase accumulation+storage, X-Cache-Status: HIT/MISS, content-type filtering, TTL, vary headers, status code filtering
