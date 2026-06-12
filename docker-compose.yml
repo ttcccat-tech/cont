@@ -70,13 +70,11 @@ services:
 
   # ── cont Proxy Engine (OpenResty) ────────────────────────────
   proxy:
-    image: openresty/openresty:alpine
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
     container_name: cont-proxy
     restart: unless-stopped
-    volumes:
-      - ./proxy/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-      - ./proxy/lua/cont:/usr/local/openresty/lualib/cont:ro
-      - proxy_logs:/usr/local/openresty/nginx/logs
     ports:
       - "18000:8000"
     environment:
