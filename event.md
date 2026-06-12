@@ -5,12 +5,26 @@
 - [ ] **Proxy Lua Plugin 鏈完善化** — develop 分支
   - header_filter.lua: `_G.cont` 取代 `require("cont.init")` ✅, CORS headers 簡化為永遠啟用 ✅
   - log.lua: `cont` 未定義 bug 修復 ✅
-  - nginx.conf: `/status` + `/metrics` 改用 `content_by_lua_block` 輸出 body ✅
+  - nginx.conf: `/status` + `/metrics` 改用 `content_by_lua_block` 輸出 body ✅（本輪修復 malformed blocks）✅
+  - body_filter.lua: `require("init")` 移除，改用 `_G.cont` ✅（本輪修復）✅
   - access.lua: rate-limit + JWT 驗證整合（待完成）
   - header_filter.lua: CORS + rate-limit headers（待完成）
   - log.lua: access log + upstream latency（待完成）
 
-- [ ] **行事曆認證問題** — Debug 模式發現 GetUserByUsername 回傳 nil（COALESCE UUID bug），已修復，rebuild 中
+- [ ] **行事曆認證問題** — COALESCE UUID bug 已修復（commit `95be3fc8`），已重建
+
+## 🔴 新發現問題
+
+- [ ] **nginx.conf /status 和 /metrics location blocks 結構錯誤**（本輪發現並修復）
+  - `/status` 的 `log_by_lua_block` 內層嵌套了多餘的 `content_by_lua_block`，導致 status handler 在 log phase 執行
+  - `/metrics` 有兩個 `header_filter_by_lua_block`，第二個試圖執行 `ngx.exit(ngx.OK)` 會阻斷 content 輸出
+  - 修復：清理 blocks，/status/log 改為空 block，/metrics 移除多餘 header_filter
+  - 已 commit `e1569967`，仍需完整 QA 驗證
+
+- [ ] **rewrite.lua / healthcheck.lua / worker.lua 使用 `require("init")`**（本輪發現）
+  - 這些 module 在 init_by_lua_block 已執行完後被 require，`require("init")` 成功但行為不明確
+  - `rewrite.lua` 回傳值被 nginx 忽略，`return cont` 無作用
+  - 建議：統一改為直接取 `_G.cont`，消除對 require init 的依賴
 
 ## 🟡 預計優化
 
