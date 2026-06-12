@@ -1,7 +1,6 @@
 -- cont.rewrite
 -- URL normalization and method handling
-
-local cont = require("init")
+-- NOTE: No init_by_lua context; use _G.cont directly
 
 -- Set upstream variables (used by proxy_pass)
 ngx.var.cont_upstream = "http://127.0.0.1:80"
@@ -16,10 +15,7 @@ elseif string.sub(path, -1) == "/" and string.len(path) > 1 then
     -- But we handle strip_path per-route in access phase
 end
 
--- Handle OPTIONS preflight (CORS preflight — handled in access plugin)
 -- Handle WebSocket upgrade
 if ngx.var.upstream_http_upgrade == "websocket" then
     ngx.var.cont_upstream = "http://127.0.0.1:80"  -- upstream target set in access
 end
-
-return cont

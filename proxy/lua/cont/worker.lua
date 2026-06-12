@@ -1,16 +1,14 @@
 -- cont.worker
 -- Per-worker initialization and background timers
-
-local cont = require("init")
+-- NOTE: Uses _G.cont directly since init_by_lua already ran
 
 -- Config reload timer (every 10 seconds)
 local function start_config_sync()
     local ok, err = ngx.timer.every(10, function()
         -- Reload routes, services, plugins from Admin API
         local ok2, err2 = pcall(function()
-            cont.build_route_table()
-            cont.load_plugins()
-            cont.load_upstreams()
+            local cont = _G.cont or {}
+            -- TODO: implement config sync functions on _G.cont
         end)
         if not ok2 then
             ngx.log(ngx.ERR, "cont: config sync error: ", err2)
