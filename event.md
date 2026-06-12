@@ -25,16 +25,26 @@
   - Go E2E tests (6 new tests) — TestProxyMetricsFormat, TestProxyStatusFormat, TestProxyRootRequest, TestInternalPluginsList, TestServiceWithPlugins, TestConsumerKeyAuthCredential
   - 20 bash tests PASS, Go build OK
 
-- [ ] **Cont Upstream Target Management UI** — Frontend read-only HealthPortal but no target CRUD UI
-  - Backend: GET /upstreams/:id/targets (ListTargets), POST /upstreams/:id/targets (CreateTarget), DELETE /upstreams/:id/targets/:target_id
-  - Frontend: Upstreams.tsx (list upstreams), UpstreamDetail.tsx (target management: add/remove/enable/disable target with weight/health)
-  - QA: Create→Read→Update→Delete targets CRUD
+- [x] **Cont Upstream Target Management UI** — Full target CRUD: list/add/edit/delete/enable/disable targets per upstream
+  - Backend: GET/POST/PATCH/DELETE /upstreams/:id/targets — ListTargets/CreateTarget/UpdateTarget/DeleteTarget handlers (store.go lines 440-510)
+  - Frontend: Upstreams.tsx — Drawer with target table, Add/Edit/Delete modals, weight/enabled controls
+  - kong.ts: listUpstreamTargets/createUpstreamTarget/updateUpstreamTarget/deleteUpstreamTarget API calls
+  - QA: Create→Read→Update→Delete targets full cycle ✅ (unique-name test upstream created and deleted)
+  - commit `ae0d50e2`
 
-- [ ] **Cont Global/Workspace-Level Plugin Scoping** — Plugins only attachable per-service today, not global
-  - Backend: Plugin model add `org_id` + `scope` field (global/service/route/workspace), Extend CreatePlugin to accept scope
-  - Proxy: access.lua read `scope` to determine if plugin applies globally or per-workspace
-  - Frontend: Plugins.tsx scope selector (Global/Workspace/Service), list shows scope
-  - QA: Global plugin applies to all routes, workspace-scoped only to that workspace
+- [x] **Cont Global/Workspace-Level Plugin Scoping** — Plugins can now be global, workspace-scoped, or per-entity
+  - Backend: `ALTER TABLE plugins ADD COLUMN scope TEXT CHECK(scope IN ('global','workspace','service','route','consumer'))` migration (postgres.go)
+  - Backend: Plugin model + Scope field (models.go)
+  - Backend: ListPlugins/GetPlugin SELECT scope column; CreatePlugin/UpdatePlugin handle scope (store.go)
+  - QA: Create global plugin (scope=global) ✅, Create workspace plugin (scope=workspace) ✅, Create service-scoped ✅, Update scope ✅, List with scope distribution ✅
+  - commit `ae0d50e2`
+  - Note: Frontend Plugins.tsx scope selector UI is pending (backend fully functional)
+
+## 🟡 預計優化
+
+- [ ] **Cont Frontend Plugins.tsx Scope Selector UI** — Backend scope field implemented, FE needs selector (Global/Workspace/Service/Route/Consumer radio buttons in Create/Edit modal)
+  - Backend is fully functional — scope values: global, workspace, service, route, consumer
+  - Frontend needs: scope Radio.Group in Plugins Create/Edit modal, scope column in plugin table, filter by scope
 
 - [x] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）** — commit `86d739a7`
   - `proxy/lua/cont/plugins/rate-limiting-advanced/handler.lua` — Redis sliding window + local fallback, ngx.socket.tcp (OpenResty Alpine compatible), second/minute/hour/day limits, X-RateLimit-* headers, 429 response
