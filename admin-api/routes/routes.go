@@ -1229,13 +1229,15 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 		if err != nil || user == nil {
 			// Record failed attempt even for unknown user
 			store.RecordFailedLogin(req.Username, clientIP)
-			c.JSON(401, gin.H{"error": "invalid credentials"})
+			c.JSON(401, gin.H{"error": "invalid credentials", "debug": "user not found"})
 			return
 		}
 
-		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		hashBytes := []byte(user.PasswordHash)
+		err = bcrypt.CompareHashAndPassword(hashBytes, []byte(req.Password))
+		if err != nil {
 			store.RecordFailedLogin(req.Username, clientIP)
-			c.JSON(401, gin.H{"error": "invalid credentials"})
+			c.JSON(401, gin.H{"error": "invalid credentials", "debug_hash_len": len(hashBytes), "debug_pass_len": len(req.Password)})
 			return
 		}
 

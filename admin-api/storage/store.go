@@ -23,7 +23,7 @@ func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error)
 	query := `
 		SELECT id, name, protocol, host, port, path, url, retries,
 		       connect_timeout, read_timeout, write_timeout, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM services
 		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
@@ -102,7 +102,7 @@ func (s *Store) GetService(id, orgID string) (*Service, error) {
 	return s.getOneService(s.db.QueryRow(`
 		SELECT id, name, protocol, host, port, path, url, retries,
 		       connect_timeout, read_timeout, write_timeout, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM services WHERE id = $1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`, id, orgID))
 }
 
@@ -180,7 +180,7 @@ func (s *Store) GetServiceByName(name, orgID string) (*Service, error) {
 	row := s.db.QueryRow(`
 		SELECT id, name, protocol, host, port, path, url, retries,
 		       connect_timeout, read_timeout, write_timeout, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM services WHERE name=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`, name, orgID)
 	return s.getOneService(row)
 }
@@ -192,7 +192,7 @@ func (s *Store) ListRoutes(orgID string, limit, offset int) ([]Route, error) {
 		SELECT id, name, service_id, protocols, hosts, paths, methods,
 		       strip_path, preserve_host, regex_priority,
 		       https_redirect_status_code, connection_timeout, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM routes
 		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
@@ -269,7 +269,7 @@ func (s *Store) GetRoute(id, orgID string) (*Route, error) {
 		SELECT id, name, service_id, protocols, hosts, paths, methods,
 		       strip_path, preserve_host, regex_priority,
 		       https_redirect_status_code, connection_timeout, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM routes WHERE id = $1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`, id, orgID)
 	var r Route
 	var name, serviceID sql.NullString
@@ -334,7 +334,7 @@ func (s *Store) DeleteRoute(id, orgID string) error {
 func (s *Store) ListUpstreams(orgID string, limit, offset int) ([]Upstream, error) {
 	query := `
 		SELECT id, name, algorithm, slots, healthchecks, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM upstreams
 		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
@@ -399,7 +399,7 @@ func (s *Store) GetUpstream(id, orgID string) (*Upstream, error) {
 	var created, updated sql.NullString
 	err := s.db.QueryRow(`
 		SELECT id, name, algorithm, slots, healthchecks, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM upstreams WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`,
 		id, orgID).Scan(
 		&u.ID, &name, &algorithm, &slots, &healthchecks, &enabled, &u.OrgID, &created, &updated)
@@ -442,7 +442,7 @@ func (s *Store) DeleteUpstream(id, orgID string) error {
 func (s *Store) ListTargetsByUpstream(upstreamID string) ([]Target, error) {
 	rows, err := s.db.Query(`
 		SELECT id, target, weight, enabled,
-		       COALESCE(org_id, '') as org_id, created_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at
 		FROM targets WHERE upstream_id=$1 ORDER BY created_at`, upstreamID)
 	if err != nil {
 		return nil, err
@@ -513,7 +513,7 @@ func (s *Store) DeleteTarget(upstreamID, targetID, orgID string) error {
 func (s *Store) ListConsumers(orgID string, limit, offset int) ([]Consumer, error) {
 	query := `
 		SELECT id, username, custom_id, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM consumers
 		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
@@ -572,7 +572,7 @@ func (s *Store) GetConsumer(id, orgID string) (*Consumer, error) {
 	var created, updated sql.NullString
 	err := s.db.QueryRow(`
 		SELECT id, username, custom_id, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM consumers WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`,
 		id, orgID).Scan(
 		&c.ID, &username, &customID, &enabled, &c.OrgID, &created, &updated)
@@ -697,7 +697,7 @@ func (s *Store) DeleteConsumerCredential(consumerID, credentialType, credentialI
 func (s *Store) ListPlugins(orgID string, limit, offset int) ([]Plugin, error) {
 	query := `
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM plugins
 		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
@@ -781,7 +781,7 @@ func (s *Store) GetPlugin(id, orgID string) (*Plugin, error) {
 	var created, updated sql.NullString
 	err := s.db.QueryRow(`
 		SELECT id, name, route_id, service_id, consumer_id, config, enabled,
-		       COALESCE(org_id, '') as org_id, created_at, updated_at
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM plugins WHERE id=$1 AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`,
 		id, orgID).Scan(
 		&p.ID, &name, &routeID, &serviceID, &consumerID,
@@ -842,7 +842,7 @@ func (s *Store) DeletePlugin(id, orgID string) error {
 
 func (s *Store) ListWorkspaces(orgID string) ([]Workspace, error) {
 	query := `
-		SELECT id, name, COALESCE(org_id, '') as org_id, created_at
+		SELECT id, name, COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at
 		FROM workspaces
 		WHERE (($1 = '' AND org_id IS NULL) OR ($1 != '' AND org_id::text = $1))
 		ORDER BY created_at DESC`
@@ -886,7 +886,7 @@ func (s *Store) GetWorkspace(id string, orgID string) (*Workspace, error) {
 	var w Workspace
 	var name sql.NullString
 	var created sql.NullString
-	query := `SELECT id, name, COALESCE(org_id, '') as org_id, created_at FROM workspaces WHERE id=$1`
+	query := `SELECT id, name, COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at FROM workspaces WHERE id=$1`
 	args := []interface{}{id}
 	if orgID != "" {
 		query += ` AND (($2 = '' AND org_id IS NULL) OR org_id::text = $2)`
@@ -1083,7 +1083,7 @@ func firstLine(s string) string {
 // User methods
 
 func (s *Store) GetUserByUsername(username string) (*User, error) {
-	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at, COALESCE(org_id, '') FROM users WHERE username = $1 AND enabled = true`, username)
+	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at, COALESCE(org_id, '00000000-0000-0000-0000-000000000000') FROM users WHERE username = $1 AND enabled = true`, username)
 	var u User
 	var displayName, email sql.NullString
 	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &displayName, &email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt, &u.OrgID)
