@@ -1967,7 +1967,7 @@ func (s *Store) CreateConfigSnapshot(sn *ConfigSnapshot) (*ConfigSnapshot, error
 	err = s.db.QueryRow(
 		`INSERT INTO config_snapshots (version_label, config_data, diff_from_prev, actor_user_id, actor_username)
 		 VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at`,
-		sn.VersionLabel, configData, nullString(diffFromPrev), nullString(sn.ActorUserID), nullString(sn.ActorUsername),
+		sn.VersionLabel, configData, nullString(stringVal(diffFromPrev)), nullString(sn.ActorUserID), nullString(sn.ActorUsername),
 	).Scan(&outID, &sn.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -1988,7 +1988,7 @@ func (s *Store) captureCurrentConfig() (string, error) {
 	}
 
 	// Services
-	svcs, err := s.ListServices("", true)
+	svcs, err := s.ListServices("", 0, 0)
 	if err != nil {
 		return "{}", err
 	}
@@ -2005,7 +2005,7 @@ func (s *Store) captureCurrentConfig() (string, error) {
 	}
 
 	// Routes (admin only, no org filter)
-	routes, err := s.ListRoutes("", true)
+	routes, err := s.ListRoutes("", 0, 0)
 	if err != nil {
 		return "{}", err
 	}
@@ -2014,14 +2014,14 @@ func (s *Store) captureCurrentConfig() (string, error) {
 		routeMaps = append(routeMaps, map[string]interface{}{
 			"id":   r.ID,
 			"name": r.Name,
-			"service_id": r.ServiceID,
+			"service_id": r.GetServiceID(),
 			"hosts": r.Hosts,
 			"paths": r.Paths,
 		})
 	}
 
 	// Plugins (admin only)
-	plugins, err := s.ListPlugins("")
+	plugins, err := s.ListPlugins("", 0, 0)
 	if err != nil {
 		return "{}", err
 	}
@@ -2036,7 +2036,7 @@ func (s *Store) captureCurrentConfig() (string, error) {
 	}
 
 	// Consumers (admin only)
-	consumers, err := s.ListConsumers("")
+	consumers, err := s.ListConsumers("", 0, 0)
 	if err != nil {
 		return "{}", err
 	}
@@ -2283,62 +2283,62 @@ func (s *Store) RollbackConfigSnapshot(id string) (map[string][]string, error) {
 	errors := map[string][]string{}
 
 	// Restore services: delete current, re-create from snapshot
-	currentSvcs, _ := s.ListServices("", true)
+	currentSvcs, _ := s.ListServices("", 0, 0)
 	for _, svc := range currentSvcs {
-		if err := s.DeleteService(svc.ID); err != nil {
+		if err := s.DeleteService(svc.ID, ""); err != nil {
 			errors["services"] = append(errors["services"], fmt.Sprintf("delete %s: %v", svc.ID, err))
 		}
 	}
 	for _, svc := range cfg.Services {
-		s := Service{
+		svcRec := Service{
 			Name:     getStr(svc, "name"),
 			Host:     getStr(svc, "host"),
 			Port:     getInt(svc, "port"),
 			Path:     getStr(svc, "path"),
 			Protocol: getStr(svc, "protocol"),
 		}
-		if _, err := s.CreateService(&s, ""); err != nil {
-			errors["services"] = append(errors["services"], fmt.Sprintf("create %s: %v", s.Name, err))
+		if _, err := s.CreateService(&svcRec); err != nil {
+			errors["services"] = append(errors["services"], fmt.Sprintf("create %s: %v", svcRec.Name, err))
 		}
 	}
 
 	// Restore consumers
-	currentCons, _ := s.ListConsumers("")
+	currentCons, _ := s.ListConsumers("", 0, 0)
 	for _, c := range currentCons {
-		if err := s.DeleteConsumer(c.ID); err != nil {
+		if err := s.DeleteConsumer(c.ID, ""); err != nil {
 			errors["consumers"] = append(errors["consumers"], fmt.Sprintf("delete %s: %v", c.ID, err))
 		}
 	}
 	for _, c := range cfg.Consumers {
 		cu := Consumer{Username: getStr(c, "username")}
-		if _, err := s.CreateConsumer(&cu, ""); err != nil {
+		if _, err := s.CreateConsumer(&cu); err != nil {
 			errors["consumers"] = append(errors["consumers"], fmt.Sprintf("create %s: %v", cu.Username, err))
 		}
 	}
 
 	// Restore routes
-	currentRoutes, _ := s.ListRoutes("", true)
+	currentRoutes, _ := s.ListRoutes("", 0, 0)
 	for _, r := range currentRoutes {
-		if err := s.DeleteRoute(r.ID); err != nil {
+		if err := s.DeleteRoute(r.ID, ""); err != nil {
 			errors["routes"] = append(errors["routes"], fmt.Sprintf("delete %s: %v", r.ID, err))
 		}
 	}
 	for _, r := range cfg.Routes {
 		route := Route{
-			Name:     getStr(r, "name"),
-			ServiceID: getStr(r, "service_id"),
+			Name: getStr(r, "name"),
+			Service: &ServiceRef{ID: getStr(r, "service_id")},
 			Hosts:    getStrArr(r, "hosts"),
 			Paths:    getStrArr(r, "paths"),
 		}
-		if _, err := s.CreateRoute(&route, ""); err != nil {
+		if _, err := s.CreateRoute(&route); err != nil {
 			errors["routes"] = append(errors["routes"], fmt.Sprintf("create %s: %v", route.Name, err))
 		}
 	}
 
 	// Restore plugins
-	currentPlugins, _ := s.ListPlugins("")
+	currentPlugins, _ := s.ListPlugins("", 0, 0)
 	for _, p := range currentPlugins {
-		if err := s.DeletePlugin(p.ID); err != nil {
+		if err := s.DeletePlugin(p.ID, ""); err != nil {
 			errors["plugins"] = append(errors["plugins"], fmt.Sprintf("delete %s: %v", p.ID, err))
 		}
 	}
@@ -2348,7 +2348,7 @@ func (s *Store) RollbackConfigSnapshot(id string) (map[string][]string, error) {
 			Enabled: getBool(p, "enabled"),
 			Scope:   getStr(p, "scope"),
 		}
-		if _, err := s.CreatePlugin(&pl, ""); err != nil {
+		if _, err := s.CreatePlugin(&pl); err != nil {
 			errors["plugins"] = append(errors["plugins"], fmt.Sprintf("create %s: %v", pl.Name, err))
 		}
 	}
