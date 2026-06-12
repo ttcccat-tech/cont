@@ -6,6 +6,16 @@
 
 ## 🟡 預計優化
 
+- [ ] **Cont Plugin Management System** — 動態啟用/停用/設定 Plugin
+  - 現況：Plugin model + CRUD routes 已存在，rate-limiting handler 已實作，access.lua 有 plugin chain
+  - 缺口：Proxy 無 `/internal/plugins` 端點（worker reload 時 plugins 無法同步）、無 Plugin Management Frontend UI
+  - **本輪已完成第一層（Backend Internal Endpoint）**：
+    - `GET /internal/plugins` — 無認證，返回所有 enabled plugins（stripped for proxy）
+    - `worker.lua` 每10s 呼叫 `/cont-admin-api/internal/plugins` 同步 `_G.cont.plugins`
+    - commit `b22568f4` + `52a9a2f8`
+  - 下一階段：Frontend Plugin Management UI（列表/建立/啟用/停用）
+  - QA: GET /internal/plugins → 200 ✅ (6 enabled plugins), CRUD → 200/204 ✅
+
 - [x] **Cont Auth 正式實作（JWT / OAuth2 / SSO）** — 登入頁面優化與現有用戶遷移
   - 本輪發現 testadmin 用戶密碼無法通過登入驗證（db 中無有效 bcrypt hash）
   - 需要：確認 SeedDefaultUsers 是否成功執行、修復管理後台建立用戶的密碼雜湊流程
