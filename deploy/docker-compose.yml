@@ -1,0 +1,144 @@
+# Cont Gateway — Production Deployment
+# One-command startup: cp .env.example .env && docker compose up -d
+
+services:
+  # ── Databases ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: cont-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: cont
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kongpass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cont_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: cont-redis
+    restart: always
+    command: redis-server --appendonly yes --appendfsync everysec --requirepass ${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cont_net
+
+  # ── Cont Admin API (Go Gin) ────────────────────────────────────────────────
+  admin-api:
+    build:
+      context: ${APP_DIR:-../admin-api}
+      dockerfile: Dockerfile
+    image: cont/admin-api:${IMAGE_TAG:-latest}
+    container_name: cont-admin-api
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8001/health-check"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    environment:
+      ADMIN_PORT: "8001"
+      API_PORT: "8001"
+      PROXY_PORT: "8000"
+      POSTGRES_URL: "postgres://kong:${POSTGRES_PASSWORD:-kongpass}@cont-postgres:5432/cont?sslmode=disable"
+      REDIS_URL: "cont-redis:6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-}"
+      JWT_SECRET: "${JWT_SECRET}"
+      CONT_URL: "${CONT_URL:-}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASS: "${SMTP_PASS:-}"
+      SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-}"
+      EMAIL_WEBHOOK_URL: "${EMAIL_WEBHOOK_URL:-}"
+    ports:
+      - "${ADMIN_API_PORT:-18081}:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cont_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  # ── Cont Proxy Engine (OpenResty) ───────────────────────────────────────────
+  proxy:
+    build:
+      context: ${APP_DIR:-../proxy}
+      dockerfile: Dockerfile
+    image: cont/proxy:${IMAGE_TAG:-latest}
+    container_name: cont-proxy
+    restart: always
+    volumes:
+      - proxy_logs:/usr/local/openresty/nginx/logs
+    ports:
+      - "${PROXY_PORT:-18000}:8000"
+    environment:
+      - LUA_PACKAGE_PATH=/usr/local/openresty/lualib/cont/?.lua;/usr/local/openresty/lualib/cont/?/init.lua;;;
+      - CONT_CORS_ORIGIN=${CONT_CORS_ORIGIN:-*}
+      - CONT_LOG_FORMAT=${CONT_LOG_FORMAT:-json}
+      - CONT_LOG_LEVEL=${CONT_LOG_LEVEL:-info}
+      - CONT_JSON_PRETTY=${CONT_JSON_PRETTY:-false}
+      - CONT_WRAP_ERRORS=${CONT_WRAP_ERRORS:-true}
+    depends_on:
+      admin-api:
+        condition: service_healthy
+    networks:
+      - cont_net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+  # ── Cont Frontend (React + Nginx) ──────────────────────────────────────────
+  frontend:
+    build:
+      context: ${APP_DIR:-../frontend}
+      dockerfile: Dockerfile
+      args:
+        VITE_KONG_BASE: /api
+        VITE_API_BASE: /api
+    image: cont/frontend:${IMAGE_TAG:-latest}
+    container_name: cont-frontend
+    restart: always
+    ports:
+      - "${FRONTEND_PORT:-18082}:80"
+    depends_on:
+      - admin-api
+    networks:
+      - cont_net
+
+networks:
+  cont_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  postgres_data:
+  proxy_logs:
