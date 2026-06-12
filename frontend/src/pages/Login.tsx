@@ -146,6 +146,13 @@ export default function Login() {
   const [regLoading, setRegLoading] = useState(false)
   const [regCountdown, setRegCountdown] = useState(0)
   const [regError, setRegError] = useState('')
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotStep, setForgotStep] = useState<'send' | 'verify' | 'done'>('send')
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotCode, setForgotCode] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotCountdown, setForgotCountdown] = useState(0)
+  const [forgotError, setForgotError] = useState('')
 
   // Fetch available OAuth providers on mount
   useEffect(() => {
@@ -459,6 +466,188 @@ export default function Login() {
   }
 
   // Login form (default)
+  if (showForgotPassword) {
+    if (forgotStep === 'done') {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: 'var(--primary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'var(--secondary)',
+            border: '1px solid var(--accent)',
+            borderRadius: 12,
+            padding: '40px 32px',
+            width: 360,
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+            <h2 style={{ color: 'var(--text)', marginBottom: 8 }}>密碼已重設</h2>
+            <p style={{ color: 'var(--muted)', marginBottom: 24 }}>請使用新密碼登入</p>
+            <Button type="primary" size="large" block onClick={() => {
+              setShowForgotPassword(false)
+              setForgotStep('send')
+              setForgotEmail('')
+              setForgotCode('')
+            }}>
+              返回登入
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    if (forgotStep === 'verify') {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: 'var(--primary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'var(--secondary)',
+            border: '1px solid var(--accent)',
+            borderRadius: 12,
+            padding: '40px 32px',
+            width: 360,
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: 32 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 12,
+                background: 'linear-gradient(135deg, var(--highlight), var(--accent))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 24, fontWeight: 700, margin: '0 auto 12px',
+              }}>K</div>
+              <h2 style={{ color: 'var(--text)', margin: 0 }}>Cont</h2>
+              <p style={{ color: 'var(--muted)', marginTop: 8 }}>輸入驗證碼</p>
+            </div>
+
+            {forgotError && <Alert type="error" message={forgotError} style={{ marginBottom: 12 }} />}
+
+            <Form
+              onFinish={async (values) => {
+                setForgotLoading(true)
+                setForgotError('')
+                try {
+                  await axios.post(`${API_BASE}/auth/password-reset/verify`, {
+                    email: forgotEmail,
+                    code: values.code,
+                    new_password: values.password,
+                  })
+                  setForgotStep('done')
+                } catch (err: any) {
+                  setForgotError(err.response?.data?.error || '驗證失敗')
+                } finally {
+                  setForgotLoading(false)
+                }
+              }}
+              layout="vertical"
+              requiredMark={false}
+            >
+              <Form.Item label="驗證碼" name="code" rules={[{ required: true, message: '請輸入驗證碼' }]}>
+                <Input.OTP size="large" />
+              </Form.Item>
+              <Form.Item label="新密碼" name="password"
+                rules={[{ required: true, message: '請輸入新密碼' }, { min: 6, message: '密碼至少 6 位' }]}>
+                <Input.Password size="large" placeholder="新密碼" />
+              </Form.Item>
+              <Form.Item style={{ marginBottom: 0 }}>
+                <Button type="primary" htmlType="submit" size="large" loading={forgotLoading} block>
+                  重設密碼
+                </Button>
+              </Form.Item>
+            </Form>
+
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <Button type="link" size="small" onClick={() => setForgotStep('send')} style={{ color: 'var(--muted)' }}>
+                重新發送驗證碼
+              </Button>
+              {forgotCountdown > 0 && <span style={{ color: 'var(--muted)', marginLeft: 8 }}>({forgotCountdown}s)</span>}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // forgotStep === 'send'
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'var(--primary)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <div style={{
+          background: 'var(--secondary)',
+          border: '1px solid var(--accent)',
+          borderRadius: 12,
+          padding: '40px 32px',
+          width: 360,
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 12,
+              background: 'linear-gradient(135deg, var(--highlight), var(--accent))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 24, fontWeight: 700, margin: '0 auto 12px',
+            }}>K</div>
+            <h2 style={{ color: 'var(--text)', margin: 0 }}>Cont</h2>
+            <p style={{ color: 'var(--muted)', marginTop: 8 }}>輸入註冊信箱以重設密碼</p>
+          </div>
+
+          {forgotError && <Alert type="error" message={forgotError} style={{ marginBottom: 12 }} />}
+
+          <Form
+            onFinish={async (values) => {
+              setForgotLoading(true)
+              setForgotError('')
+              try {
+                await axios.post(`${API_BASE}/auth/password-reset/send`, { email: values.email })
+                setForgotEmail(values.email)
+                setForgotStep('verify')
+                setForgotCountdown(60)
+                const timer = setInterval(() => {
+                  setForgotCountdown(c => {
+                    if (c <= 1) { clearInterval(timer); return 0 }
+                    return c - 1
+                  })
+                }, 1000)
+              } catch (err: any) {
+                setForgotError(err.response?.data?.error || '發送失敗')
+              } finally {
+                setForgotLoading(false)
+              }
+            }}
+            layout="vertical"
+            requiredMark={false}
+          >
+            <Form.Item label="電子郵件" name="email"
+              rules={[{ required: true, message: '請輸入信箱' }, { type: 'email', message: '請輸入有效信箱' }]}>
+              <Input prefix={<MailOutlined />} size="large" placeholder="admin@cont.dev" />
+            </Form.Item>
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button type="primary" htmlType="submit" size="large" loading={forgotLoading} block>
+                發送驗證碼
+              </Button>
+            </Form.Item>
+          </Form>
+
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <Button type="link" size="small" onClick={() => setShowForgotPassword(false)} style={{ color: 'var(--muted)' }}>
+              返回登入
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -538,7 +727,12 @@ export default function Login() {
               Sign In
             </Button>
           </Form.Item>
-        </Form>
+
+          <div style={{ textAlign: 'right', marginBottom: 8 }}>
+            <Button type="link" size="small" onClick={() => setShowForgotPassword(true)} style={{ color: 'var(--muted)', padding: 0 }}>
+              忘記密碼？
+            </Button>
+          </div>
 
         <Divider style={{ margin: '24px 0 16px', color: 'var(--muted)', borderColor: 'var(--accent)' }}>
           <span style={{ fontSize: 12, padding: '0 8px' }}>or</span>

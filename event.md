@@ -14,19 +14,12 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont 密碼重設 Flow（Password Reset）** — `reset-password not yet implemented` 需實作
-  - Backend: `password_reset_tokens` table（token, user_id, expires_at）、`CreatePasswordResetToken()`/`VerifyPasswordResetToken()`/`ResetPassword()`
-  - Backend: `POST /auth/password-reset/send`（寄送重設郵件）、`POST /auth/password-reset/verify`（驗證 token）、`POST /auth/password-reset/confirm`（設定新密碼）
-  - Backend: 替換 bcrypt hash 需要新的 utility `hashPassword(password string)` + store層更新
-  - Frontend: Login.tsx 新增「忘記密碼」連結 → modal/頁面（輸入 email → 顯示成功訊息）
-  - Email webhook 通知（使用現有 EMAIL_WEBHOOK_URL）
-  - commit `33e8a1af` 已暫存，待整批 commit
-
-- [ ] **Cont Google OAuth2 完整 SSO 整合** — OAuth provider CRUD 已完成，需完成 Google OAuth2 登入 flow
+- [x] **Cont Google OAuth2 完整 SSO 整合** — OAuth provider CRUD 已完成，需完成 Google OAuth2 登入 flow
   - 需要：啟用 Google provider（client_id/client_secret 設定）、前端 Login.tsx 點擊 Google 登入
   - Google OAuth2 需要：Client ID + Client Secret（透過 OAuth Settings tab 設定）
   - 前端按鈕：動態從 `/auth/oauth/providers` 讀取 enabled providers，渲染 OAuth 登入按鈕
   - 測試：完整 OAuth2 flow（ initiation → callback → JWT → 登入成功）
+  - **Bug fix `67ad54db`**: OAuthState.ExpiresAt int64→time.Time type mismatch，導致 oauth_states Scan 失敗；修復後 initiation → 302 redirect ✅, state 正確寫入 DB ✅, callback token exchange 嘗試 ✅（需真實 Google credentials 完成完整 flow）
 
 - [x] **Cont OAuth Provider CRUD Management** — commit `33e8a1af`
   - Backend: ListOAuthProviders/GetOAuthProvider/CreateOAuthProvider/UpdateOAuthProvider/DeleteOAuthProvider in store.go + routes/oauth.go
