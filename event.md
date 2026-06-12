@@ -37,8 +37,8 @@
   - Backend: Plugin model + Scope field (models.go)
   - Backend: ListPlugins/GetPlugin SELECT scope column; CreatePlugin/UpdatePlugin handle scope (store.go)
   - QA: Create global plugin (scope=global) ✅, Create workspace plugin (scope=workspace) ✅, Create service-scoped ✅, Update scope ✅, List with scope distribution ✅
+  - Frontend Plugins.tsx scope selector UI 完整實作（global/workspace/service/route/consumer 五選項 + 條件式 entity selector + 表格 scope tag 顯示）✅
   - commit `ae0d50e2`
-  - Note: Frontend Plugins.tsx scope selector UI is pending (backend fully functional)
 
 ## 🟡 預計優化
 
