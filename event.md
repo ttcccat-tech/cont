@@ -42,10 +42,12 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Config Versioning & Diff/Rollback System** — Config Snapshots exist but lack version comparison and rollback. Need: snapshot metadata (version number, parent_id), compare endpoint (diff two snapshots), rollback endpoint (restore Kong config from snapshot), frontend diff viewer (side-by-side JSON diff), rollback confirmation UI
+- [x] **Cont Config Versioning & Diff/Rollback System** — Config Snapshots exist but lack version comparison and rollback. Need: snapshot metadata (version number, parent_id), compare endpoint (diff two snapshots), rollback endpoint (restore Kong config from snapshot), frontend diff viewer (side-by-side JSON diff), rollback confirmation UI
   - Backend: snapshots table needs version counter + parent_id, new routes: GET /config-snapshots/:id/diff/:otherId, POST /config-snapshots/:id/rollback
   - Frontend: ConfigSnapshots.tsx add diff modal (two-column JSON diff), rollback button with confirmation
-  -候选 commit: 實現 config versioning + diff + rollback
+  - 完整實作 commit `57d0981a` (config versioning + diff + rollback)
+  - **Bug fix `9eddd8d3`**: captureCurrentConfig 使用 `""` 空字串做 orgID 查詢 admin 資料，但 services/routes/plugins/consumers 的 org_id 是 zero UUID 而非 NULL，導致 snapshot 捕獲不到任何資料；改用 `00000000-0000-0000-0000-000000000000` 修復
+  - QA: Create→Read→Diff→Rollback 完整流程 ✅ (snapshot id=9 建立成功, GET /config/snapshots → 5 snapshots, Diff → JSON diff output, Rollback → success:true)
 
 - [x] **Cont Lua Plugin 鏈實際執行（rate-limiting-advanced + proxy-cache-advanced）** — commit `86d739a7`
   - `proxy/lua/cont/plugins/rate-limiting-advanced/handler.lua` — Redis sliding window + local fallback, ngx.socket.tcp (OpenResty Alpine compatible), second/minute/hour/day limits, X-RateLimit-* headers, 429 response
