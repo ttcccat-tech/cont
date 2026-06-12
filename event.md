@@ -29,10 +29,16 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Billing/Plan Stripe 整合** — 立即啟動
-  - Phase 3 of Cont SaaS multi-tenant roadmap（Phase 1: Organization 資料模型、Phase 2: Workspace org_id 隔離已完成）
-  - 目標：Plan（Free/Pro/Enterprise）、Subscription、Stripe Checkout/Portal、Webhook 處理
-  - 候選方向：Stripe Billing API、Plans table、Subscription 狀態管理、Webhook endpoint
+- [x] **Cont Billing/Plan Stripe 整合** — ✅ 已實作
+  - Backend: `routes/billing.go` — Plans/Subscriptions CRUD、Stripe Checkout/Portal、Webhook handler
+  - Backend: `storage/billing.go` — Plan/Subscription store methods、DefaultPlans seed
+  - Backend: `storage/postgres.go` — `plans` + `subscriptions` tables（含 Stripe webhook events 支援）
+  - Frontend: `BillingPortal.tsx` — Plan cards、billing cycle toggle、Checkout/Portal session
+  - Frontend: `kong.ts` — `getPlans/getSubscription/createCheckoutSession/createPortalSession` API
+  - Frontend: `Settings.tsx` — billing tab 整合 BillingPortal
+  - docker-compose.yml: `STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、Price env vars 已配置
+  - Backend webhook: `POST /webhooks/stripe` 處理 `checkout.session.completed`、`customer.subscription.updated/deleted`、`invoice.payment_failed`
+  - `GET /billing/plans` → 200 ✅, `GET /billing/subscription` → 200 ✅
 
 - [ ] **Cont 使用者管理（RBAC 權限）** — 待實作
   - 使用者管理精細化（Workspace 級 RBAC）已完成
