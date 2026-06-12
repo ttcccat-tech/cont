@@ -6,6 +6,11 @@
 
 ## 🟡 預計優化
 
+- [ ] **Cont Billing/Plan Stripe 整合** — 立即啟動
+  - Phase 3 of Cont SaaS multi-tenant roadmap（Phase 1: Organization 資料模型、Phase 2: Workspace org_id 隔離已完成）
+  - 目標：Plan（Free/Pro/Enterprise）、Subscription、Stripe Checkout/Portal、Webhook 處理
+  - 候選方向：Stripe Billing API、Plans table、Subscription 狀態管理、Webhook endpoint
+
 - [ ] **Cont 使用者管理（RBAC 權限）** — 待實作
   - 使用者管理精細化（Workspace 級 RBAC）已完成
   - 下一階段：Resource-level RBAC UI（針對 service/route/upstream 的精細權限）

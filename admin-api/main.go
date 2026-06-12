@@ -33,6 +33,11 @@ func main() {
 		log.Printf("Warning: failed to seed default users: %v", err)
 	}
 
+	// Seed default plans (Stripe billing)
+	if err := store.InitDefaultPlans(); err != nil {
+		log.Printf("Warning: failed to init default plans: %v", err)
+	}
+
 	// JWT secret
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -242,6 +247,18 @@ func main() {
 
 		// Crypto utilities
 		admin.POST("/crypto/rsa-keypair", routes.GenerateRSAKeyPair)
+
+		// Billing / Stripe
+		frontendBaseURL := os.Getenv("FRONTEND_BASE_URL")
+		if frontendBaseURL == "" {
+			frontendBaseURL = "http://localhost:5173"
+		}
+		admin.GET("/billing/plans", routes.ListPlans(store))
+		admin.GET("/billing/subscription", routes.GetSubscription(store))
+		admin.POST("/billing/checkout", routes.CreateCheckoutSession(store, frontendBaseURL))
+		admin.POST("/billing/portal", routes.CreatePortalSession(store, frontendBaseURL))
+		admin.POST("/webhooks/stripe", routes.HandleStripeWebhook(store, os.Getenv("STRIPE_WEBHOOK_SECRET")))
+		admin.GET("/billing/subscriptions", routes.ListSubscriptions(store))
 	}
 
 	port := os.Getenv("ADMIN_PORT")

@@ -379,6 +379,38 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_consumers_org  ON consumers(org_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_plugins_org    ON plugins(org_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_workspaces_org ON workspaces(org_id)`,
+
+		// Phase 3: Billing/Plan (Stripe integration)
+		`CREATE TABLE IF NOT EXISTS plans (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			display_name TEXT NOT NULL,
+			price_monthly INTEGER DEFAULT 0,
+			price_yearly INTEGER DEFAULT 0,
+			features TEXT DEFAULT '[]',
+			workspace_limit INTEGER DEFAULT 3,
+			user_limit INTEGER DEFAULT 5,
+			request_limit BIGINT DEFAULT 1000,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS subscriptions (
+			id TEXT PRIMARY KEY,
+			org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+			plan_name TEXT NOT NULL DEFAULT 'free',
+			stripe_customer_id TEXT,
+			stripe_subscription_id TEXT UNIQUE,
+			stripe_price_id TEXT,
+			status TEXT NOT NULL DEFAULT 'active',
+			billing_cycle TEXT DEFAULT 'monthly',
+			current_period_start TIMESTAMPTZ,
+			current_period_end TIMESTAMPTZ,
+			cancel_at_period_end BOOLEAN DEFAULT false,
+			trial_end TIMESTAMPTZ,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_org ON subscriptions(org_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_sub ON subscriptions(stripe_subscription_id)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
