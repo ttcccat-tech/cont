@@ -12,7 +12,7 @@ end
 
 -- ── Internal Admin API call via ngx.location.capture ──────────────────────────
 local function admin_api_call(path)
-    local res = ngx.location.capture("/cont-admin-api" .. path)
+    local res = ngx.location.capture("/__cont_api_internal__" .. path)
     return res.status, res.body
 end
 

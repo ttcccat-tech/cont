@@ -4,7 +4,7 @@
 
 -- Fetch plugins from Admin API internal endpoint
 local function sync_plugins()
-    local res = ngx.location.capture("/cont-admin-api/internal/plugins")
+    local res = ngx.location.capture("/__cont_api_internal__/internal/plugins")
     if res.status ~= 200 then
         ngx.log(ngx.WARN, "cont: plugin sync failed: status=", res.status)
         return
