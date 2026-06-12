@@ -38,6 +38,11 @@ func main() {
 		log.Printf("Warning: failed to init default plans: %v", err)
 	}
 
+	// Seed Google OAuth provider placeholder
+	if err := store.SeedGoogleOAuthProvider(); err != nil {
+		log.Printf("Warning: failed to seed Google OAuth provider: %v", err)
+	}
+
 	// JWT secret
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -72,10 +77,14 @@ func main() {
 		auth.POST("/register/send-otp", routes.SendOTP(store))
 		auth.POST("/register/verify-otp", routes.VerifyOTP(store, jwtSecret))
 		auth.GET("/me", routes.AuthRequired(jwtSecret), routes.GetMe(jwtSecret))
-		// OAuth2/OIDC SSO
-		auth.GET("/oauth/providers", routes.ListOAuthProviders(store))
-		auth.GET("/:provider", routes.InitiateOAuth(store))
-		auth.GET("/:provider/callback", routes.HandleOAuthCallback(store, jwtSecret))
+	// OAuth2/OIDC SSO
+	auth.GET("/oauth/providers", routes.ListOAuthProviders(store))
+	auth.GET("/oauth/providers/:provider", routes.GetOAuthProvider(store))
+	auth.POST("/oauth/providers", routes.CreateOAuthProvider(store))
+	auth.PUT("/oauth/providers/:provider", routes.UpdateOAuthProvider(store))
+	auth.DELETE("/oauth/providers/:provider", routes.DeleteOAuthProvider(store))
+	auth.GET("/:provider", routes.InitiateOAuth(store))
+	auth.GET("/:provider/callback", routes.HandleOAuthCallback(store, jwtSecret))
 	}
 
 	// Internal endpoint for proxy auth validation (public, no auth)

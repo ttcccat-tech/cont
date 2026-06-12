@@ -2,7 +2,6 @@ package routes
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -49,33 +48,131 @@ type OAuthUserInfo struct {
 // ListOAuthProviders returns all configured OAuth providers
 func ListOAuthProviders(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		db := store.DB()
-		rows, err := db.Query(`
-			SELECT provider, client_id, issuer_url, authorization_url,
-			       token_url, userinfo_url, jwks_url, scopes, enabled
-			FROM oauth_providers ORDER BY provider`)
+		providers, err := store.ListOAuthProviders()
 		if err != nil {
 			c.JSON(500, gin.H{"error": "failed to list providers"})
 			return
 		}
-		defer rows.Close()
-		var providers []OAuthProvider
-		for rows.Next() {
-			var p OAuthProvider
-			var issuer, authURL, tokenURL, userinfo, jwks, scopes sql.NullString
-			if err := rows.Scan(&p.Provider, &p.ClientID, &issuer, &authURL,
-				&tokenURL, &userinfo, &jwks, &scopes, &p.Enabled); err != nil {
-				continue
-			}
-			p.IssuerURL = issuer.String
-			p.AuthURL = authURL.String
-			p.TokenURL = tokenURL.String
-			p.UserInfoURL = userinfo.String
-			p.JWKSURL = jwks.String
-			p.Scopes = scopes.String
-			providers = append(providers, p)
+		// Strip secrets for list response
+		var public []map[string]interface{}
+		for _, p := range providers {
+			public = append(public, map[string]interface{}{
+				"provider":          p.Provider,
+				"client_id":         p.ClientID,
+				"issuer_url":        p.IssuerURL,
+				"authorization_url": p.AuthorizationURL,
+				"token_url":         p.TokenURL,
+				"userinfo_url":      p.UserInfoURL,
+				"jwks_url":          p.JWKSURL,
+				"scopes":            p.Scopes,
+				"enabled":           p.Enabled,
+			})
 		}
-		c.JSON(200, providers)
+		c.JSON(200, public)
+	}
+}
+
+// GetOAuthProvider returns a single OAuth provider config
+func GetOAuthProvider(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		provider := c.Param("provider")
+		p, err := store.GetOAuthProvider(provider)
+		if err != nil {
+			c.JSON(404, gin.H{"error": "provider not found"})
+			return
+		}
+		c.JSON(200, p)
+	}
+}
+
+// CreateOAuthProvider creates a new OAuth provider
+func CreateOAuthProvider(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input struct {
+			Provider         string `json:"provider" binding:"required"`
+			ClientID         string `json:"client_id" binding:"required"`
+			ClientSecret     string `json:"client_secret" binding:"required"`
+			IssuerURL        string `json:"issuer_url"`
+			AuthorizationURL string `json:"authorization_url"`
+			TokenURL         string `json:"token_url" binding:"required"`
+			UserInfoURL      string `json:"userinfo_url"`
+			JWKSURL          string `json:"jwks_url"`
+			Scopes           string `json:"scopes"`
+			Enabled          bool   `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		p := &storage.OAuthProviderModel{
+			Provider:         input.Provider,
+			ClientID:         input.ClientID,
+			ClientSecret:     input.ClientSecret,
+			IssuerURL:        input.IssuerURL,
+			AuthorizationURL: input.AuthorizationURL,
+			TokenURL:         input.TokenURL,
+			UserInfoURL:      input.UserInfoURL,
+			JWKSURL:          input.JWKSURL,
+			Scopes:           input.Scopes,
+			Enabled:          input.Enabled,
+		}
+		created, err := store.CreateOAuthProvider(p)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(201, created)
+	}
+}
+
+// UpdateOAuthProvider updates an existing OAuth provider
+func UpdateOAuthProvider(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		provider := c.Param("provider")
+		var input struct {
+			ClientID         string `json:"client_id" binding:"required"`
+			ClientSecret     string `json:"client_secret"` // optional — empty means don't update
+			IssuerURL        string `json:"issuer_url"`
+			AuthorizationURL string `json:"authorization_url"`
+			TokenURL         string `json:"token_url" binding:"required"`
+			UserInfoURL      string `json:"userinfo_url"`
+			JWKSURL          string `json:"jwks_url"`
+			Scopes           string `json:"scopes"`
+			Enabled          bool   `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		p := &storage.OAuthProviderModel{
+			ClientID:         input.ClientID,
+			ClientSecret:     input.ClientSecret,
+			IssuerURL:        input.IssuerURL,
+			AuthorizationURL: input.AuthorizationURL,
+			TokenURL:         input.TokenURL,
+			UserInfoURL:      input.UserInfoURL,
+			JWKSURL:          input.JWKSURL,
+			Scopes:           input.Scopes,
+			Enabled:          input.Enabled,
+		}
+		updated, err := store.UpdateOAuthProvider(provider, p)
+		if err != nil {
+			c.JSON(404, gin.H{"error": "provider not found"})
+			return
+		}
+		c.JSON(200, updated)
+	}
+}
+
+// DeleteOAuthProvider deletes an OAuth provider
+func DeleteOAuthProvider(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		provider := c.Param("provider")
+		if err := store.DeleteOAuthProvider(provider); err != nil {
+			c.JSON(404, gin.H{"error": "provider not found"})
+			return
+		}
+		c.Status(204)
 	}
 }
 

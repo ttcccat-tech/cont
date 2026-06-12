@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Card, Form, Input, Switch, Select, Button, Space, Tag, message, Divider, Row, Col, InputNumber, Alert, Tabs } from 'antd'
-import { SaveOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Card, Form, Input, Switch, Select, Button, Space, Tag, message, Divider, Row, Col, InputNumber, Alert, Tabs, Table, Modal, Popconfirm } from 'antd'
+import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import BillingPortal from '../components/BillingPortal'
-import api from '../api/kong'
+import api, { listOAuthProviders, createOAuthProvider, updateOAuthProvider, deleteOAuthProvider, OAuth2Provider } from '../api/kong'
 
 interface KongConfig {
   // Connection settings
@@ -200,7 +200,152 @@ export default function SettingsPage() {
           label: '方案與計費',
           children: <BillingPortal />,
         },
+        {
+          key: 'oauth',
+          label: 'OAuth 設定',
+          children: <OAuthSettingsTab />,
+        },
       ]} />
+    </div>
+  )
+}
+
+// ── OAuth Provider Settings Tab ──────────────────────────────────────────────
+
+function OAuthSettingsTab() {
+  const [providers, setProviders] = useState<OAuth2Provider[]>([])
+  const [loading, setLoading] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<OAuth2Provider | null>(null)
+  const [form] = Form.useForm()
+
+  const loadProviders = async () => {
+    setLoading(true)
+    try {
+      const data = await listOAuthProviders()
+      setProviders(data || [])
+    } catch {
+      message.error('載入 OAuth 設定失敗')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadProviders() }, [])
+
+  const handleCreate = () => { setEditing(null); form.resetFields(); setModalOpen(true) }
+  const handleEdit = (p: OAuth2Provider) => { setEditing(p); form.setFieldsValue(p); setModalOpen(true) }
+
+  const handleModalOk = async () => {
+    try {
+      const vals = await form.validateFields()
+      if (editing) {
+        await updateOAuthProvider(editing.provider, vals)
+        message.success('OAuth 設定已更新')
+      } else {
+        await createOAuthProvider(vals)
+        message.success('OAuth Provider 已建立')
+      }
+      setModalOpen(false)
+      loadProviders()
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } }
+      message.error(err?.response?.data?.error || '儲存失敗')
+    }
+  }
+
+  const handleDelete = async (provider: string) => {
+    try {
+      await deleteOAuthProvider(provider)
+      message.success('已刪除')
+      loadProviders()
+    } catch {
+      message.error('刪除失敗')
+    }
+  }
+
+  const columns = [
+    { title: 'Provider', dataIndex: 'provider', key: 'provider' },
+    { title: 'Client ID', dataIndex: 'client_id', key: 'client_id', render: (v: string) => v || <span style={{color:'var(--muted)'}}>—</span> },
+    { title: 'Issuer', dataIndex: 'issuer_url', key: 'issuer_url', render: (v: string) => v || <span style={{color:'var(--muted)'}}>—</span> },
+    { title: 'Token URL', dataIndex: 'token_url', key: 'token_url', render: (v: string) => v || <span style={{color:'var(--muted)'}}>—</span> },
+    { title: 'Scopes', dataIndex: 'scopes', key: 'scopes', render: (v: string) => v || 'openid email profile' },
+    { title: '狀態', dataIndex: 'enabled', key: 'enabled', render: (enabled: boolean) => enabled ? <Tag color="green">啟用</Tag> : <Tag color="default">停用</Tag> },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_: unknown, record: OAuth2Provider) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>編輯</Button>
+          <Popconfirm title="確定刪除？" onConfirm={() => handleDelete(record.provider)}>
+            <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]
+
+  return (
+    <div>
+      <div style={{display:'flex', justifyContent:'space-between', marginBottom:16}}>
+        <div>
+          <Alert
+            message="OAuth 2.0 / OIDC Single Sign-On 設定"
+            description="設定第三方 OAuth2 provider（如 Google）以啟用 SSO。設定完成後，使用者可在登入頁面看到 OAuth 登入選項。"
+            type="info"
+            showIcon
+            style={{marginBottom:16}}
+          />
+        </div>
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>新增 Provider</Button>
+      </div>
+
+      <Table
+        dataSource={providers}
+        columns={columns}
+        rowKey="provider"
+        loading={loading}
+        pagination={false}
+      />
+
+      <Modal
+        title={editing ? '編輯 OAuth Provider' : '新增 OAuth Provider'}
+        open={modalOpen}
+        onOk={handleModalOk}
+        onCancel={() => setModalOpen(false)}
+        okText="儲存"
+        width={560}
+      >
+        <Form form={form} layout="vertical" style={{marginTop:16}}>
+          <Form.Item name="provider" label="Provider 名稱" rules={[{ required: true }]} extra="英文唯一識別碼，如 google, github">
+            <Input placeholder="google" disabled={!!editing} />
+          </Form.Item>
+          <Form.Item name="client_id" label="Client ID" rules={[{ required: true }]} extra="OAuth provider 頒發的 Client ID">
+            <Input placeholder=".apps.googleusercontent.com" />
+          </Form.Item>
+          <Form.Item name="client_secret" label="Client Secret" extra={editing ? '留空則保持不變' : 'OAuth provider 頒發的 Client Secret'} rules={editing ? [] : [{ required: true }]}>
+            <Input.Password placeholder={editing ? '（不變）' : ''} />
+          </Form.Item>
+          <Form.Item name="issuer_url" label="Issuer URL" extra="OpenID Connect Issuer，如 https://accounts.google.com">
+            <Input placeholder="https://accounts.google.com" />
+          </Form.Item>
+          <Form.Item name="authorization_url" label="Authorization URL" extra="Authorization endpoint">
+            <Input placeholder="https://accounts.google.com/o/oauth2/v2/auth" />
+          </Form.Item>
+          <Form.Item name="token_url" label="Token URL" rules={[{ required: true }]} extra="Token endpoint">
+            <Input placeholder="https://oauth2.googleapis.com/token" />
+          </Form.Item>
+          <Form.Item name="userinfo_url" label="UserInfo URL" extra="UserInfo endpoint（可選，預設使用 OIDC userinfo）">
+            <Input placeholder="https://openidconnect.googleapis.com/v1/userinfo" />
+          </Form.Item>
+          <Form.Item name="scopes" label="Scopes" extra="空白則預設 openid email profile">
+            <Input placeholder="openid email profile" />
+          </Form.Item>
+          <Form.Item name="enabled" label="啟用" valuePropName="checked" initialValue={false}>
+            <Switch />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

@@ -2748,3 +2748,146 @@ func (s *Store) GetResourcePermissionsForGroup(authGroupID, resourceID string) (
 	err := row.Scan(&perm)
 	return perm, err
 }
+
+// ── OAuth Provider Management ───────────────────────────────────────────────
+
+// ListOAuthProviders returns all configured OAuth providers
+func (s *Store) ListOAuthProviders() ([]OAuthProviderModel, error) {
+	rows, err := s.db.Query(`
+		SELECT id, provider, client_id, client_secret, issuer_url,
+		       authorization_url, token_url, userinfo_url, jwks_url,
+		       scopes, enabled, created_at, updated_at
+		FROM oauth_providers ORDER BY provider`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var providers []OAuthProviderModel
+	for rows.Next() {
+		var p OAuthProviderModel
+		var issURL, authURL, userInfoURL, jwksURL, scopes, updatedAt sql.NullString
+		err := rows.Scan(&p.ID, &p.Provider, &p.ClientID, &p.ClientSecret,
+			&issURL, &authURL, &p.TokenURL, &userInfoURL, &jwksURL,
+			&scopes, &p.Enabled, &p.CreatedAt, &updatedAt)
+		if err != nil {
+			return nil, err
+		}
+		p.IssuerURL = issURL.String
+		p.AuthorizationURL = authURL.String
+		p.UserInfoURL = userInfoURL.String
+		p.JWKSURL = jwksURL.String
+		p.Scopes = scopes.String
+		p.UpdatedAt = updatedAt.String
+		providers = append(providers, p)
+	}
+	return providers, nil
+}
+
+// GetOAuthProvider returns a single OAuth provider by name
+func (s *Store) GetOAuthProvider(provider string) (*OAuthProviderModel, error) {
+	var p OAuthProviderModel
+	var issURL, authURL, userInfoURL, jwksURL, scopes, updatedAt sql.NullString
+	err := s.db.QueryRow(`
+		SELECT id, provider, client_id, client_secret, issuer_url,
+		       authorization_url, token_url, userinfo_url, jwks_url,
+		       scopes, enabled, created_at, updated_at
+		FROM oauth_providers WHERE provider = $1`, provider,
+	).Scan(&p.ID, &p.Provider, &p.ClientID, &p.ClientSecret,
+		&issURL, &authURL, &p.TokenURL, &userInfoURL, &jwksURL,
+		&scopes, &p.Enabled, &p.CreatedAt, &updatedAt)
+	if err != nil {
+		return nil, err
+	}
+	p.IssuerURL = issURL.String
+	p.AuthorizationURL = authURL.String
+	p.UserInfoURL = userInfoURL.String
+	p.JWKSURL = jwksURL.String
+	p.Scopes = scopes.String
+	p.UpdatedAt = updatedAt.String
+	return &p, nil
+}
+
+// CreateOAuthProvider creates a new OAuth provider
+func (s *Store) CreateOAuthProvider(p *OAuthProviderModel) (*OAuthProviderModel, error) {
+	if p.Scopes == "" {
+		p.Scopes = "openid email profile"
+	}
+	var id string
+	err := s.db.QueryRow(`
+		INSERT INTO oauth_providers (provider, client_id, client_secret, issuer_url,
+			authorization_url, token_url, userinfo_url, jwks_url, scopes, enabled)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING id, created_at`,
+		p.Provider, p.ClientID, p.ClientSecret, p.IssuerURL,
+		p.AuthorizationURL, p.TokenURL, p.UserInfoURL, p.JWKSURL,
+		p.Scopes, p.Enabled,
+	).Scan(&id, &p.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	p.ID = id
+	return p, nil
+}
+
+// UpdateOAuthProvider updates an existing OAuth provider
+func (s *Store) UpdateOAuthProvider(provider string, p *OAuthProviderModel) (*OAuthProviderModel, error) {
+	result, err := s.db.Exec(`
+		UPDATE oauth_providers SET
+			client_id = $1,
+			client_secret = CASE WHEN $2 != '' THEN $2 ELSE client_secret END,
+			issuer_url = $3,
+			authorization_url = $4,
+			token_url = $5,
+			userinfo_url = $6,
+			jwks_url = $7,
+			scopes = $8,
+			enabled = $9,
+			updated_at = NOW()
+		WHERE provider = $10`,
+		p.ClientID, p.ClientSecret, p.IssuerURL,
+		p.AuthorizationURL, p.TokenURL, p.UserInfoURL, p.JWKSURL,
+		p.Scopes, p.Enabled, provider,
+	)
+	if err != nil {
+		return nil, err
+	}
+	rowsAff, _ := result.RowsAffected()
+	if rowsAff == 0 {
+		return nil, fmt.Errorf("provider not found")
+	}
+	return s.GetOAuthProvider(provider)
+}
+
+// DeleteOAuthProvider deletes an OAuth provider
+func (s *Store) DeleteOAuthProvider(provider string) error {
+	result, err := s.db.Exec(`DELETE FROM oauth_providers WHERE provider = $1`, provider)
+	if err != nil {
+		return err
+	}
+	rowsAff, _ := result.RowsAffected()
+	if rowsAff == 0 {
+		return fmt.Errorf("provider not found")
+	}
+	return nil
+}
+
+// SeedGoogleOAuthProvider seeds a Google OAuth provider if none exists
+func (s *Store) SeedGoogleOAuthProvider() error {
+	existing, _ := s.GetOAuthProvider("google")
+	if existing != nil {
+		return nil
+	}
+	_, err := s.CreateOAuthProvider(&OAuthProviderModel{
+		Provider:         "google",
+		ClientID:         "",
+		ClientSecret:     "",
+		IssuerURL:        "https://accounts.google.com",
+		AuthorizationURL: "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:         "https://oauth2.googleapis.com/token",
+		UserInfoURL:      "https://openidconnect.googleapis.com/v1/userinfo",
+		Scopes:           "openid email profile",
+		Enabled:          false,
+	})
+	return err
+}

@@ -337,6 +337,24 @@ type Organization struct {
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
+// ── OAuth Providers ──────────────────────────────────────────────────────────
+
+type OAuthProviderModel struct {
+	ID               string `json:"id"`
+	Provider         string `json:"provider" binding:"required,max=255"`
+	ClientID         string `json:"client_id" binding:"required"`
+	ClientSecret     string `json:"client_secret,omitempty"` // write-only
+	IssuerURL        string `json:"issuer_url,omitempty"`
+	AuthorizationURL string `json:"authorization_url,omitempty"`
+	TokenURL         string `json:"token_url,omitempty" binding:"required"`
+	UserInfoURL      string `json:"userinfo_url,omitempty"`
+	JWKSURL          string `json:"jwks_url,omitempty"`
+	Scopes           string `json:"scopes,omitempty"`
+	Enabled          bool   `json:"enabled"`
+	CreatedAt        string `json:"created_at,omitempty"`
+	UpdatedAt        string `json:"updated_at,omitempty"`
+}
+
 // ── OTP for email verification ──────────────────────────────────────────────
 
 type OTP struct {

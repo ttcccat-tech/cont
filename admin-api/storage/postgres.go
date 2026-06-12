@@ -283,6 +283,12 @@ func RunMigrations(db *sql.DB) error {
 		// Allow NULL password_hash for OAuth-only users
 		`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`,
 
+		// OAuth providers — add updated_at column if missing (seeded by SeedGoogleOAuthProvider)
+		`DO $$ BEGIN
+			ALTER TABLE oauth_providers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+		EXCEPTION WHEN OTHERS THEN NULL;
+		END $$`,
+
 		// Consumer credentials (key-auth, basic-auth, hmac-auth)
 		`CREATE TABLE IF NOT EXISTS consumer_credentials (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

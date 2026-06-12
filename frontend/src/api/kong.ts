@@ -154,6 +154,28 @@ export const login = (username: string, password: string) =>
   analyticsClient.post('/auth/login', { username, password }).then(r => r.data)
 export const getMe = () => analyticsClient.get('/auth/me').then(r => r.data)
 
+// OAuth2 Provider Management
+export interface OAuth2Provider {
+  id?: string
+  provider: string
+  client_id: string
+  client_secret?: string
+  issuer_url?: string
+  authorization_url?: string
+  token_url: string
+  userinfo_url?: string
+  jwks_url?: string
+  scopes?: string
+  enabled: boolean
+  created_at?: string
+  updated_at?: string
+}
+export const listOAuthProviders = () => analyticsClient.get<OAuth2Provider[]>('/auth/oauth/providers').then(r => r.data)
+export const getOAuthProvider = (provider: string) => analyticsClient.get<OAuth2Provider>(`/auth/oauth/providers/${provider}`).then(r => r.data)
+export const createOAuthProvider = (data: Partial<OAuth2Provider>) => analyticsClient.post<OAuth2Provider>('/auth/oauth/providers', data).then(r => r.data)
+export const updateOAuthProvider = (provider: string, data: Partial<OAuth2Provider>) => analyticsClient.put<OAuth2Provider>(`/auth/oauth/providers/${provider}`, data).then(r => r.data)
+export const deleteOAuthProvider = (provider: string) => analyticsClient.delete(`/auth/oauth/providers/${provider}`)
+
 export const getGroups = () => analyticsClient.get<AuthGroup[]>('/groups').then(r => r.data)
 export const createGroup = (data: Partial<AuthGroup>) => analyticsClient.post<AuthGroup>('/groups', data).then(r => r.data)
 export const updateGroup = (id: string, data: Partial<AuthGroup>) => analyticsClient.patch<AuthGroup>(`/groups/${id}`, data).then(r => r.data)
