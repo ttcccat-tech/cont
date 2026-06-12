@@ -270,7 +270,7 @@ type PluginScope struct {
 
 type Plugin struct {
 	ID         string          `json:"id"`
-	Name       string          `json:"name" binding:"required,max=255"`
+	Name       string          `json:"name,omitempty" binding:"omitempty,max=255"`
 	Route      *PluginScope    `json:"route,omitempty"`
 	Service    *PluginScope    `json:"service,omitempty"`
 	Consumer   *PluginScope    `json:"consumer,omitempty"`
