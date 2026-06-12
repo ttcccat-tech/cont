@@ -6,11 +6,14 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Auth 正式實作（JWT / OAuth2 / SSO）** — 登入頁面優化與現有用戶遷移
+- [x] **Cont Auth 正式實作（JWT / OAuth2 / SSO）** — 登入頁面優化與現有用戶遷移
   - 本輪發現 testadmin 用戶密碼無法通過登入驗證（db 中無有效 bcrypt hash）
   - 需要：確認 SeedDefaultUsers 是否成功執行、修復管理後台建立用戶的密碼雜湊流程
   - 下一階段：完整 SSO 流程整合（Google OAuth2）
   - access.lua: JWT validation (validate_jwt), consumer auth (key-auth/basic-auth/hmac-auth via /internal/validate-cred), OPTIONS preflight, route matching, load balancing (roundrobin/leastconn/weighted-ip-hash)
+  - 本輪發現並修復：admin org_id filter bug — ListServices/GetService 等6個函式使用 `org_id IS NULL` 對 admin（orgID=''），但 services 的 org_id 是 zero UUID 而非 NULL，導致新建立的 service admin 無法讀取
+  - 修復 commit `f09c70fc`：WHERE 子句改用 `COALESCE(org_id::text, '00000000-...') = '00000000-...'` 取代 `org_id IS NULL`
+  - QA: Create→Read→Delete services/upstreams/consumers CRUD 全部 200/204 ✅
 - [x] **nginx.conf /status 和 /metrics location blocks 結構錯誤**（本輪發現並修復）
   - `/status` 的 `log_by_lua_block` 內層嵌套了多餘的 `content_by_lua_block`，導致 status handler 在 log phase 執行
   - `/metrics` 有兩個 `header_filter_by_lua_block`，第二個試圖執行 `ngx.exit(ngx.OK)` 會阻斷 content 輸出
