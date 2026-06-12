@@ -21,10 +21,11 @@
   - 修復：清理 blocks，/status/log 改為空 block，/metrics 移除多餘 header_filter
   - 已 commit `e1569967`，仍需完整 QA 驗證
 
-- [ ] **rewrite.lua / healthcheck.lua / worker.lua 使用 `require("init")`**（本輪發現）
-  - 這些 module 在 init_by_lua_block 已執行完後被 require，`require("init")` 成功但行為不明確
-  - `rewrite.lua` 回傳值被 nginx 忽略，`return cont` 無作用
-  - 建議：統一改為直接取 `_G.cont`，消除對 require init 的依賴
+- [ ] **rewrite.lua / healthcheck.lua / worker.lua 使用 `require("init")`** — ✅ 已修復（commit `7bb492ee`）
+  - `rewrite.lua`: 移除 `require("init")`，移除無用的 `return cont`
+  - `healthcheck.lua`: 移除 `require("init")` 和 `require("resty.http")`，改用 `ngx.socket.tcp`（OpenResty 内建）
+  - `worker.lua`: 移除 `require("init")`，移除對不存在函式 `cont.build_route_table()` 的呼叫
+  - 統一使用 `_G.cont` 獲取全域狀態
 
 ## 🟡 預計優化
 
