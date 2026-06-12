@@ -403,12 +403,10 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont E2E Billing/Stripe Flow Tests**
-  - 現有 E2E 測試覆蓋 Auth flow、Proxy Lua plugin chain、Services CRUD
-  - 缺口：Billing/Plan Stripe 流程（Plans list、Checkout session、Portal session、Webhook events）完全無測試覆蓋
-  - 需要：新增 `test/e2e-billing.sh` — Plans API smoke、Checkout URL generation、Portal URL generation、subscription status check
-  - Frontend BillingPortal.tsx 互動流程（plan selection → checkout → success redirect）也需要覆蓋
-  - 預計產出：4+ E2E billing tests，納入 `test/e2e-runner.sh`
+- [x] **Cont E2E Billing/Stripe Flow Tests** — commit `69c7ded3`
+  - 新增 `test/e2e-billing.sh` — 20 個 E2E 測試：Plans list/auth、Subscription auth flow、Checkout/Portal auth+validation、Stripe webhook error handling、Subscriptions list/auth
+  - Bug fix: `/webhooks/stripe` 原本在 auth 保護的 admin group 內，Stripe 無法在無 JWT 的情況下呼叫 → 移到 auth group 外（Stripe signature 驗證替代 auth）
+  - QA: 20/20 tests PASS（Plans/Subscription/Checkout/Portal/Webhook/Subscriptions CRUD）
 
 ## 完整開發流程（開發守護遵循）
 
