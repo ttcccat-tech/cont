@@ -98,7 +98,7 @@ func GetConsumerUsage(store *storage.Store) gin.HandlerFunc {
 		period := c.DefaultQuery("period", "daily")
 
 		// Look up consumer to get org_id
-		consumer, err := store.GetConsumer(consumerID)
+		consumer, err := store.GetConsumer(consumerID, "")
 		if err != nil || consumer == nil {
 			c.JSON(http.StatusNotFound, gin.H{"code": "NOT_FOUND", "message": "consumer not found"})
 			return
@@ -118,7 +118,7 @@ func GetConsumerUsage(store *storage.Store) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, ConsumerUsageResponse{
 			ConsumerID: consumerID,
-			OrgID:      consumer.OrganizationID,
+			OrgID:      consumer.OrgID,
 			Period:     period,
 			Total:      total,
 			Usage:      usage,
@@ -163,11 +163,17 @@ func GetUsageSummary(store *storage.Store) gin.HandlerFunc {
 			total += o.Count
 		}
 
+		// Convert to OrgUsageItem
+		orgUsageItems := make([]OrgUsageItem, len(topOrgs))
+		for i, o := range topOrgs {
+			orgUsageItems[i] = OrgUsageItem{OrgID: o.OrgID, Count: o.Count}
+		}
+
 		c.JSON(http.StatusOK, UsageSummaryResponse{
 			StartHour:     startHour,
 			EndHour:       endHour,
 			TotalRequests: total,
-			TopOrgs:       topOrgs,
+			TopOrgs:       orgUsageItems,
 		})
 	}
 }

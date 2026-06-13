@@ -144,7 +144,7 @@ func (r *Redis) UsageByTimeRange(ctx context.Context, keyPattern string, startHo
 	}
 
 	results := make([]HourlyUsage, 0, len(keys))
-	for i, key := range keys {
+	for i := range keys {
 		var count int64
 		if vals[i] != nil {
 			count, _ = vals[i].(int64)
@@ -161,12 +161,14 @@ func (r *Redis) UsageByTimeRange(ctx context.Context, keyPattern string, startHo
 
 // GetOrgUsageByHour returns hourly usage for an org within a time range
 func (r *Redis) GetOrgUsageByHour(ctx context.Context, orgID, startHour, endHour string) ([]HourlyUsage, error) {
-	return r.UsageByTimeRange(ctx, "cont:usage:%s:%%s", orgID, startHour, endHour)
+	pattern := fmt.Sprintf("cont:usage:%s:%%s", orgID)
+	return r.UsageByTimeRange(ctx, pattern, startHour, endHour)
 }
 
 // GetConsumerUsageByHour returns hourly usage for a consumer within a time range
 func (r *Redis) GetConsumerUsageByHour(ctx context.Context, consumerID, startHour, endHour string) ([]HourlyUsage, error) {
-	return r.UsageByTimeRange(ctx, "cont:usage:consumer:%s:%%s", consumerID, startHour, endHour)
+	pattern := fmt.Sprintf("cont:usage:consumer:%s:%%s", consumerID)
+	return r.UsageByTimeRange(ctx, pattern, startHour, endHour)
 }
 
 // GetTopOrgsByUsage returns top N orgs by total usage in a time range

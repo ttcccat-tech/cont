@@ -3478,7 +3478,7 @@ func GetPlanQuota(store *storage.Store) gin.HandlerFunc {
 
 		// Get current hourly usage from Redis
 		// Key format: cont:usage:{org_id}:{YYYYMMDDHH}
-		currentUsage, _ := store.Redis().GetHourlyUsage(c.Request.Context(), orgID)
+		currentUsage, _ := store.Redis().GetUsage(c.Request.Context(), orgID)
 
 		c.JSON(200, gin.H{
 			"request_limit": requestLimit,

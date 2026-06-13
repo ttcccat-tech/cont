@@ -296,6 +296,11 @@ func main() {
 		admin.POST("/billing/portal", routes.CreatePortalSession(store, frontendBaseURL))
 		admin.GET("/billing/subscriptions", routes.ListSubscriptions(store))
 		admin.GET("/billing/usage", routes.GetUsage(store))
+
+		// Usage Tracking API
+		admin.GET("/usage/org/:org_id", routes.GetOrgUsage(store))
+		admin.GET("/usage/consumer/:consumer_id", routes.GetConsumerUsage(store))
+		admin.GET("/usage/summary", routes.GetUsageSummary(store))
 	}
 
 	// Stripe Webhook — public (Stripe signs with secret, no JWT auth)
