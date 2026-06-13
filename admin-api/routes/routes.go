@@ -3429,3 +3429,62 @@ func CountUnreadNotifications(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// GetPlanQuota returns the plan quota and current hourly usage for a consumer.
+// Called by the Cont proxy's access.lua during rate-limit enforcement.
+// Returns: { request_limit: int, current_usage: int, plan_name: string }
+func GetPlanQuota(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		consumerID := c.Param("consumer_id")
+		if consumerID == "" {
+			c.JSON(400, gin.H{"error": "missing consumer_id"})
+			return
+		}
+
+		// Get consumer to find org_id
+		consumer, err := store.GetConsumer(consumerID, "")
+		if err != nil || consumer == nil {
+			c.JSON(404, gin.H{"error": "consumer not found"})
+			return
+		}
+
+		orgID := consumer.OrgID
+		if orgID == "" || orgID == "00000000-0000-0000-0000-000000000000" {
+			// No org = free plan
+			c.JSON(200, gin.H{
+				"request_limit": 1000,
+				"current_usage": 0,
+				"plan_name":     "free",
+			})
+			return
+		}
+
+		// Get subscription for org
+		sub, err := store.GetSubscriptionByOrg(orgID)
+		if err != nil {
+			internalError(c)
+			return
+		}
+
+		planName := "free"
+		requestLimit := int64(1000)
+		if sub != nil {
+			planName = sub.PlanName
+			// Get plan details for request_limit
+			plan, err := store.GetPlanByName(planName)
+			if err == nil && plan != nil {
+				requestLimit = plan.RequestLimit
+			}
+		}
+
+		// Get current hourly usage from Redis
+		// Key format: cont:usage:{org_id}:{YYYYMMDDHH}
+		currentUsage, _ := store.Redis().GetHourlyUsage(c.Request.Context(), orgID)
+
+		c.JSON(200, gin.H{
+			"request_limit": requestLimit,
+			"current_usage": currentUsage,
+			"plan_name":     planName,
+		})
+	}
+}
+

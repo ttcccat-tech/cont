@@ -112,6 +112,7 @@ func main() {
 	r.GET("/internal/validate-cred/:type/:key", routes.ValidateCredential(store))
 	r.GET("/internal/validate-jwt/:token", routes.ValidateJWT(store, jwtSecret))
 	r.GET("/internal/plugins", routes.ListInternalPlugins(store))
+	r.GET("/internal/plan-quota/:consumer_id", routes.GetPlanQuota(store))
 
 	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")

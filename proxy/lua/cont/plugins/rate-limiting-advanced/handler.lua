@@ -159,6 +159,46 @@ function _M.access(self, plugin)
     local over_limit = false
     local retry_after = 0
 
+    -- ── Plan Quota Check (Over-limit Enforcement) ─────────────────────────────
+    -- Check plan quota from plans table for authenticated consumers
+    local consumer_id = ngx.ctx.authenticated_consumer_id
+    if consumer_id then
+        local res = ngx.location.capture("/__cont_api_internal__/internal/plan-quota/" .. ngx.escape_uri(consumer_id))
+        if res.status == 200 then
+            local ok, data = pcall(cjson.decode, res.body)
+            if ok and data and data.request_limit and data.request_limit > 0 then
+                local request_limit = tonumber(data.request_limit)
+                local current_usage = tonumber(data.current_usage) or 0
+                local plan_name = data.plan_name or "unknown"
+
+                -- Set usage info headers
+                ngx.header["X-Plan-Quota-Limit"] = tostring(request_limit)
+                ngx.header["X-Plan-Quota-Remaining"] = tostring(math.max(0, request_limit - current_usage))
+                ngx.header["X-Plan-Name"] = plan_name
+
+                -- 80% warning
+                local usage_pct = (current_usage / request_limit) * 100
+                if usage_pct >= 80 then
+                    ngx.header["X-Usage-Warning"] = tostring(math.floor(usage_pct)) .. "%"
+                end
+
+                -- Over limit → 429
+                if current_usage >= request_limit then
+                    ngx.header["X-RateLimit-Limit-Reached"] = "true"
+                    ngx.header["Retry-After"] = "3600"
+                    ngx.header["Content-Type"] = "application/json"
+                    ngx.status = 429
+                    ngx.say(cjson.encode({
+                        message = "Plan quota exceeded",
+                        error = "Too Many Requests",
+                        statusCode = 429,
+                    }))
+                    return ngx.exit(429)
+                end
+            end
+        end
+    end
+
     -- Check second limit
     if cfg.second and cfg.second > 0 then
         local key = redis_key(plugin, identifier, "s")
