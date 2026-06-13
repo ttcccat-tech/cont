@@ -268,18 +268,30 @@ func (s *Store) GetGrpcService(id, orgID string) (*GrpcService, error) {
 }
 
 func (s *Store) UpdateGrpcService(id, orgID string, gs *GrpcService) (*GrpcService, error) {
-	err := s.db.QueryRow(`
+	row := s.db.QueryRow(`
 		UPDATE grpc_services SET
 			name=$2, package=$3, proto_file=$4, upstream_id=NULLIF($5, '')::uuid, enabled=$6, updated_at=NOW()
-		WHERE id=$1 AND ($7 = '' OR org_id::text = $7) RETURNING updated_at`,
+		WHERE id=$1 AND ($7 = '' OR org_id::text = $7)
+		RETURNING id, name, package, proto_file, upstream_id, enabled,
+		          COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, updated_at`,
 		id, gs.Name, orString(gs.Package, ""), orString(gs.ProtoFile, ""),
 		gs.UpstreamID, orBool(gs.Enabled, true), orgID,
-	).Scan(&gs.UpdatedAt)
+	)
+	var r GrpcService
+	var name, pkg, proto, upstreamID sql.NullString
+	var enabled sql.NullBool
+	var updated sql.NullString
+	err := row.Scan(&r.ID, &name, &pkg, &proto, &upstreamID, &enabled, &r.OrgID, &updated)
 	if err != nil {
 		return nil, err
 	}
-	gs.ID = id
-	return gs, nil
+	r.Name = name.String
+	r.Package = pkg.String
+	r.ProtoFile = proto.String
+	r.UpstreamID = upstreamID.String
+	if enabled.Valid { r.Enabled = enabled.Bool }
+	if updated.Valid { r.UpdatedAt = updated.String }
+	return &r, nil
 }
 
 func (s *Store) DeleteGrpcService(id, orgID string) error {
