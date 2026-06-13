@@ -120,6 +120,7 @@ func main() {
 	r.GET("/internal/plugins", routes.ListInternalPlugins(store))
 	r.GET("/internal/plan-quota/:consumer_id", routes.GetPlanQuota(store))
 	r.GET("/internal/plan-quota/default", routes.GetDefaultPlanQuota(store))
+	r.GET("/internal/config/snapshot", routes.GetProxyRuntimeConfig(store))
 
 	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")

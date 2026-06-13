@@ -877,6 +877,83 @@ func ListInternalPlugins(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// GetProxyRuntimeConfig returns the full live runtime config for the Lua proxy.
+// Called by access.lua via /__cont_api_internal__/internal/config/snapshot (no auth).
+// This is separate from the admin /config/snapshots CRUD endpoints.
+func GetProxyRuntimeConfig(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		routes, err := store.ListRoutes("", 1000, 0)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		services, err := store.ListServices("", 1000, 0)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		upstreams, err := store.ListUpstreams("", 1000, 0)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		plugins, err := store.ListPlugins("", 1000, 0)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		type ProxyTarget struct{ Target string `json:"target"`; Weight int `json:"weight"` }
+		targetsMap := make(map[string][]ProxyTarget)
+		for _, u := range upstreams {
+			tgts, err := store.ListTargetsByUpstream(u.ID)
+			if err == nil {
+				var pts []ProxyTarget
+				for _, t := range tgts {
+					pts = append(pts, ProxyTarget{Target: t.Target, Weight: t.Weight})
+				}
+				targetsMap[u.ID] = pts
+			}
+		}
+		type ProxyPlugin struct {
+			ID        string                 `json:"id"`
+			Name      string                 `json:"name"`
+			RouteID   string                 `json:"route_id,omitempty"`
+			ServiceID string                 `json:"service_id,omitempty"`
+			Config    map[string]interface{} `json:"config,omitempty"`
+			Enabled   bool                   `json:"enabled"`
+		}
+		var proxyPlugins []ProxyPlugin
+		for _, p := range plugins {
+			if !p.Enabled {
+				continue
+			}
+			cfg := make(map[string]interface{})
+			if p.Config != nil {
+				json.Unmarshal(p.Config, &cfg)
+			}
+			var routeID, serviceID string
+			if p.Route != nil {
+				routeID = p.Route.ID
+			}
+			if p.Service != nil {
+				serviceID = p.Service.ID
+			}
+			proxyPlugins = append(proxyPlugins, ProxyPlugin{
+				ID: p.ID, Name: p.Name,
+				RouteID: routeID, ServiceID: serviceID,
+				Config: cfg, Enabled: p.Enabled,
+			})
+		}
+		c.JSON(200, gin.H{
+			"routes":    routes,
+			"services":  services,
+			"upstreams": upstreams,
+			"targets":   targetsMap,
+			"plugins":   proxyPlugins,
+		})
+	}
+}
+
 // ── Plugins ────────────────────────────────────────────────────────────────
 
 func ListPlugins(store *storage.Store) gin.HandlerFunc {

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // WebhookSubscription represents a webhook subscription for an org
@@ -111,12 +113,11 @@ func (s *Store) GetWebhookSubscription(id, orgID string) (*WebhookSubscription, 
 
 // CreateWebhookSubscription creates a new webhook subscription
 func (s *Store) CreateWebhookSubscription(sub *WebhookSubscription) (*WebhookSubscription, error) {
-	eventTypesJSON, _ := jsonMarshal(sub.EventTypes)
 	err := s.db.QueryRow(`
 		INSERT INTO webhook_subscriptions (org_id, url, event_types, secret, active)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at`,
-		sub.OrgID, sub.URL, eventTypesJSON, sub.Secret, true,
+		sub.OrgID, sub.URL, pq.Array(sub.EventTypes), nullString(sub.Secret), true,
 	).Scan(&sub.ID, &sub.CreatedAt)
 	if err != nil {
 		return nil, err
