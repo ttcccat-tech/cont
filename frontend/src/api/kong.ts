@@ -111,6 +111,19 @@ export interface KongPlugin {
   scope?: string // global, workspace, service, route, consumer
 }
 
+// Plugin type schema from the built-in registry
+export interface PluginSchema {
+  name: string
+  version?: string
+  label?: string
+  description?: string
+  access_phase?: boolean
+  log_phase?: boolean
+  pre_proxy?: boolean
+  post_proxy?: boolean
+  config_schema?: Record<string, unknown>
+}
+
 export interface KongConsumer {
   id?: string; username: string; custom_id?: string; created_at?: number
 }
@@ -408,6 +421,9 @@ export const api = {
     analyticsClient.post<GrpcMethod>(wsPrefix(`/grpc-services/${serviceId}/methods`), data).then(r => r.data),
   deleteGrpcMethod: (serviceId: string, methodId: string) =>
     analyticsClient.delete(wsPrefix(`/grpc-services/${serviceId}/methods/${methodId}`)),
+
+  // Plugin registry (available plugin types)
+  getPluginRegistry: () => analyticsClient.get<{ plugins: PluginSchema[] }>('/internal/plugin-registry').then(r => r.data?.plugins ?? []),
 }
 
 export default api

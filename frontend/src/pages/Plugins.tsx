@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Table, Button, Space, Tag, message, Modal, Form, Input, Select, Switch, Popconfirm, InputNumber, Divider, Radio } from 'antd'
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, SettingOutlined, AppstoreOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import api, { KongPlugin, KongService, KongRoute, KongConsumer } from '../api/kong'
+import api, { KongPlugin, KongService, KongRoute, KongConsumer, PluginSchema } from '../api/kong'
 import { useAuth } from '../context/AuthContext'
 
 type EnabledFilter = 'all' | 'enabled' | 'disabled'
@@ -226,7 +226,9 @@ export default function PluginsPage() {
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [configOpen, setConfigOpen] = useState(false)
+  const [galleryOpen, setGalleryOpen] = useState(false)
   const [editingPlugin, setEditingPlugin] = useState<KongPlugin | null>(null)
+  const [pluginRegistry, setPluginRegistry] = useState<PluginSchema[]>([])
   const [form] = Form.useForm()
   const [configForm] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
@@ -244,6 +246,17 @@ export default function PluginsPage() {
       })
       .catch(() => message.error('無法連接 Kong Admin API'))
       .finally(() => setLoading(false))
+  }
+
+  const fetchPluginRegistry = () => {
+    api.getPluginRegistry()
+      .then(setPluginRegistry)
+      .catch(() => message.error('無法取得插件目錄'))
+  }
+
+  const openGallery = () => {
+    fetchPluginRegistry()
+    setGalleryOpen(true)
   }
 
   useEffect(() => { fetchAll() }, [])
@@ -405,6 +418,7 @@ export default function PluginsPage() {
             <Radio.Button value="disabled">已停用</Radio.Button>
           </Radio.Group>
           <Button icon={<ReloadOutlined />} onClick={fetchAll}>刷新</Button>
+          <Button icon={<AppstoreOutlined />} onClick={openGallery}>插件目錄</Button>
           {canWrite('plugins') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增插件</Button>
           )}
@@ -545,6 +559,71 @@ export default function PluginsPage() {
             )}
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Plugin Gallery Modal — browse available plugin types */}
+      <Modal
+        title="插件目錄"
+        open={galleryOpen}
+        onCancel={() => setGalleryOpen(false)}
+        footer={null}
+        width={800}
+      >
+        <div style={{ marginTop: 16 }}>
+          {pluginRegistry.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>
+              載入中...
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+              {pluginRegistry.map(p => {
+                const phases = []
+                if (p.access_phase) phases.push('Access')
+                if (p.log_phase) phases.push('Log')
+                if (p.pre_proxy) phases.push('PreProxy')
+                if (p.post_proxy) phases.push('PostProxy')
+                return (
+                  <div key={p.name} style={{
+                    border: '1px solid #f0f0f0',
+                    borderRadius: 8,
+                    padding: 16,
+                    background: '#fafafa',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <Tag color="purple">{p.name}</Tag>
+                      {p.version && <Tag style={{ fontSize: 11 }}>{p.version}</Tag>}
+                    </div>
+                    {p.label && <div style={{ fontWeight: 600, marginBottom: 4 }}>{p.label}</div>}
+                    {p.description && <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>{p.description}</div>}
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {phases.map(ph => (
+                        <Tag key={ph} style={{ fontSize: 11 }} color="blue">{ph}</Tag>
+                      ))}
+                    </div>
+                    {p.config_schema && (
+                      <div style={{ marginTop: 8 }}>
+                        <Tag style={{ fontSize: 11 }}>可配置</Tag>
+                      </div>
+                    )}
+                    <Button
+                      size="small"
+                      type="link"
+                      style={{ padding: 0, marginTop: 8, fontSize: 12 }}
+                      onClick={() => {
+                        // Pre-select this plugin in the create modal and open it
+                        form.setFieldsValue({ name: p.name })
+                        setGalleryOpen(false)
+                        openCreate()
+                      }}
+                    >
+                      安裝
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   )
