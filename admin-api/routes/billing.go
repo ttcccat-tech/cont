@@ -185,6 +185,14 @@ func CreateCheckoutSession(store *storage.Store, frontendBaseURL string) gin.Han
 			return
 		}
 
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "Subscription",
+			TargetID:      "",
+			ActorUsername: org.Name,
+			Description:   fmt.Sprintf("Checkout session started for org %s, plan %s (%s)", orgID, req.PlanName, req.BillingCycle),
+		})
+
 		c.JSON(200, gin.H{"url": sess.URL})
 	}
 }
@@ -326,6 +334,13 @@ func HandleStripeWebhook(store *storage.Store, webhookSecret string) gin.Handler
 					}
 					store.UpdateOrganizationPlan(orgID, planName)
 					log.Printf("Webhook: subscription activated for org %s, plan %s", orgID, planName)
+					store.CreateAuditLog(&storage.AuditLog{
+						AuditType:     "create",
+						TargetType:    "Subscription",
+						TargetID:      subscriptionID,
+						ActorUsername: "stripe",
+						Description:   fmt.Sprintf("Subscription activated for org %s, plan %s", orgID, planName),
+					})
 				}
 			}
 
@@ -391,6 +406,13 @@ func HandleStripeWebhook(store *storage.Store, webhookSecret string) gin.Handler
 			store.UpsertSubscription(updatedSub)
 			store.UpdateOrganizationPlan(orgID, planName)
 			log.Printf("Webhook: subscription updated for org %s, status %s", orgID, subscr.Status)
+			store.CreateAuditLog(&storage.AuditLog{
+				AuditType:     "update",
+				TargetType:    "Subscription",
+				TargetID:      subscr.ID,
+				ActorUsername: "stripe",
+				Description:   fmt.Sprintf("Subscription updated for org %s, status %s", orgID, subscr.Status),
+			})
 
 		case "customer.subscription.deleted":
 			var subscr stripe.Subscription
@@ -408,6 +430,13 @@ func HandleStripeWebhook(store *storage.Store, webhookSecret string) gin.Handler
 					store.UpdateOrganizationPlan(s.OrgID, "free")
 					store.EnsureFreeSubscription(s.OrgID)
 					log.Printf("Webhook: subscription canceled for org %s, reverted to free", s.OrgID)
+					store.CreateAuditLog(&storage.AuditLog{
+						AuditType:     "delete",
+						TargetType:    "Subscription",
+						TargetID:      s.ID,
+						ActorUsername: "stripe",
+						Description:   fmt.Sprintf("Subscription canceled for org %s, reverted to free", s.OrgID),
+					})
 					break
 				}
 			}
@@ -418,6 +447,13 @@ func HandleStripeWebhook(store *storage.Store, webhookSecret string) gin.Handler
 				break
 			}
 			log.Printf("Webhook: invoice payment failed for customer %s", inv.Customer.ID)
+			store.CreateAuditLog(&storage.AuditLog{
+				AuditType:     "alert",
+				TargetType:    "Subscription",
+				TargetID:      "",
+				ActorUsername: "stripe",
+				Description:   fmt.Sprintf("Invoice payment failed for customer %s", inv.Customer.ID),
+			})
 
 		default:
 			log.Printf("Webhook: unhandled event type %s", event.Type)
