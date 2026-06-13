@@ -187,6 +187,168 @@ func (s *Store) GetServiceByName(name, orgID string) (*Service, error) {
 	return s.getOneService(row)
 }
 
+// ── gRPC Services ───────────────────────────────────────────────────────────
+
+func (s *Store) ListGrpcServices(orgID string, limit, offset int) ([]GrpcService, error) {
+	query := `
+		SELECT id, name, package, proto_file, upstream_id, enabled,
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
+		FROM grpc_services
+		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
+		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := s.db.Query(query, orgID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []GrpcService
+	for rows.Next() {
+		var r GrpcService
+		var name, pkg, proto, upstreamID sql.NullString
+		var enabled sql.NullBool
+		var created, updated sql.NullString
+		if err := rows.Scan(&r.ID, &name, &pkg, &proto, &upstreamID, &enabled, &r.OrgID, &created, &updated); err != nil {
+			return nil, err
+		}
+		r.Name = name.String
+		r.Package = pkg.String
+		r.ProtoFile = proto.String
+		r.UpstreamID = upstreamID.String
+		if enabled.Valid { r.Enabled = enabled.Bool }
+		if created.Valid { r.CreatedAt = created.String }
+		if updated.Valid { r.UpdatedAt = updated.String }
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+func (s *Store) CreateGrpcService(gs *GrpcService) (*GrpcService, error) {
+	var id string
+	orgID := gs.OrgID
+	if orgID == "" {
+		orgID = "00000000-0000-0000-0000-000000000000"
+	}
+	err := s.db.QueryRow(`
+		INSERT INTO grpc_services (name, package, proto_file, upstream_id, enabled, org_id)
+		VALUES ($1, $2, $3, NULLIF($4, ''), $5, $6)
+		RETURNING id, created_at, updated_at`,
+		gs.Name, orString(gs.Package, ""), orString(gs.ProtoFile, ""),
+		gs.UpstreamID, orBool(gs.Enabled, true), orgID,
+	).Scan(&id, &gs.CreatedAt, &gs.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	gs.ID = id
+	gs.OrgID = orgID
+	s.ensureResourceEntry(id, gs.Name, "grpc_service")
+	return gs, nil
+}
+
+func (s *Store) GetGrpcService(id, orgID string) (*GrpcService, error) {
+	row := s.db.QueryRow(`
+		SELECT id, name, package, proto_file, upstream_id, enabled,
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
+		FROM grpc_services WHERE id = $1 AND (($2 = '' OR org_id::text = $2))`, id, orgID)
+	var r GrpcService
+	var name, pkg, proto, upstreamID sql.NullString
+	var enabled sql.NullBool
+	var created, updated sql.NullString
+	err := row.Scan(&r.ID, &name, &pkg, &proto, &upstreamID, &enabled, &r.OrgID, &created, &updated)
+	if err != nil {
+		return nil, err
+	}
+	r.Name = name.String
+	r.Package = pkg.String
+	r.ProtoFile = proto.String
+	r.UpstreamID = upstreamID.String
+	if enabled.Valid { r.Enabled = enabled.Bool }
+	if created.Valid { r.CreatedAt = created.String }
+	if updated.Valid { r.UpdatedAt = updated.String }
+	return &r, nil
+}
+
+func (s *Store) UpdateGrpcService(id, orgID string, gs *GrpcService) (*GrpcService, error) {
+	err := s.db.QueryRow(`
+		UPDATE grpc_services SET
+			name=$2, package=$3, proto_file=$4, upstream_id=NULLIF($5, ''), enabled=$6, updated_at=NOW()
+		WHERE id=$1 AND ($7 = '' OR org_id::text = $7) RETURNING updated_at`,
+		id, gs.Name, orString(gs.Package, ""), orString(gs.ProtoFile, ""),
+		gs.UpstreamID, orBool(gs.Enabled, true), orgID,
+	).Scan(&gs.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	gs.ID = id
+	return gs, nil
+}
+
+func (s *Store) DeleteGrpcService(id, orgID string) error {
+	_, err := s.db.Exec("DELETE FROM grpc_services WHERE id=$1 AND ($2 = '' OR org_id::text = $2)", id, orgID)
+	return err
+}
+
+// ── gRPC Methods ────────────────────────────────────────────────────────────
+
+func (s *Store) ListGrpcMethods(serviceID, orgID string) ([]GrpcMethod, error) {
+	query := `
+		SELECT id, service_id, name, method_type, input_type, output_type, enabled,
+		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
+		FROM grpc_methods
+		WHERE service_id = $1 AND ($2 = '' OR org_id::text = $2)
+		ORDER BY created_at ASC`
+	rows, err := s.db.Query(query, serviceID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []GrpcMethod
+	for rows.Next() {
+		var r GrpcMethod
+		var name, methodType, inputType, outputType sql.NullString
+		var enabled sql.NullBool
+		var created, updated sql.NullString
+		if err := rows.Scan(&r.ID, &r.ServiceID, &name, &methodType, &inputType, &outputType, &enabled, &r.OrgID, &created, &updated); err != nil {
+			return nil, err
+		}
+		r.Name = name.String
+		r.MethodType = methodType.String
+		r.InputType = inputType.String
+		r.OutputType = outputType.String
+		if enabled.Valid { r.Enabled = enabled.Bool }
+		if created.Valid { r.CreatedAt = created.String }
+		if updated.Valid { r.UpdatedAt = updated.String }
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+func (s *Store) CreateGrpcMethod(gm *GrpcMethod) (*GrpcMethod, error) {
+	var id string
+	orgID := gm.OrgID
+	if orgID == "" {
+		orgID = "00000000-0000-0000-0000-000000000000"
+	}
+	err := s.db.QueryRow(`
+		INSERT INTO grpc_methods (service_id, name, method_type, input_type, output_type, enabled, org_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, created_at, updated_at`,
+		gm.ServiceID, gm.Name, orString(gm.MethodType, "unary"),
+		orString(gm.InputType, ""), orString(gm.OutputType, ""),
+		orBool(gm.Enabled, true), orgID,
+	).Scan(&id, &gm.CreatedAt, &gm.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	gm.ID = id
+	gm.OrgID = orgID
+	return gm, nil
+}
+
+func (s *Store) DeleteGrpcMethod(id, orgID string) error {
+	_, err := s.db.Exec("DELETE FROM grpc_methods WHERE id=$1 AND ($2 = '' OR org_id::text = $2)", id, orgID)
+	return err
+}
+
 // ── Routes ─────────────────────────────────────────────────────────────────
 
 func (s *Store) ListRoutes(orgID string, limit, offset int) ([]Route, error) {

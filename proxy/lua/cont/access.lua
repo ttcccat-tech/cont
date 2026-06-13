@@ -396,6 +396,15 @@ end
 -- Record request start time for latency tracking in plugins
 ngx.ctx.request_start_time = ngx.now() * 1000
 
+-- gRPC-Web detection: set content-type for grpc-web requests
+local content_type = ngx.var.http_content_type or ""
+if content_type == "application/grpc-web" or content_type == "application/grpc-web+proto" then
+    ngx.ctx.grpc_web = true
+    -- gRPC-Web uses HTTP/1.1 but communicates with a gRPC backend
+    -- The upstream must use grpc:// or grpcs:// scheme
+    ngx.log(ngx.INFO, "cont: gRPC-Web request detected, content-type=", content_type)
+end
+
 -- Run per-plugin access()
 for _, plugin in ipairs(get_applicable_plugins(route.id, service_id)) do
     if plugin.name == "jwt" or plugin.name == "key-auth"

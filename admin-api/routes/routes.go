@@ -384,6 +384,139 @@ func DeleteService(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// ── gRPC Services ────────────────────────────────────────────────────────────
+
+func ListGrpcServices(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		size, offset := paginate(c)
+		orgID := getOrgID(c)
+		rows, err := store.ListGrpcServices(orgID, size, offset)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gin.H{"data": rows, "next": ""})
+	}
+}
+
+func CreateGrpcService(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var gs storage.GrpcService
+		if err := c.ShouldBindJSON(&gs); err != nil {
+			badRequest(c, err)
+			return
+		}
+		orgID := getOrgID(c)
+		if orgID != "" {
+			gs.OrgID = orgID
+		}
+		result, err := store.CreateGrpcService(&gs)
+		if err != nil {
+			if isUniqueViolation(err) {
+				alreadyExists(c, "grpc_service")
+				return
+			}
+			internalError(c)
+			return
+		}
+		c.JSON(201, result)
+	}
+}
+
+func GetGrpcService(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		gs, err := store.GetGrpcService(c.Param("id"), orgID)
+		if err == sql.ErrNoRows {
+			notFound(c, "grpc service not found")
+			return
+		}
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gs)
+	}
+}
+
+func UpdateGrpcService(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var gs storage.GrpcService
+		if err := c.ShouldBindJSON(&gs); err != nil {
+			badRequest(c, err)
+			return
+		}
+		orgID := getOrgID(c)
+		result, err := store.UpdateGrpcService(c.Param("id"), orgID, &gs)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, result)
+	}
+}
+
+func DeleteGrpcService(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if err := store.DeleteGrpcService(c.Param("id"), orgID); err != nil {
+			internalError(c)
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
+// ── gRPC Methods ────────────────────────────────────────────────────────────
+
+func ListGrpcMethods(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		rows, err := store.ListGrpcMethods(c.Param("id"), orgID)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gin.H{"data": rows})
+	}
+}
+
+func CreateGrpcMethod(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var gm storage.GrpcMethod
+		if err := c.ShouldBindJSON(&gm); err != nil {
+			badRequest(c, err)
+			return
+		}
+		gm.ServiceID = c.Param("id")
+		orgID := getOrgID(c)
+		if orgID != "" {
+			gm.OrgID = orgID
+		}
+		result, err := store.CreateGrpcMethod(&gm)
+		if err != nil {
+			if isUniqueViolation(err) {
+				alreadyExists(c, "grpc_method")
+				return
+			}
+			internalError(c)
+			return
+		}
+		c.JSON(201, result)
+	}
+}
+
+func DeleteGrpcMethod(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if err := store.DeleteGrpcMethod(c.Param("methodId"), orgID); err != nil {
+			internalError(c)
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
 // ── Routes ────────────────────────────────────────────────────────────────
 
 func ListRoutes(store *storage.Store) gin.HandlerFunc {

@@ -77,6 +77,17 @@ export interface KongService {
   read_timeout?: number; write_timeout?: number; enabled?: boolean; created_at?: number
 }
 
+export interface GrpcService {
+  id?: string; name: string; package?: string; proto_file?: string
+  upstream_id?: string; enabled?: boolean; created_at?: string; updated_at?: string
+}
+
+export interface GrpcMethod {
+  id?: string; service_id?: string; name: string; method_type?: string
+  input_type?: string; output_type?: string; enabled?: boolean
+  created_at?: string; updated_at?: string
+}
+
 export interface KongRoute {
   id?: string; name?: string; service?: { id: string }
   protocol?: string; paths?: string[]; methods?: string[]
@@ -370,6 +381,18 @@ export const api = {
     analyticsClient.patch(wsPrefix(`/consumers/${consumerId}/key-auth/credentials/${credentialId}`), data).then(r => r.data),
   deleteKeyAuthCredential: (consumerId: string, credentialId: string) =>
     analyticsClient.delete(wsPrefix(`/consumers/${consumerId}/key-auth/credentials/${credentialId}`)),
+
+  // gRPC Services
+  listGrpcServices: () => analyticsClient.get<GrpcService[]>(wsPrefix('/grpc-services')).then(r => r.data?.data ?? []),
+  getGrpcService: (id: string) => analyticsClient.get<GrpcService>(wsPrefix(`/grpc-services/${id}`)).then(r => r.data),
+  createGrpcService: (data: Partial<GrpcService>) => analyticsClient.post<GrpcService>(wsPrefix('/grpc-services'), data).then(r => r.data),
+  updateGrpcService: (id: string, data: Partial<GrpcService>) => analyticsClient.patch<GrpcService>(wsPrefix(`/grpc-services/${id}`), data).then(r => r.data),
+  deleteGrpcService: (id: string) => analyticsClient.delete(wsPrefix(`/grpc-services/${id}`)),
+  listGrpcMethods: (serviceId: string) => analyticsClient.get<GrpcMethod[]>(wsPrefix(`/grpc-services/${serviceId}/methods`)).then(r => r.data?.data ?? []),
+  createGrpcMethod: (serviceId: string, data: Partial<GrpcMethod>) =>
+    analyticsClient.post<GrpcMethod>(wsPrefix(`/grpc-services/${serviceId}/methods`), data).then(r => r.data),
+  deleteGrpcMethod: (serviceId: string, methodId: string) =>
+    analyticsClient.delete(wsPrefix(`/grpc-services/${serviceId}/methods/${methodId}`)),
 }
 
 export default api

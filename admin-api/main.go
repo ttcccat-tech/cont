@@ -143,6 +143,21 @@ func main() {
 			svcs.DELETE("/:id", routes.RequirePermission(store, "services", true), routes.DeleteService(store))
 		}
 
+		// gRPC Services
+		grpcSvcs := admin.Group("/grpc-services")
+		{
+			grpcSvcs.GET("", routes.RequirePermission(store, "services", false), routes.ListGrpcServices(store))
+			grpcSvcs.POST("", routes.RequirePermission(store, "services", true), routes.CreateGrpcService(store))
+			grpcSvcs.GET("/:id", routes.RequirePermission(store, "services", false), routes.GetGrpcService(store))
+			grpcSvcs.PUT("/:id", routes.RequirePermission(store, "services", true), routes.UpdateGrpcService(store))
+			grpcSvcs.PATCH("/:id", routes.RequirePermission(store, "services", true), routes.UpdateGrpcService(store))
+			grpcSvcs.DELETE("/:id", routes.RequirePermission(store, "services", true), routes.DeleteGrpcService(store))
+			// gRPC Methods nested under service
+			grpcSvcs.GET("/:id/methods", routes.RequirePermission(store, "services", false), routes.ListGrpcMethods(store))
+			grpcSvcs.POST("/:id/methods", routes.RequirePermission(store, "services", true), routes.CreateGrpcMethod(store))
+			grpcSvcs.DELETE("/:id/methods/:methodId", routes.RequirePermission(store, "services", true), routes.DeleteGrpcMethod(store))
+		}
+
 		rt := admin.Group("/routes")
 		{
 			rt.GET("", routes.RequirePermission(store, "routes", false), routes.ListRoutes(store))

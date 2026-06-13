@@ -495,6 +495,38 @@ func RunMigrations(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status, next_retry)`,
+
+		// gRPC Services (Phase 1)
+		`CREATE TABLE IF NOT EXISTS grpc_services (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			name TEXT NOT NULL,
+			package TEXT DEFAULT '',
+			proto_file TEXT DEFAULT '',
+			upstream_id UUID,
+			enabled BOOLEAN DEFAULT true,
+			org_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW(),
+			UNIQUE(org_id, name)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_grpc_services_org ON grpc_services(org_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_grpc_services_upstream ON grpc_services(upstream_id)`,
+
+		// gRPC Methods
+		`CREATE TABLE IF NOT EXISTS grpc_methods (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			service_id UUID NOT NULL REFERENCES grpc_services(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			method_type TEXT DEFAULT 'unary' CHECK (method_type IN ('unary', 'client_streaming', 'server_streaming', 'bidirectional')),
+			input_type TEXT DEFAULT '',
+			output_type TEXT DEFAULT '',
+			enabled BOOLEAN DEFAULT true,
+			org_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW(),
+			UNIQUE(service_id, name)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_grpc_methods_service ON grpc_methods(service_id)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

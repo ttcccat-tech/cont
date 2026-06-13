@@ -19,8 +19,7 @@ import AlertHistory from './pages/AlertHistory'
 import ApiKeyRequests from './pages/ApiKeyRequests'
 import ApiDocs from './pages/ApiDocs'
 import Upstreams from './pages/Upstreams'
-import Users from './pages/Users'
-import Groups from './pages/Groups'
+import GrpcServices from './pages/GrpcServices'
 import WorkspaceDetail from './pages/WorkspaceDetail'
 import Workspaces from './pages/Workspaces'
 import { getToken, clearAuth } from './api/kong'
@@ -112,6 +111,7 @@ export default function App() {
                   <Route path="/plugins" element={<Plugins />} />
                   <Route path="/consumers" element={<Consumers />} />
                   <Route path="/upstreams" element={<Upstreams />} />
+                  <Route path="/grpc-services" element={<GrpcServices />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/audit" element={<AuditLog />} />

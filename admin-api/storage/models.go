@@ -298,6 +298,33 @@ func (c *ConsumerCredential) ToResponse() CredentialResponse {
 	}
 }
 
+// GrpcService represents a gRPC service definition managed by Cont
+type GrpcService struct {
+	ID          string `json:"id"`
+	Name        string `json:"name,omitempty" binding:"omitempty,max=255"`
+	Package     string `json:"package,omitempty" binding:"omitempty,max=255"` // e.g. "helloworld"
+	ProtoFile   string `json:"proto_file,omitempty" binding:"omitempty,max=65535"`
+	UpstreamID  string `json:"upstream_id,omitempty"`
+	Enabled     bool   `json:"enabled"`
+	OrgID       string `json:"org_id,omitempty"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
+}
+
+// GrpcMethod represents a gRPC method within a service
+type GrpcMethod struct {
+	ID          string `json:"id"`
+	ServiceID   string `json:"service_id"`
+	Name        string `json:"name,omitempty" binding:"omitempty,max=255"`         // e.g. "SayHello"
+	MethodType  string `json:"method_type,omitempty" binding:"omitempty,oneof=unary client_streaming server_streaming bidirectional"` // unary, client_streaming, server_streaming, bidirectional
+	InputType   string `json:"input_type,omitempty" binding:"omitempty,max=255"`   // e.g. "HelloRequest"
+	OutputType  string `json:"output_type,omitempty" binding:"omitempty,max=255"`  // e.g. "HelloReply"
+	Enabled     bool   `json:"enabled"`
+	OrgID       string `json:"org_id,omitempty"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
+}
+
 // PluginScope holds the id of the entity this plugin is attached to
 type PluginScope struct {
 	ID string `json:"id"`
