@@ -19,11 +19,14 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
+	"github.com/ttcccat-tech/cont/admin-api/tracing"
+	"go.opentelemetry.io/otel/semconv/v1.24.0"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // Tracing middleware — generates or propagates a trace ID (X-Cont-Trace-ID) for distributed tracing.
-// The trace ID is stored in gin.Context and included in all log output.
+// Creates an OpenTelemetry span for each request.
 func Tracing() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		traceID := c.GetHeader("X-Cont-Trace-ID")
@@ -34,6 +37,19 @@ func Tracing() gin.HandlerFunc {
 		}
 		c.Set("trace_id", traceID)
 		c.Header("X-Cont-Trace-ID", traceID)
+
+		// Create OTel span
+		tracer := tracing.Tracer("cont-admin-api")
+		_, span := tracer.Start(c.Request.Context(), c.Request.Method+" "+c.FullPath(),
+			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithAttributes(
+				semconv.HTTPMethod(c.Request.Method),
+				semconv.HTTPURL(c.Request.URL.String()),
+				semconv.HTTPRoute(c.FullPath()),
+			),
+		)
+		defer span.End()
+
 		c.Next()
 	}
 }

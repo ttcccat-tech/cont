@@ -12,6 +12,7 @@ import (
 	"github.com/ttcccat-tech/cont/admin-api/internal/worker"
 	"github.com/ttcccat-tech/cont/admin-api/routes"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
+	"github.com/ttcccat-tech/cont/admin-api/tracing"
 )
 
 func main() {
@@ -66,6 +67,9 @@ func main() {
 		jwtSecret = "cont-dev-secret-change-in-production"
 		log.Printf("WARNING: JWT_SECRET not set, using default. DO NOT use in production.")
 	}
+
+	// Init OpenTelemetry tracing (must be before gin setup)
+	tracing.Init()
 
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
