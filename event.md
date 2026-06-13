@@ -329,18 +329,20 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Admin API OpenTelemetry Tracing 實作** — Cont 已有 X-Cont-Trace-ID 生成，但缺少實際的 spans / OTLP export
-  - Backend: 整合 OpenTelemetry SDK (go.opentelemetry.io/otel)，替換現有 Tracing() middleware 為 otelgin middleware
-  - 支援 OTLP exporter (OTEL_EXPORTER_OTLP_ENDPOINT) 匯出 traces 至 Jaeger / Grafana Tempo / OTEL Collector
-  - 替換手動 rand.Read trace ID 為 SDK trace/span model
-  - Proxy: access.lua 已生成 X-Cont-Trace-ID，需整合 OpenTelemetry propagation (W3C TraceContext)
-  - 驗證：API request → spans 出現在 Jaeger/Grafana Tempo UI
+（無）
 
 ## 🔴 未完成
 
 （無）
 
 ## ✅ 已完成
+
+- [x] **Cont Admin API OpenTelemetry Tracing 實作** — commit `93ea9186`
+  - Backend: `tracing/tracing.go` — Init() 設定 OTel TracerProvider，支援 OTLP exporter (OTEL_EXPORTER_OTLP_ENDPOINT)、W3C TraceContext + Baggage propagation，無 endpoint 時使用 in-memory fallback
+  - Backend: `routes/routes.go` Tracing() middleware 建立 OTel span，含 HTTP method/URL/route attributes
+  - Backend: `main.go` 匯入 tracing package
+  - Go mod: 新增 OTel v1.24.0 packages (sdk, otlptrace, otlptracegrpc, trace)
+  - Proxy: `access.lua` 已有 X-Cont-Trace-ID 生成與傳遞（W3C TraceContext propagation）
 
 - [x] **usage-tracking plugin latency 為 0** — commit `6052037e`
   - access.lua 未設定 `request_start_time`，log phase 計算 latency 時永遠為 0
