@@ -4,9 +4,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/ttcccat-tech/cont/admin-api/engine"
 	"github.com/ttcccat-tech/cont/admin-api/routes"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
 )
@@ -42,6 +44,11 @@ func main() {
 	if err := store.SeedGoogleOAuthProvider(); err != nil {
 		log.Printf("Warning: failed to seed Google OAuth provider: %v", err)
 	}
+
+	// Start alert engine (evaluates rules every 30s)
+	alerter := engine.NewAlerter(store, 30*time.Second, "")
+	alerter.Start()
+	defer alerter.Stop()
 
 	// JWT secret
 	jwtSecret := os.Getenv("JWT_SECRET")
