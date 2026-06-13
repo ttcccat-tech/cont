@@ -3697,6 +3697,66 @@ func DeleteWebhook(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// UpdateWebhook updates a webhook subscription
+func UpdateWebhook(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if orgID == "" {
+			orgID = "00000000-0000-0000-0000-000000000000"
+		}
+		id := c.Param("id")
+		existing, err := store.GetWebhookSubscription(id, orgID)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		if existing == nil {
+			notFound(c, "webhook not found")
+			return
+		}
+		var req struct {
+			URL        string   `json:"url"`
+			EventTypes []string `json:"event_types"`
+			Active     *bool    `json:"active"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			badRequest(c, err)
+			return
+		}
+		url := existing.URL
+		eventTypes := existing.EventTypes
+		active := existing.Active
+		if req.URL != "" {
+			url = req.URL
+		}
+		if req.EventTypes != nil {
+			validTypes := map[string]bool{
+				"api_key.approved": true, "api_key.rejected": true,
+				"alert.triggered": true, "subscription.expired": true,
+			}
+			for _, t := range req.EventTypes {
+				if !validTypes[t] {
+					badRequestMsg(c, "invalid event_type: "+t)
+					return
+				}
+			}
+			eventTypes = req.EventTypes
+		}
+		if req.Active != nil {
+			active = *req.Active
+		}
+		if err := store.UpdateWebhookSubscription(id, orgID, url, eventTypes, active); err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gin.H{
+			"id": id, "org_id": orgID,
+			"url": url, "event_types": eventTypes,
+			"active": active,
+		})
+	}
+}
+
 // ListWebhookDeliveries returns delivery history for a webhook
 func ListWebhookDeliveries(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {

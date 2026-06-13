@@ -132,6 +132,15 @@ func (s *Store) DeleteWebhookSubscription(id, orgID string) error {
 	return err
 }
 
+func (s *Store) UpdateWebhookSubscription(id, orgID, url string, eventTypes []string, active bool) error {
+	_, err := s.db.Exec(`
+		UPDATE webhook_subscriptions
+		SET url=$3, event_types=$4, active=$5
+		WHERE id=$1 AND org_id=$2`,
+		id, orgID, url, pq.Array(eventTypes), active)
+	return err
+}
+
 // ── Webhook Delivery store methods ─────────────────────────────────────────
 
 // ListWebhookDeliveries returns delivery records for a webhook subscription
