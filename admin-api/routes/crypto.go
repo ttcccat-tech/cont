@@ -15,7 +15,7 @@ import (
 func GenerateRSAKeyPair(c *gin.Context) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate RSA key: " + err.Error()})
+		internalError(c)
 		return
 	}
 
@@ -29,7 +29,7 @@ func GenerateRSAKeyPair(c *gin.Context) {
 	// Encode public key to PKCS#8 PEM (SubjectPublicKeyInfo) — Go 1.18 compatible
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to marshal public key: " + err.Error()})
+		internalError(c)
 		return
 	}
 	publicKeyPEM := pem.EncodeToMemory(&pem.Block{

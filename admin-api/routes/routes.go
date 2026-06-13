@@ -30,7 +30,7 @@ func AuthRequired(jwtSecret string) gin.HandlerFunc {
 			authHeader = c.GetHeader("Kong-Admin-Token")
 		}
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+			unauthorized(c, "missing authorization header")
 			return
 		}
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
@@ -41,12 +41,12 @@ func AuthRequired(jwtSecret string) gin.HandlerFunc {
 			return []byte(jwtSecret), nil
 		})
 		if err != nil || !token.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			unauthorized(c, "invalid or expired token")
 			return
 		}
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
+			unauthorized(c, "invalid token claims")
 			return
 		}
 		c.Set("user_id", claims["sub"])
@@ -118,7 +118,7 @@ func nextList(c *gin.Context, count int, size, offset int) {
 // badRequest sends a 400 with a structured validation error message
 func badRequest(c *gin.Context, err error) {
 	if err == nil {
-		c.JSON(400, gin.H{"message": "invalid request body"})
+		badRequestMsg(c, "invalid request body")
 		return
 	}
 	msg := err.Error()
@@ -145,11 +145,11 @@ func badRequest(c *gin.Context, err error) {
 			}
 		}
 		if len(fields) > 0 {
-			c.JSON(400, gin.H{"message": "validation failed", "errors": fields})
+			badRequestValidation(c, "validation failed", fields)
 			return
 		}
 	}
-	c.JSON(400, gin.H{"message": msg})
+	badRequestMsg(c, msg)
 }
 
 func makeCursor(offset int) string {
@@ -201,7 +201,7 @@ func ListServices(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		rows, err := store.ListServices(orgID, size, offset)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": rows, "next": ""})
@@ -222,10 +222,10 @@ badRequest(c, err)
 		result, err := store.CreateService(&s)
 		if err != nil {
 			if isUniqueViolation(err) {
-				c.JSON(409, gin.H{"message": "service already exists"})
+				alreadyExists(c, "service")
 				return
 			}
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, result)
@@ -237,11 +237,11 @@ func GetService(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		s, err := store.GetService(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "service not found"})
+			notFound(c, "service not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, s)
@@ -258,11 +258,11 @@ badRequest(c, err)
 		orgID := getOrgID(c)
 		result, err := store.UpdateService(c.Param("id"), orgID, &s)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "service not found"})
+			notFound(c, "service not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, result)
@@ -273,7 +273,7 @@ func DeleteService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
 		if err := store.DeleteService(c.Param("id"), orgID); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -288,7 +288,7 @@ func ListRoutes(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		rows, err := store.ListRoutes(orgID, size, offset)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": rows, "next": ""})
@@ -307,11 +307,11 @@ badRequest(c, err)
 		if r.Service != nil && r.Service.ID == "" && r.GetServiceName() != "" {
 			svc, err := store.GetServiceByName(r.GetServiceName(), orgID)
 			if err != nil {
-				c.JSON(400, gin.H{"message": "service not found: " + r.GetServiceName()})
+				notFound(c, "service not found: "+r.GetServiceName())
 				return
 			}
 			if svc == nil {
-				c.JSON(400, gin.H{"message": "service not found: " + r.GetServiceName()})
+				notFound(c, "service not found: "+r.GetServiceName())
 				return
 			}
 			r.Service.ID = svc.ID
@@ -319,7 +319,7 @@ badRequest(c, err)
 		r.OrgID = orgID
 		result, err := store.CreateRoute(&r)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, result)
@@ -331,11 +331,11 @@ func GetRoute(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		r, err := store.GetRoute(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "route not found"})
+			notFound(c, "route not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, r)
@@ -352,11 +352,11 @@ badRequest(c, err)
 		orgID := getOrgID(c)
 		result, err := store.UpdateRoute(c.Param("id"), orgID, &r)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "route not found"})
+			notFound(c, "route not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, result)
@@ -367,7 +367,7 @@ func DeleteRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
 		if err := store.DeleteRoute(c.Param("id"), orgID); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -382,7 +382,7 @@ func ListUpstreams(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		rows, err := store.ListUpstreams(orgID, size, offset)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": rows, "next": ""})
@@ -402,7 +402,7 @@ badRequest(c, err)
 		}
 		result, err := store.CreateUpstream(&u)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, result)
@@ -414,11 +414,11 @@ func GetUpstream(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		u, err := store.GetUpstream(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "upstream not found"})
+			notFound(c, "upstream not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, u)
@@ -435,11 +435,11 @@ badRequest(c, err)
 		orgID := getOrgID(c)
 		result, err := store.UpdateUpstream(c.Param("id"), orgID, &u)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "upstream not found"})
+			notFound(c, "upstream not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, result)
@@ -450,7 +450,7 @@ func DeleteUpstream(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
 		if err := store.DeleteUpstream(c.Param("id"), orgID); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -463,17 +463,17 @@ func GetUpstreamHealth(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		upstream, err := store.GetUpstream(upstreamID, orgID)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "upstream not found"})
+			notFound(c, "upstream not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 
 		targets, err := store.ListTargetsByUpstream(upstreamID)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 
@@ -528,7 +528,7 @@ func ListTargets(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := store.ListTargetsByUpstream(c.Param("id"))
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": rows, "next": ""})
@@ -550,7 +550,7 @@ badRequest(c, err)
 		}
 		result, err := store.CreateTarget(&t)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, result)
@@ -567,7 +567,7 @@ badRequest(c, err)
 		orgID := getOrgID(c)
 		result, err := store.UpdateTarget(c.Param("id"), c.Param("target_id"), orgID, &t)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, result)
@@ -578,7 +578,7 @@ func DeleteTarget(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
 		if err := store.DeleteTarget(c.Param("id"), c.Param("target_id"), orgID); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -593,7 +593,7 @@ func ListConsumers(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		rows, err := store.ListConsumers(orgID, size, offset)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": rows, "next": ""})
@@ -613,7 +613,7 @@ badRequest(c, err)
 		}
 		result, err := store.CreateConsumer(&con)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, result)
@@ -625,11 +625,11 @@ func GetConsumer(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		con, err := store.GetConsumer(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "consumer not found"})
+			notFound(c, "consumer not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, con)
@@ -646,11 +646,11 @@ badRequest(c, err)
 		orgID := getOrgID(c)
 		result, err := store.UpdateConsumer(c.Param("id"), orgID, &con)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "consumer not found"})
+			notFound(c, "consumer not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, result)
@@ -661,7 +661,7 @@ func DeleteConsumer(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
 		if err := store.DeleteConsumer(c.Param("id"), orgID); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -677,15 +677,15 @@ func ListCredentials(store *storage.Store, credentialType string) gin.HandlerFun
 		// Verify consumer exists
 		if _, err := store.GetConsumer(consumerID, orgID); err != nil {
 			if err == sql.ErrNoRows {
-				c.JSON(404, gin.H{"message": "consumer not found"})
+				notFound(c, "consumer not found")
 				return
 			}
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		rows, err := store.ListConsumerCredentials(consumerID, credentialType)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		// Return API-safe responses (no secrets)
@@ -704,10 +704,10 @@ func CreateCredential(store *storage.Store, credentialType string) gin.HandlerFu
 		// Verify consumer exists
 		if _, err := store.GetConsumer(consumerID, orgID); err != nil {
 			if err == sql.ErrNoRows {
-				c.JSON(404, gin.H{"message": "consumer not found"})
+				notFound(c, "consumer not found")
 				return
 			}
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		var req struct {
@@ -731,7 +731,7 @@ func CreateCredential(store *storage.Store, credentialType string) gin.HandlerFu
 		}
 		result, err := store.CreateConsumerCredential(cred)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, result.ToResponse())
@@ -744,10 +744,10 @@ func DeleteCredential(store *storage.Store, credentialType string) gin.HandlerFu
 		credID := c.Param("credId")
 		if err := store.DeleteConsumerCredential(consumerID, credentialType, credID); err != nil {
 			if err == sql.ErrNoRows {
-				c.JSON(404, gin.H{"message": "credential not found"})
+				notFound(c, "credential not found")
 				return
 			}
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -760,16 +760,16 @@ func ValidateCredential(store *storage.Store) gin.HandlerFunc {
 		credType := c.Param("type")
 		key := c.Param("key")
 		if key == "" {
-			c.JSON(401, gin.H{"message": "missing key"})
+			unauthorized(c, "missing key")
 			return
 		}
 		cred, err := store.GetConsumerCredentialByKey(credType, key)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				c.JSON(401, gin.H{"message": "invalid credentials"})
+				unauthorized(c, "invalid credentials")
 				return
 			}
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"consumer_id": cred.ConsumerID})
@@ -782,7 +782,7 @@ func ValidateJWT(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := c.Param("token")
 		if tokenStr == "" {
-			c.JSON(401, gin.H{"message": "missing token"})
+			unauthorized(c, "missing token")
 			return
 		}
 
@@ -794,13 +794,13 @@ func ValidateJWT(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			c.JSON(401, gin.H{"message": "invalid or expired token"})
+			unauthorized(c, "invalid or expired token")
 			return
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			c.JSON(401, gin.H{"message": "invalid token claims"})
+			unauthorized(c, "invalid token claims")
 			return
 		}
 
@@ -823,7 +823,7 @@ func ListInternalPlugins(store *storage.Store) gin.HandlerFunc {
 		// Filter to enabled plugins only to keep payload small
 		plugins, err := store.ListPlugins("", 1000, 0) // "" = admin org, fetch all
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		// Filter to enabled only and strip bulky fields for proxy
@@ -873,7 +873,7 @@ func ListPlugins(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		rows, err := store.ListPlugins(orgID, size, offset)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": rows, "next": ""})
@@ -893,7 +893,7 @@ badRequest(c, err)
 		}
 		result, err := store.CreatePlugin(&p)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, result)
@@ -905,11 +905,11 @@ func GetPlugin(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		p, err := store.GetPlugin(c.Param("id"), orgID)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "plugin not found"})
+			notFound(c, "plugin not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, p)
@@ -926,11 +926,11 @@ badRequest(c, err)
 		orgID := getOrgID(c)
 		result, err := store.UpdatePlugin(c.Param("id"), orgID, &p)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "plugin not found"})
+			notFound(c, "plugin not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, result)
@@ -941,7 +941,7 @@ func DeletePlugin(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
 		if err := store.DeletePlugin(c.Param("id"), orgID); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -955,7 +955,7 @@ func ListWorkspaces(store *storage.Store) gin.HandlerFunc {
 		orgID := getOrgID(c)
 		rows, err := store.ListWorkspaces(orgID)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": rows, "next": ""})
@@ -971,7 +971,7 @@ badRequest(c, err)
 		}
 		result, err := store.CreateWorkspace(&w)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, result)
@@ -988,22 +988,22 @@ func GetWorkspace(store *storage.Store) gin.HandlerFunc {
 		// Check if user has access to this workspace
 		wsRole, err := store.GetUserWorkspaceRole(userID.(string), wsID)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		// Global admin bypasses workspace-level access checks
 		if role.(string) != "admin" && wsRole == "" {
-			c.JSON(404, gin.H{"message": "workspace not found"})
+			notFound(c, "workspace not found")
 			return
 		}
 
 		w, err := store.GetWorkspace(wsID, orgID)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "workspace not found"})
+			notFound(c, "workspace not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, w)
@@ -1021,7 +1021,7 @@ func ListMyWorkspaces(store *storage.Store) gin.HandlerFunc {
 		if role.(string) == "admin" {
 			rows, err := store.ListWorkspaces(orgID)
 			if err != nil {
-				c.JSON(500, gin.H{"message": err.Error()})
+				internalError(c)
 				return
 			}
 			c.JSON(200, gin.H{"data": rows, "next": ""})
@@ -1031,7 +1031,7 @@ func ListMyWorkspaces(store *storage.Store) gin.HandlerFunc {
 		// Non-admin: only workspaces they are explicitly assigned to
 		workspaces, err := store.ListUserWorkspaces(userID.(string))
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": workspaces, "next": ""})
@@ -1048,11 +1048,11 @@ func UpdateWorkspace(store *storage.Store) gin.HandlerFunc {
 		}
 		result, err := store.UpdateWorkspace(c.Param("id"),&w, orgID)
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"message": "workspace not found"})
+			notFound(c, "workspace not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, result)
@@ -1063,7 +1063,7 @@ func DeleteWorkspace(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
 		if err := store.DeleteWorkspace(c.Param("id"), orgID); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -1083,7 +1083,7 @@ func SetUserWorkspace(store *storage.Store) gin.HandlerFunc {
 		}
 		wsID := c.Param("id")
 		if err := store.SetUserWorkspace(req.UserID, wsID, req.Role); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"message": "user workspace assignment updated"})
@@ -1096,7 +1096,7 @@ func RemoveUserWorkspace(store *storage.Store) gin.HandlerFunc {
 		userID := c.Param("userId")
 		wsID := c.Param("id")
 		if err := store.RemoveUserWorkspace(userID, wsID); err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -1109,7 +1109,7 @@ func GetUserWorkspaces(store *storage.Store) gin.HandlerFunc {
 		userID := c.Param("userId")
 		workspaces, err := store.ListUserWorkspaces(userID)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": workspaces})
@@ -1122,7 +1122,7 @@ func ListWorkspaceUsers(store *storage.Store) gin.HandlerFunc {
 		wsID := c.Param("id")
 		users, err := store.ListWorkspaceUsers(wsID)
 		if err != nil {
-			c.JSON(500, gin.H{"message": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"data": users})
@@ -1136,7 +1136,7 @@ func RequireWorkspacePermission(store *storage.Store, entity string, write bool)
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "user_id not found in token"})
+			forbidden(c, "user_id not found in token")
 			return
 		}
 		role, _ := c.Get("role")
@@ -1158,7 +1158,7 @@ func RequireWorkspacePermission(store *storage.Store, entity string, write bool)
 		if workspaceID == "" {
 			workspaces, err := store.ListUserWorkspaces(userID.(string))
 			if err != nil || len(workspaces) == 0 {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "no workspace access"})
+				forbidden(c, "no workspace access")
 				return
 			}
 			workspaceID = workspaces[0].WorkspaceID
@@ -1166,11 +1166,11 @@ func RequireWorkspacePermission(store *storage.Store, entity string, write bool)
 
 		wsRole, err := store.GetUserWorkspaceRole(userID.(string), workspaceID)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if wsRole == "" {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "workspace access denied"})
+			forbidden(c, "workspace access denied")
 			return
 		}
 
@@ -1188,13 +1188,13 @@ func RequireWorkspacePermission(store *storage.Store, entity string, write bool)
 
 		// For write operations, require editor or admin workspace role
 		if write && wsLevel < 2 {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "write permission denied for " + entity})
+			forbidden(c, "write permission denied for " + entity)
 			return
 		}
 
 		// For delete operations, require admin workspace role
 		if entity == "delete" && wsLevel < 3 {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "delete permission denied"})
+			forbidden(c, "delete permission denied")
 			return
 		}
 
@@ -1262,7 +1262,7 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request"})
+			badRequestMsg(c, "invalid request")
 			return
 		}
 		// Get client IP for attempt tracking
@@ -1271,7 +1271,7 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 		// Check lockout (user-based)
 		locked, err := store.IsLockedOut(req.Username, LoginMaxAttempts, LoginWindowSeconds)
 		if err == nil && locked {
-			c.JSON(429, gin.H{"error": "too many failed login attempts, account temporarily locked"})
+			c.JSON(429, ErrorResponse{Code: "RATE_LIMITED", Message: "too many failed login attempts, account temporarily locked"})
 			return
 		}
 
@@ -1279,7 +1279,7 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 		if err != nil || user == nil {
 			// Record failed attempt even for unknown user
 			store.RecordFailedLogin(req.Username, clientIP)
-			c.JSON(401, gin.H{"error": "invalid credentials", "debug": "user not found"})
+			unauthorized(c, "invalid credentials")
 			return
 		}
 
@@ -1287,7 +1287,7 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 		err = bcrypt.CompareHashAndPassword(hashBytes, []byte(req.Password))
 		if err != nil {
 			store.RecordFailedLogin(req.Username, clientIP)
-			c.JSON(401, gin.H{"error": "invalid credentials", "debug_hash_len": len(hashBytes), "debug_pass_len": len(req.Password)})
+			unauthorized(c, "invalid credentials")
 			return
 		}
 
@@ -1308,7 +1308,7 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 		})
 		tokenStr, err := token.SignedString([]byte(jwtSecret))
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to generate token"})
+			internalError(c)
 			return
 		}
 		c.JSON(200, LoginResponse{
@@ -1334,7 +1334,7 @@ func SendOTP(store *storage.Store) gin.HandlerFunc {
 			Purpose string `json:"purpose" binding:"required,oneof=register reset-password"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request: " + err.Error()})
+			badRequestMsg(c, "invalid request: " + err.Error())
 			return
 		}
 
@@ -1351,7 +1351,7 @@ func SendOTP(store *storage.Store) gin.HandlerFunc {
 		// Store OTP (expires in 10 minutes)
 		otp, err := store.CreateOTP(req.Email, code, req.Purpose, 10)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to create OTP"})
+			internalError(c)
 			return
 		}
 
@@ -1381,32 +1381,32 @@ func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 			DisplayName string `json:"display_name,omitempty"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request: " + err.Error()})
+			badRequestMsg(c, "invalid request: " + err.Error())
 			return
 		}
 
 		// Find and validate OTP
 		otp, err := store.GetOTP(req.Email, req.Code, req.Purpose)
 		if err != nil || otp == nil {
-			c.JSON(400, gin.H{"error": "invalid or expired verification code"})
+			badRequestMsg(c, "invalid or expired verification code")
 			return
 		}
 
 		if req.Purpose == "register" {
 			// Validate registration fields
 			if req.Username == "" || req.Password == "" {
-				c.JSON(400, gin.H{"error": "username and password are required for registration"})
+				badRequestMsg(c, "username and password are required for registration")
 				return
 			}
 			if len(req.Password) < 6 {
-				c.JSON(400, gin.H{"error": "password must be at least 6 characters"})
+				badRequestMsg(c, "password must be at least 6 characters")
 				return
 			}
 
 			// Check if username already exists
 			existing, _ := store.GetUserByUsername(req.Username)
 			if existing != nil {
-				c.JSON(409, gin.H{"error": "username already taken"})
+				conflict(c, "username already taken")
 				return
 			}
 
@@ -1415,14 +1415,14 @@ func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 			org := &storage.Organization{Name: orgName, Plan: "free"}
 			org, err = store.CreateOrganization(org)
 			if err != nil {
-				c.JSON(500, gin.H{"error": "failed to create organization"})
+				internalError(c)
 				return
 			}
 
 			// Hash password
 			hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 			if err != nil {
-				c.JSON(500, gin.H{"error": "failed to hash password"})
+				internalError(c)
 				return
 			}
 
@@ -1442,7 +1442,7 @@ func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 			}
 			user, err = store.CreateUser(user)
 			if err != nil {
-				c.JSON(500, gin.H{"error": "failed to create user: " + err.Error()})
+				internalError(c)
 				return
 			}
 
@@ -1479,20 +1479,20 @@ func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 			// Find user by email
 			user, err := store.GetUserByEmail(req.Email)
 			if err != nil || user == nil {
-				c.JSON(400, gin.H{"error": "no account found with this email"})
+				badRequestMsg(c, "no account found with this email")
 				return
 			}
 
 			// Hash new password
 			hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 			if err != nil {
-				c.JSON(500, gin.H{"error": "failed to hash password"})
+				internalError(c)
 				return
 			}
 
 			// Update password
 			if err := store.UpdateUserPassword(user.ID, string(hash)); err != nil {
-				c.JSON(500, gin.H{"error": "failed to update password"})
+				internalError(c)
 				return
 			}
 
@@ -1501,7 +1501,7 @@ func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 
 			c.JSON(200, gin.H{"message": "password reset successful"})
 		} else {
-			c.JSON(400, gin.H{"error": "invalid purpose"})
+			badRequestMsg(c, "invalid purpose")
 		}
 	}
 }
@@ -1598,12 +1598,12 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole, exists := c.Get("role")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "role not found in token"})
+			forbidden(c, "role not found in token")
 			return
 		}
 		roleStr, ok := userRole.(string)
 		if !ok {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "invalid role format"})
+			forbidden(c, "invalid role format")
 			return
 		}
 		for _, r := range roles {
@@ -1612,7 +1612,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 				return
 			}
 		}
-		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		forbidden(c, "insufficient permissions")
 	}
 }
 
@@ -1623,12 +1623,12 @@ func RequirePermission(store *storage.Store, entity string, write bool) gin.Hand
 	return func(c *gin.Context) {
 		userRole, exists := c.Get("role")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "role not found in token"})
+			forbidden(c, "role not found in token")
 			return
 		}
 		roleStr, ok := userRole.(string)
 		if !ok {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "invalid role format"})
+			forbidden(c, "invalid role format")
 			return
 		}
 		// Global admin bypasses all resource-level checks
@@ -1647,11 +1647,11 @@ func RequirePermission(store *storage.Store, entity string, write bool) gin.Hand
 			userID, _ := c.Get("user_id")
 			perm, err := store.GetResourcePermissionsForUser(userID.(string), resourceID)
 			if err != nil && err != sql.ErrNoRows {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to check resource permissions"})
+				internalError(c)
 				return
 			}
 			if perm == "deny" {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "resource access denied"})
+				forbidden(c, "resource access denied")
 				return
 			}
 			if perm == "write" {
@@ -1660,7 +1660,7 @@ func RequirePermission(store *storage.Store, entity string, write bool) gin.Hand
 				return
 			}
 			if perm == "read" && write {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "write permission denied for resource"})
+				forbidden(c, "write permission denied for resource")
 				return
 			}
 			// perm == "" or perm == "read" with read op → fall through to role check
@@ -1669,12 +1669,12 @@ func RequirePermission(store *storage.Store, entity string, write bool) gin.Hand
 		// Fall back to role-based permission check
 		if write {
 			if !storage.CanWrite(roleStr, entity) {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "write permission denied for " + entity})
+				forbidden(c, "write permission denied for " + entity)
 				return
 			}
 		} else {
 			if !storage.CanRead(roleStr, entity) {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "read permission denied for " + entity})
+				forbidden(c, "read permission denied for " + entity)
 				return
 			}
 		}
@@ -1747,7 +1747,7 @@ func ListUsers(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		users, err := store.ListUsers()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, users)
@@ -1759,11 +1759,11 @@ func GetUser(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		user, err := store.GetUser(id)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if user == nil {
-			c.JSON(404, gin.H{"error": "user not found"})
+			notFound(c, "user not found")
 			return
 		}
 		c.JSON(200, user)
@@ -1789,7 +1789,7 @@ badRequest(c, err)
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to hash password"})
+			internalError(c)
 			return
 		}
 		user, err := store.CreateUser(&storage.User{
@@ -1801,7 +1801,7 @@ badRequest(c, err)
 			Enabled:     true,
 		})
 		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			badRequestMsg(c, err.Error())
 			return
 		}
 		userID, _ := c.Get("user_id")
@@ -1836,12 +1836,12 @@ func UpdateUser(store *storage.Store) gin.HandlerFunc {
 			Enabled     *bool  `json:"enabled"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request"})
+			badRequestMsg(c, "invalid request")
 			return
 		}
 		existing, _ := store.GetUser(id)
 		if existing == nil {
-			c.JSON(404, gin.H{"error": "user not found"})
+			notFound(c, "user not found")
 			return
 		}
 		if req.DisplayName != "" {
@@ -1857,7 +1857,7 @@ func UpdateUser(store *storage.Store) gin.HandlerFunc {
 			existing.Enabled = *req.Enabled
 		}
 		if err := store.UpdateUser(id, existing); err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		updated, _ := store.GetUser(id)
@@ -1888,11 +1888,11 @@ func DeleteUser(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		existing, _ := store.GetUser(id)
 		if existing == nil {
-			c.JSON(404, gin.H{"error": "user not found"})
+			notFound(c, "user not found")
 			return
 		}
 		if err := store.DeleteUser(id); err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		userID, _ := c.Get("user_id")
@@ -1929,7 +1929,7 @@ func ListUserResourcePermissions(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		perms, err := store.ListUserResourcePermissions(id)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"permissions": perms})
@@ -1941,13 +1941,13 @@ func SetUserResourcePermissions(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		var req []UserResourcePermissionRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request"})
+			badRequestMsg(c, "invalid request")
 			return
 		}
 		// Get all current permissions for this user
 		current, err := store.ListUserResourcePermissions(id)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		currentMap := make(map[string]string)
@@ -1961,7 +1961,7 @@ func SetUserResourcePermissions(store *storage.Store) gin.HandlerFunc {
 		// Upsert new/changed permissions
 		for resourceID, perm := range newMap {
 			if err := store.SetUserResourcePermission(id, resourceID, perm); err != nil {
-				c.JSON(500, gin.H{"error": err.Error()})
+				internalError(c)
 				return
 			}
 		}
@@ -1969,7 +1969,7 @@ func SetUserResourcePermissions(store *storage.Store) gin.HandlerFunc {
 		for resourceID := range currentMap {
 			if _, exists := newMap[resourceID]; !exists {
 				if err := store.SetUserResourcePermission(id, resourceID, ""); err != nil {
-					c.JSON(500, gin.H{"error": err.Error()})
+					internalError(c)
 					return
 				}
 			}
@@ -1991,7 +1991,7 @@ func ListAuthGroups(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		groups, err := store.ListAuthGroups()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if groups == nil {
@@ -2011,10 +2011,10 @@ func CreateAuthGroup(store *storage.Store) gin.HandlerFunc {
 		created, err := store.CreateAuthGroup(&g)
 		if err != nil {
 			if isUniqueViolation(err) {
-				c.JSON(409, gin.H{"message": "group name already exists"})
+				alreadyExists(c, "group name")
 				return
 			}
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		userID, _ := c.Get("user_id")
@@ -2045,7 +2045,7 @@ func GetAuthGroup(store *storage.Store) gin.HandlerFunc {
 		groupID := resolveGroupID(store, id)
 		g, err := store.GetAuthGroup(groupID)
 		if err != nil {
-			c.JSON(404, gin.H{"message": "group not found"})
+			notFound(c, "group not found")
 			return
 		}
 		c.JSON(200, g)
@@ -2064,7 +2064,7 @@ func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 		// Fetch existing to merge
 		existing, err := store.GetAuthGroup(groupID)
 		if err != nil {
-			c.JSON(404, gin.H{"message": "group not found"})
+			notFound(c, "group not found")
 			return
 		}
 		// Apply partial updates
@@ -2081,10 +2081,10 @@ func UpdateAuthGroup(store *storage.Store) gin.HandlerFunc {
 		updated, err := store.UpdateAuthGroup(groupID, existing)
 		if err != nil {
 			if isUniqueViolation(err) {
-				c.JSON(409, gin.H{"message": "group name already exists"})
+				alreadyExists(c, "group name")
 				return
 			}
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		userID, _ := c.Get("user_id")
@@ -2115,11 +2115,11 @@ func DeleteAuthGroup(store *storage.Store) gin.HandlerFunc {
 		groupID := resolveGroupID(store, id)
 		existing, _ := store.GetAuthGroup(groupID)
 		if existing == nil {
-			c.JSON(404, gin.H{"message": "group not found"})
+			notFound(c, "group not found")
 			return
 		}
 		if err := store.DeleteAuthGroup(groupID); err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		userID, _ := c.Get("user_id")
@@ -2172,7 +2172,7 @@ func GetGroupMembers(store *storage.Store) gin.HandlerFunc {
 		groupID := resolveGroupID(store, id)
 		ids, err := store.ListGroupMembers(groupID)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		type MemberInfo struct {
@@ -2205,11 +2205,11 @@ func SetGroupMembers(store *storage.Store) gin.HandlerFunc {
 		groupID := resolveGroupID(store, id)
 		var req GroupMembersRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request"})
+			badRequestMsg(c, "invalid request")
 			return
 		}
 		if err := store.SetGroupMembers(groupID, req.UserIDs); err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"message": "members updated"})
@@ -2229,7 +2229,7 @@ func ListGroupResourcePermissions(store *storage.Store) gin.HandlerFunc {
 		groupID := resolveGroupID(store, id)
 		perms, err := store.ListGroupResourcePermissions(groupID)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, gin.H{"permissions": perms})
@@ -2242,12 +2242,12 @@ func SetGroupResourcePermissions(store *storage.Store) gin.HandlerFunc {
 		groupID := resolveGroupID(store, id)
 		var req []GroupResourcePermissionRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request"})
+			badRequestMsg(c, "invalid request")
 			return
 		}
 		current, err := store.ListGroupResourcePermissions(groupID)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		currentMap := make(map[string]string)
@@ -2260,14 +2260,14 @@ func SetGroupResourcePermissions(store *storage.Store) gin.HandlerFunc {
 		}
 		for resourceID, perm := range newMap {
 			if err := store.SetGroupResourcePermission(groupID, resourceID, perm); err != nil {
-				c.JSON(500, gin.H{"error": err.Error()})
+				internalError(c)
 				return
 			}
 		}
 		for resourceID := range currentMap {
 			if _, exists := newMap[resourceID]; !exists {
 				if err := store.SetGroupResourcePermission(groupID, resourceID, ""); err != nil {
-					c.JSON(500, gin.H{"error": err.Error()})
+					internalError(c)
 					return
 				}
 			}
@@ -2282,7 +2282,7 @@ func ListResources(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		resources, err := store.ListResources()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if resources == nil {
@@ -2296,11 +2296,11 @@ func GetResource(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		r, err := store.GetResource(c.Param("id"))
 		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{"error": "resource not found"})
+			notFound(c, "resource not found")
 			return
 		}
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, r)
@@ -2315,16 +2315,16 @@ func CreateResource(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 		if r.ID == "" {
-			c.JSON(400, gin.H{"error": "id is required"})
+			missingField(c, "id")
 			return
 		}
 		created, err := store.CreateResource(&r)
 		if err != nil {
 			if isUniqueViolation(err) {
-				c.JSON(409, gin.H{"error": "resource already exists"})
+				conflict(c, "resource already exists")
 				return
 			}
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, created)
@@ -2334,7 +2334,7 @@ func CreateResource(store *storage.Store) gin.HandlerFunc {
 func DeleteResource(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if err := store.DeleteResource(c.Param("id")); err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.Status(http.StatusNoContent)
@@ -2348,7 +2348,7 @@ func ListAuditLogs(store *storage.Store) gin.HandlerFunc {
 		size, offset := paginate(c)
 		logs, err := store.ListAuditLogs(size, offset)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if logs == nil {
@@ -2380,7 +2380,7 @@ func ListAlertRules(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rules, err := store.ListAlertRules()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if rules == nil {
@@ -2399,7 +2399,7 @@ func CreateAlertRule(store *storage.Store) gin.HandlerFunc {
 		}
 		created, err := store.CreateAlertRule(&r)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, created)
@@ -2411,7 +2411,7 @@ func GetAlertRule(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		r, err := store.GetAlertRule(id)
 		if err != nil {
-			c.JSON(404, gin.H{"message": "alert rule not found"})
+			notFound(c, "alert rule not found")
 			return
 		}
 		c.JSON(200, r)
@@ -2428,7 +2428,7 @@ func UpdateAlertRule(store *storage.Store) gin.HandlerFunc {
 		}
 		existing, err := store.GetAlertRule(id)
 		if err != nil {
-			c.JSON(404, gin.H{"message": "alert rule not found"})
+			notFound(c, "alert rule not found")
 			return
 		}
 		if req.Name != "" {
@@ -2458,7 +2458,7 @@ func UpdateAlertRule(store *storage.Store) gin.HandlerFunc {
 		existing.AlertSuppressSeconds = req.AlertSuppressSeconds
 		updated, err := store.UpdateAlertRule(id, existing)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, updated)
@@ -2470,11 +2470,11 @@ func DeleteAlertRule(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		existing, _ := store.GetAlertRule(id)
 		if existing == nil {
-			c.JSON(404, gin.H{"message": "alert rule not found"})
+			notFound(c, "alert rule not found")
 			return
 		}
 		if err := store.DeleteAlertRule(id); err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(204, nil)
@@ -2507,11 +2507,11 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 		}
 		existing, err := store.GetAPIKeyRequest(id)
 		if err != nil || existing == nil {
-			c.JSON(404, gin.H{"message": "API key request not found"})
+			notFound(c, "API key request not found")
 			return
 		}
 		if existing.Status != "pending" {
-			c.JSON(400, gin.H{"message": "API key request is not pending"})
+			badRequestMsg(c, "API key request is not pending")
 			return
 		}
 
@@ -2536,7 +2536,7 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 			newCon := &storage.Consumer{Username: consumerName}
 			createdCon, err := store.CreateConsumer(newCon)
 			if err != nil {
-				c.JSON(500, gin.H{"error": "failed to create consumer: " + err.Error()})
+				internalError(c)
 				return
 			}
 			consumerID = createdCon.ID
@@ -2552,7 +2552,7 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 		}
 		_, err = store.CreateConsumerCredential(cred)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to create credential: " + err.Error()})
+			internalError(c)
 			return
 		}
 
@@ -2564,7 +2564,7 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 		existing.KeyValue = generatedKey
 		updated, err := store.UpdateAPIKeyRequest(id, existing)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		// Write audit log
@@ -2598,14 +2598,14 @@ func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
 		}
 		existing, err := store.GetAPIKeyRequest(id)
 		if err != nil || existing == nil {
-			c.JSON(404, gin.H{"message": "API key request not found"})
+			notFound(c, "API key request not found")
 			return
 		}
 		existing.Status = "rejected"
 		existing.ReviewedBy = reviewerStr
 		updated, err := store.UpdateAPIKeyRequest(id, existing)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		// Write audit log
@@ -2638,7 +2638,7 @@ func ListMyAPIKeyRequests(store *storage.Store) gin.HandlerFunc {
 		}
 		allReqs, err := store.ListAPIKeyRequests()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		// Filter to requests by this user
@@ -2656,7 +2656,7 @@ func ListAPIKeyRequests(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqs, err := store.ListAPIKeyRequests()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if reqs == nil {
@@ -2685,7 +2685,7 @@ func CreateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 		}
 		created, err := store.CreateAPIKeyRequest(&r)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		actor, _ := c.Get("username")
@@ -2709,7 +2709,7 @@ func GetAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		r, err := store.GetAPIKeyRequest(id)
 		if err != nil {
-			c.JSON(404, gin.H{"message": "API key request not found"})
+			notFound(c, "API key request not found")
 			return
 		}
 		c.JSON(200, r)
@@ -2726,7 +2726,7 @@ func UpdateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 		}
 		existing, err := store.GetAPIKeyRequest(id)
 		if err != nil {
-			c.JSON(404, gin.H{"message": "API key request not found"})
+			notFound(c, "API key request not found")
 			return
 		}
 		if req.KeyName != "" {
@@ -2742,7 +2742,7 @@ func UpdateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 		}
 		updated, err := store.UpdateAPIKeyRequest(id, existing)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(200, updated)
@@ -2754,11 +2754,11 @@ func DeleteAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		existing, _ := store.GetAPIKeyRequest(id)
 		if existing == nil {
-			c.JSON(404, gin.H{"message": "API key request not found"})
+			notFound(c, "API key request not found")
 			return
 		}
 		if err := store.DeleteAPIKeyRequest(id); err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		userID, _ := c.Get("user_id")
@@ -2789,7 +2789,7 @@ func ListConfigSnapshots(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		snaps, err := store.ListConfigSnapshots()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if snaps == nil {
@@ -2808,7 +2808,7 @@ func CreateConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 		}
 		created, err := store.CreateConfigSnapshot(&sn)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(201, created)
@@ -2820,11 +2820,11 @@ func DeleteConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		existing, _ := store.GetConfigSnapshot(id)
 		if existing == nil {
-			c.JSON(404, gin.H{"message": "snapshot not found"})
+			notFound(c, "snapshot not found")
 			return
 		}
 		if err := store.DeleteConfigSnapshot(id); err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		c.JSON(204, nil)
@@ -2836,12 +2836,12 @@ func DiffConfigSnapshots(store *storage.Store) gin.HandlerFunc {
 		id1 := c.Query("id1")
 		id2 := c.Query("id2")
 		if id1 == "" || id2 == "" {
-			c.JSON(400, gin.H{"error": "id1 and id2 query parameters required"})
+			badRequestMsg(c, "id1 and id2 query parameters required")
 			return
 		}
 		diff, err := store.DiffConfigSnapshots(id1, id2)
 		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			badRequestMsg(c, err.Error())
 			return
 		}
 		c.JSON(200, gin.H{"diff": diff})
@@ -2853,7 +2853,7 @@ func RollbackConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		errors, err := store.RollbackConfigSnapshot(id)
 		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			badRequestMsg(c, err.Error())
 			return
 		}
 		if len(errors) > 0 {
@@ -2869,7 +2869,7 @@ func GetConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		snap, err := store.GetConfigSnapshot(id)
 		if err != nil {
-			c.JSON(404, gin.H{"message": "snapshot not found"})
+			notFound(c, "snapshot not found")
 			return
 		}
 		c.JSON(200, snap)

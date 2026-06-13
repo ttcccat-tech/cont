@@ -43,7 +43,7 @@ func ListPlans(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		plans, err := store.ListPlans()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if plans == nil {
@@ -68,19 +68,19 @@ func GetSubscription(store *storage.Store) gin.HandlerFunc {
 				}
 			}
 			if orgID == "" {
-				c.JSON(400, gin.H{"error": "organization ID required"})
+				badRequestMsg(c, "organization ID required")
 				return
 			}
 		}
 
 		subscr, err := store.GetSubscriptionByOrg(orgID)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if subscr == nil {
 			if err := store.EnsureFreeSubscription(orgID); err != nil {
-				c.JSON(500, gin.H{"error": err.Error()})
+				internalError(c)
 				return
 			}
 			subscr, _ = store.GetSubscriptionByOrg(orgID)
@@ -94,13 +94,13 @@ func GetSubscription(store *storage.Store) gin.HandlerFunc {
 func CreateCheckoutSession(store *storage.Store, frontendBaseURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !stripeEnabled {
-			c.JSON(400, gin.H{"error": "Stripe is not configured. Set STRIPE_SECRET_KEY environment variable."})
+			badRequestMsg(c, "Stripe is not configured. Set STRIPE_SECRET_KEY environment variable.")
 			return
 		}
 
 		orgID := c.GetString("org_id")
 		if orgID == "" {
-			c.JSON(400, gin.H{"error": "organization ID required"})
+			badRequestMsg(c, "organization ID required")
 			return
 		}
 
@@ -115,13 +115,13 @@ func CreateCheckoutSession(store *storage.Store, frontendBaseURL string) gin.Han
 
 		org, err := store.GetOrganization(orgID)
 		if err != nil || org == nil {
-			c.JSON(404, gin.H{"error": "organization not found"})
+			notFound(c, "organization not found")
 			return
 		}
 
 		priceID := getPlanPriceID(req.PlanName, req.BillingCycle)
 		if priceID == "" {
-			c.JSON(400, gin.H{"error": "Stripe price not configured. Set STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PRO_YEARLY, etc."})
+			badRequestMsg(c, "Stripe price not configured. Set STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PRO_YEARLY, etc.")
 			return
 		}
 
@@ -145,7 +145,7 @@ func CreateCheckoutSession(store *storage.Store, frontendBaseURL string) gin.Han
 			}
 			cust, err := customer.New(params)
 			if err != nil {
-				c.JSON(500, gin.H{"error": fmt.Sprintf("failed to create Stripe customer: %v", err)})
+				internalError(c)
 				return
 			}
 			customerID = cust.ID
@@ -181,7 +181,7 @@ func CreateCheckoutSession(store *storage.Store, frontendBaseURL string) gin.Han
 
 		sess, err := stripecheckout.New(params)
 		if err != nil {
-			c.JSON(500, gin.H{"error": fmt.Sprintf("failed to create checkout session: %v", err)})
+			internalError(c)
 			return
 		}
 
@@ -194,19 +194,19 @@ func CreateCheckoutSession(store *storage.Store, frontendBaseURL string) gin.Han
 func CreatePortalSession(store *storage.Store, frontendBaseURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !stripeEnabled {
-			c.JSON(400, gin.H{"error": "Stripe is not configured"})
+			badRequestMsg(c, "Stripe is not configured")
 			return
 		}
 
 		orgID := getOrgID(c)
 		if orgID == "" {
-			c.JSON(400, gin.H{"error": "organization ID required"})
+			badRequestMsg(c, "organization ID required")
 			return
 		}
 
 		subscr, err := store.GetSubscriptionByOrg(orgID)
 		if err != nil || subscr == nil || subscr.StripeCustomerID == "" {
-			c.JSON(404, gin.H{"error": "no billing account found. Subscribe to a paid plan first."})
+			notFound(c, "no billing account found. Subscribe to a paid plan first.")
 			return
 		}
 
@@ -221,7 +221,7 @@ func CreatePortalSession(store *storage.Store, frontendBaseURL string) gin.Handl
 		}
 		sess, err := session.New(params)
 		if err != nil {
-			c.JSON(500, gin.H{"error": fmt.Sprintf("failed to create portal session: %v", err)})
+			internalError(c)
 			return
 		}
 
@@ -234,13 +234,13 @@ func CreatePortalSession(store *storage.Store, frontendBaseURL string) gin.Handl
 func HandleStripeWebhook(store *storage.Store, webhookSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !stripeEnabled {
-			c.JSON(400, gin.H{"error": "Stripe is not configured"})
+			badRequestMsg(c, "Stripe is not configured")
 			return
 		}
 
 		payload, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			c.JSON(400, gin.H{"error": "failed to read body"})
+			badRequestMsg(c, "failed to read body")
 			return
 		}
 
@@ -249,12 +249,12 @@ func HandleStripeWebhook(store *storage.Store, webhookSecret string) gin.Handler
 		if webhookSecret != "" {
 			event, err = stripewebhook.ConstructEvent(payload, sigHeader, webhookSecret)
 			if err != nil {
-				c.JSON(400, gin.H{"error": fmt.Sprintf("webhook signature verification failed: %v", err)})
+				badRequestMsg(c, fmt.Sprintf("webhook signature verification failed: %v", err))
 				return
 			}
 		} else {
 			if err := json.Unmarshal(payload, &event); err != nil {
-				c.JSON(400, gin.H{"error": "invalid JSON"})
+				invalidJSON(c)
 				return
 			}
 		}
@@ -432,7 +432,7 @@ func ListSubscriptions(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		subs, err := store.ListSubscriptions()
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			internalError(c)
 			return
 		}
 		if subs == nil {

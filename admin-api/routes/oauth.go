@@ -50,7 +50,7 @@ func ListOAuthProviders(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		providers, err := store.ListOAuthProviders()
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to list providers"})
+			internalError(c)
 			return
 		}
 		// Strip secrets for list response
@@ -78,7 +78,7 @@ func GetOAuthProvider(store *storage.Store) gin.HandlerFunc {
 		provider := c.Param("provider")
 		p, err := store.GetOAuthProvider(provider)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "provider not found"})
+			notFound(c, "provider not found")
 			return
 		}
 		c.JSON(200, p)
@@ -101,7 +101,7 @@ func CreateOAuthProvider(store *storage.Store) gin.HandlerFunc {
 			Enabled          bool   `json:"enabled"`
 		}
 		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			badRequestMsg(c, err.Error())
 			return
 		}
 		p := &storage.OAuthProviderModel{
@@ -118,7 +118,7 @@ func CreateOAuthProvider(store *storage.Store) gin.HandlerFunc {
 		}
 		created, err := store.CreateOAuthProvider(p)
 		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			badRequestMsg(c, err.Error())
 			return
 		}
 		c.JSON(201, created)
@@ -141,7 +141,7 @@ func UpdateOAuthProvider(store *storage.Store) gin.HandlerFunc {
 			Enabled          bool   `json:"enabled"`
 		}
 		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			badRequestMsg(c, err.Error())
 			return
 		}
 		p := &storage.OAuthProviderModel{
@@ -157,7 +157,7 @@ func UpdateOAuthProvider(store *storage.Store) gin.HandlerFunc {
 		}
 		updated, err := store.UpdateOAuthProvider(provider, p)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "provider not found"})
+			notFound(c, "provider not found")
 			return
 		}
 		c.JSON(200, updated)
@@ -169,7 +169,7 @@ func DeleteOAuthProvider(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		provider := c.Param("provider")
 		if err := store.DeleteOAuthProvider(provider); err != nil {
-			c.JSON(404, gin.H{"error": "provider not found"})
+			notFound(c, "provider not found")
 			return
 		}
 		c.Status(204)
@@ -192,14 +192,14 @@ func InitiateOAuth(store *storage.Store) gin.HandlerFunc {
 		).Scan(&p.Provider, &p.ClientID, &p.ClientSecret, &p.AuthURL,
 			&p.TokenURL, &p.UserInfoURL, &p.Scopes, &p.Enabled)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "provider not found or disabled"})
+			notFound(c, "provider not found or disabled")
 			return
 		}
 
 		// Generate state (CSRF token)
 		stateBytes := make([]byte, 32)
 		if _, err := rand.Read(stateBytes); err != nil {
-			c.JSON(500, gin.H{"error": "failed to generate state"})
+			internalError(c)
 			return
 		}
 		state := base64.URLEncoding.EncodeToString(stateBytes)
@@ -212,7 +212,7 @@ func InitiateOAuth(store *storage.Store) gin.HandlerFunc {
 			SET provider=$2, redirect_uri=$3, expires_at=$4`,
 			state, provider, redirectURI, expiresAt)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to store state"})
+			internalError(c)
 			return
 		}
 
@@ -250,12 +250,12 @@ func HandleOAuthCallback(store *storage.Store, jwtSecret string) gin.HandlerFunc
 		db := store.DB()
 
 		if errorParam != "" {
-			c.JSON(400, gin.H{"error": "oauth_error", "description": errorParam})
+			badRequestWithDetails(c, "oauth_error", errorParam)
 			return
 		}
 
 		if code == "" || state == "" {
-			c.JSON(400, gin.H{"error": "missing code or state"})
+			badRequestMsg(c, "missing code or state")
 			return
 		}
 
@@ -266,11 +266,11 @@ func HandleOAuthCallback(store *storage.Store, jwtSecret string) gin.HandlerFunc
 			FROM oauth_states WHERE state = $1`, state,
 		).Scan(&storedState.State, &storedState.Provider, &storedState.RedirectURI, &storedState.ExpiresAt)
 		if err != nil || storedState.Provider != provider {
-			c.JSON(400, gin.H{"error": "invalid state"})
+			badRequestMsg(c, "invalid state")
 			return
 		}
 		if time.Now().After(storedState.ExpiresAt) {
-			c.JSON(400, gin.H{"error": "state expired"})
+			badRequestMsg(c, "state expired")
 			return
 		}
 
@@ -284,7 +284,7 @@ func HandleOAuthCallback(store *storage.Store, jwtSecret string) gin.HandlerFunc
 			FROM oauth_providers WHERE provider = $1 AND enabled = true`, provider,
 		).Scan(&p.Provider, &p.ClientID, &p.ClientSecret, &p.TokenURL, &p.UserInfoURL)
 		if err != nil {
-			c.JSON(404, gin.H{"error": "provider not found"})
+			notFound(c, "provider not found")
 			return
 		}
 
@@ -292,28 +292,28 @@ func HandleOAuthCallback(store *storage.Store, jwtSecret string) gin.HandlerFunc
 		callbackURL := getOAuthCallbackURL(c, provider)
 		tokenData, err := exchangeCodeForToken(p, code, callbackURL)
 		if err != nil {
-			c.JSON(502, gin.H{"error": "token exchange failed", "details": err.Error()})
+			badGateway(c, "token exchange failed", err.Error())
 			return
 		}
 
 		// Fetch user info
 		userInfo, err := fetchUserInfo(p, tokenData.AccessToken)
 		if err != nil {
-			c.JSON(502, gin.H{"error": "failed to fetch user info", "details": err.Error()})
+			badGateway(c, "failed to fetch user info", err.Error())
 			return
 		}
 
 		// Find or create user
 		user, err := store.GetOrCreateOAuthUser(provider, userInfo.Subject, userInfo.Email, userInfo.Name)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to provision user", "details": err.Error()})
+			internalError(c)
 			return
 		}
 
 		// Generate JWT
 		token, err := generateOAuthJWT(user, jwtSecret)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to generate token"})
+			internalError(c)
 			return
 		}
 
