@@ -296,6 +296,7 @@ export interface Subscription {
 
 export const getPlans = () => analyticsClient.get<Plan[]>('/billing/plans').then(r => r.data)
 export const getSubscription = () => analyticsClient.get<Subscription>('/billing/subscription').then(r => r.data)
+export const getUsage = () => analyticsClient.get<{org_id: string; plan: string; used: number; limit: number; percent_used: number; reset_at: string}>('/billing/usage').then(r => r.data)
 export const createCheckoutSession = (planName: string, billingCycle: string) =>
   analyticsClient.post<{ url: string }>('/billing/checkout', { plan_name: planName, billing_cycle: billingCycle }).then(r => r.data)
 export const createPortalSession = () =>

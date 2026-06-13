@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Card, Row, Col, Tag, Button, Space, Modal, Radio, message, Spin, Divider, Alert } from 'antd'
+import { Card, Row, Col, Tag, Button, Space, Modal, Radio, message, Spin, Divider, Alert, Progress } from 'antd'
 import { CreditCardOutlined, TeamOutlined, AppstoreOutlined, DollarOutlined } from '@ant-design/icons'
-import { getPlans, getSubscription, createCheckoutSession, createPortalSession, Plan, Subscription } from '../api/kong'
+import { getPlans, getSubscription, createCheckoutSession, createPortalSession, getUsage, Plan, Subscription } from '../api/kong'
 
 function formatPrice(cents: number): string {
   if (cents === 0) return '免費'
@@ -70,13 +70,15 @@ export default function BillingPortal() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [usage, setUsage] = useState<{used: number; limit: number; percent_used: number; reset_at: string} | null>(null)
 
   const load = async () => {
     setLoading(true)
     try {
-      const [p, s] = await Promise.all([getPlans(), getSubscription()])
+      const [p, s, u] = await Promise.all([getPlans(), getSubscription(), getUsage()])
       setPlans(p)
       setSubscription(s)
+      setUsage(u)
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } }
       message.error(err?.response?.data?.error || '載入方案失敗')
@@ -173,6 +175,32 @@ export default function BillingPortal() {
           showIcon
           style={{ marginBottom: 16 }}
         />
+      )}
+
+      {usage && usage.limit > 0 && (
+        <Card style={{ marginBottom: 24, background: 'var(--secondary)', border: 'none' }}>
+          <div style={{ marginBottom: 8 }}>
+            <Space style={{ float: 'right' }}>
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>
+                {new Date(usage.reset_at).toLocaleDateString('zh-TW')} 重置
+              </span>
+            </Space>
+            <span style={{ fontWeight: 600 }}>本月 API 使用量</span>
+          </div>
+          <Progress
+            percent={Math.min(usage.percent_used, 100)}
+            format={() => `${usage.used.toLocaleString()} / ${usage.limit.toLocaleString()}`}
+            strokeColor={usage.percent_used >= 90 ? '#ff4d4f' : usage.percent_used >= 75 ? '#faad14' : '#1677ff'}
+          />
+          {usage.percent_used >= 80 && (
+            <Alert
+              message={`您已使用本月配額的 ${usage.percent_used.toFixed(1)}%，建議升級以避免限流`}
+              type="warning"
+              showIcon
+              style={{ marginTop: 8 }}
+            />
+          )}
+        </Card>
       )}
 
       <Row gutter={[16, 16]}>
