@@ -2,6 +2,14 @@
 
 ## ✅ 已完成
 
+- [x] **Cont gRPC Protocol Support（gRPC Service CRUD + gRPC-Web Proxy）** — commit `964d60d7` + `25644b50`
+  - Backend: `GET/POST /grpc-services` List/Create, `GET/PUT/PATCH/DELETE /grpc-services/:id` Read/Update/Delete, nested `GET/POST/DELETE /grpc-services/:id/methods` — 完整 CRUD
+  - Backend: `UpdateGrpcService` bug fix — previously returned only `updated_at`, now returns all fields (id/name/package/proto_file/upstream_id/enabled/org_id) like other CRUD methods
+  - Frontend: `GrpcServices.tsx` — 列表/建立/編輯/刪除 gRPC service + methods drawer（完整 UI）
+  - kong.ts: `listGrpcServices/getGrpcService/createGrpcService/updateGrpcService/deleteGrpcService/listGrpcMethods/createGrpcMethod/deleteGrpcMethod` 全部實作
+  - Proxy: `access.lua` gRPC-Web content-type detection (`application/grpc-web`, `application/grpc-web+proto`)，`nginx.conf` 轉發 `X-GRPC-Web` header 讓 upstream 可偵測 gRPC-Web 呼叫
+  - QA: Create→201 ✅, List→200 ✅, Read→200 ✅, PATCH→200 ✅, Delete→204 ✅, Unauthorized→401 ✅, gRPC Methods CRUD ✅
+
 - [x] **Cont Plugin Management System** — 動態啟用/停用/設定 Plugin
   - Backend: `GET /internal/plugins` — 無認證，返回所有 enabled plugins（stripped for proxy）
   - Proxy: `worker.lua` 每10s 呼叫 `/__cont_api_internal__/internal/plugins` 同步 `_G.cont.plugins`
@@ -328,13 +336,6 @@
   - 驗證：觸發一條 alert rule → AlertHistory 出現記錄 + SSE 通知前端
 
 ## 🟡 預計優化
-
-- [ ] **Cont gRPC Protocol Support** — Cont 目前只支援 REST API 管理 Kong，gRPC 是現代微服務主流通訊協議
-  - Backend: 新增 `GET/PUT /grpc-services` (gRPC service mapping)、`POST /grpc-services/:id/methods` (method-level routing)
-  - Frontend: 新增 gRPC Services 頁面（列表/建立/編輯/刪除 gRPC service + method routes）
-  - Proxy: `access.lua` 新增 gRPC-Web 支援（HTTP/2 + protobuf content-type detection）
-  - kong.ts: 新增 gRPC service CRUD API functions
-  - QA: Create→Read→Update→Delete gRPC services, gRPC-Web request → proxy pass ✅
 
 - [ ] **Cont Circuit Breaker Plugin** — Kong upstream 健康狀態驅動的熔斷器，防止連鎖故障
   - Proxy Lua plugin: `cont/plugins/circuit-breaker/handler.lua`
