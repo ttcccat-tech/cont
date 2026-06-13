@@ -1872,6 +1872,35 @@ func (s *Store) DeleteAlertRule(id string) error {
 	return err
 }
 
+// ── Alert History ──────────────────────────────────────────────────────────
+
+func (s *Store) ListAlertHistory(limit, offset int) ([]AlertHistory, error) {
+	rows, err := s.db.Query(
+		`SELECT id, rule_id, rule_name, org_id, metric_type, operator, threshold, actual_value, triggered_at, COALESCE(message,'')
+		 FROM alert_history ORDER BY triggered_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var history []AlertHistory
+	for rows.Next() {
+		var h AlertHistory
+		if err := rows.Scan(&h.ID, &h.RuleID, &h.RuleName, &h.OrgID, &h.MetricType, &h.Operator, &h.Threshold, &h.ActualValue, &h.TriggeredAt, &h.Message); err != nil {
+			return nil, err
+		}
+		history = append(history, h)
+	}
+	return history, rows.Err()
+}
+
+func (s *Store) CreateAlertHistory(h *AlertHistory) error {
+	row := s.db.QueryRow(
+		`INSERT INTO alert_history(rule_id, rule_name, org_id, metric_type, operator, threshold, actual_value, message)
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, triggered_at`,
+		h.RuleID, h.RuleName, h.OrgID, h.MetricType, h.Operator, h.Threshold, h.ActualValue, h.Message)
+	return row.Scan(&h.ID, &h.TriggeredAt)
+}
+
 // ── API Key Requests ───────────────────────────────────────────────────────
 
 func (s *Store) ListAPIKeyRequests() ([]APIKeyRequest, error) {

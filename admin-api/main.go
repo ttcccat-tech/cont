@@ -262,6 +262,7 @@ func main() {
 			alerts.PUT("/rules/:id", routes.UpdateAlertRule(store))
 			alerts.PATCH("/rules/:id", routes.UpdateAlertRule(store))
 			alerts.DELETE("/rules/:id", routes.DeleteAlertRule(store))
+			alerts.GET("/history", routes.ListAlertHistory(store))
 		}
 
 		// API Key Requests

@@ -15,6 +15,7 @@ import AuditLog from './pages/AuditLog'
 import ConfigVersioning from './pages/ConfigVersioning'
 import HealthPortal from './pages/HealthPortal'
 import AlertRules from './pages/AlertRules'
+import AlertHistory from './pages/AlertHistory'
 import ApiKeyRequests from './pages/ApiKeyRequests'
 import ApiDocs from './pages/ApiDocs'
 import Upstreams from './pages/Upstreams'
@@ -117,6 +118,7 @@ export default function App() {
                   <Route path="/config-versioning" element={<ConfigVersioning />} />
                   <Route path="/health-portal" element={<HealthPortal />} />
                   <Route path="/alerts" element={<AlertRules />} />
+                  <Route path="/alert-history" element={<AlertHistory />} />
                   <Route path="/api-key-requests" element={<ApiKeyRequests />} />
                   <Route path="/api-docs" element={<ApiDocs />} />
                   <Route path="/users" element={<Users />} />

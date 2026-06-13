@@ -2812,6 +2812,36 @@ func DeleteAlertRule(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// ── Alert History ──────────────────────────────────────────────────────────
+
+type AlertHistoryResponse struct {
+	History []storage.AlertHistory `json:"history"`
+	Total   int                    `json:"total"`
+}
+
+func ListAlertHistory(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		limit := 50
+		offset := 0
+		if l := c.Query("limit"); l != "" {
+			if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 200 {
+				limit = parsed
+			}
+		}
+		if o := c.Query("offset"); o != "" {
+			if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+				offset = parsed
+			}
+		}
+		history, err := store.ListAlertHistory(limit, offset)
+		if err != nil {
+			log.Printf("[alert_history] list failed: %v", err)
+			history = []storage.AlertHistory{}
+		}
+		c.JSON(200, AlertHistoryResponse{History: history, Total: len(history)})
+	}
+}
+
 // ── API Key Requests ────────────────────────────────────────────────────────
 
 type UpdateAPIKeyReq struct {

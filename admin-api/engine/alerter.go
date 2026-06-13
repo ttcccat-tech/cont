@@ -261,6 +261,21 @@ func (a *Alerter) fireAlert(rule *storage.AlertRule, currentValue float64) {
 		log.Printf("[alerter] failed to update triggered state for rule %d: %v", rule.ID, err)
 	}
 
+	// Persist alert history record
+	history := &storage.AlertHistory{
+		RuleID:      rule.ID,
+		RuleName:    rule.Name,
+		OrgID:       "", // alerter runs globally, org_id is set per-rule if needed
+		MetricType:  rule.MetricType,
+		Operator:    rule.Operator,
+		Threshold:   rule.ThresholdValue,
+		ActualValue: currentValue,
+		Message:     fmt.Sprintf("Alert rule '%s' triggered: %s %s %f (actual: %f)", rule.Name, rule.MetricType, rule.Operator, rule.ThresholdValue, currentValue),
+	}
+	if err := a.store.CreateAlertHistory(history); err != nil {
+		log.Printf("[alerter] failed to create alert history for rule %d: %v", rule.ID, err)
+	}
+
 	// Update last fired timestamp
 	a.mu.Lock()
 	a.lastFiredAt[rule.ID] = time.Now()

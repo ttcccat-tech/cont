@@ -216,6 +216,22 @@ func RunMigrations(db *sql.DB) error {
 			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
 
+		// Alert History
+		`CREATE TABLE IF NOT EXISTS alert_history (
+			id SERIAL PRIMARY KEY,
+			rule_id INTEGER REFERENCES alert_rules(id) ON DELETE CASCADE,
+			rule_name TEXT NOT NULL,
+			org_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+			metric_type TEXT NOT NULL,
+			operator TEXT NOT NULL,
+			threshold REAL NOT NULL,
+			actual_value REAL NOT NULL,
+			triggered_at TIMESTAMPTZ DEFAULT NOW(),
+			message TEXT
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_alert_history_rule_id ON alert_history(rule_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_alert_history_triggered_at ON alert_history(triggered_at DESC)`,
+
 		// API Key Requests
 		`CREATE TABLE IF NOT EXISTS api_key_requests (
 			id SERIAL PRIMARY KEY,

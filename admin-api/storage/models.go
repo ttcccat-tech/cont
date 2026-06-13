@@ -77,6 +77,21 @@ type AlertRule struct {
 	UpdatedAt           string  `json:"updated_at,omitempty"`
 }
 
+// ── Alert History ──────────────────────────────────────────────────────────
+
+type AlertHistory struct {
+	ID         int64   `json:"id"`
+	RuleID     int64   `json:"rule_id"`
+	RuleName   string  `json:"rule_name"`
+	OrgID      string  `json:"org_id"`
+	MetricType string  `json:"metric_type"`
+	Operator   string  `json:"operator"`
+	Threshold  float64 `json:"threshold"`
+	ActualValue float64 `json:"actual_value"`
+	TriggeredAt string `json:"triggered_at"`
+	Message    string  `json:"message,omitempty"`
+}
+
 // ── API Key Requests ───────────────────────────────────────────────────────
 
 type APIKeyRequest struct {
