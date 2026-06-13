@@ -329,6 +329,12 @@
   - Frontend: AlertRules.tsx — `alert_triggered` SSE handler 需呼叫 `fetchRules()` 真正更新 state；AlertHistory.tsx — SSE 監聽 + 即時 prepend 觸發記錄到列表
   - 驗證：觸發一條 alert rule → AlertRules.tsx 的「最近觸發」應在 30s 內更新、AlertHistory.tsx 應即時出現新列
 
+- [x] **Cont AlertRules.tsx SSE 即時更新 + AlertHistory 聯動** — commit `28cccd5b`
+  - AlertRules.tsx: `fetchRulesRef` stable ref 避免 SSE handler stale closure，`alert_triggered` 事件觸發 `fetchRulesRef.current()` 真正刷新列表
+  - AlertHistory.tsx: 新增 SSE `alert_triggered` 監聽，即時 prepend 觸發記錄到列表頂端，並 toast 通知使用者
+  - Backend: `/alerts/rules` 回傳 `last_triggered_at`/`last_triggered_value` 驗證 ✅，DB 直接寫入後 API 正確回傳
+  - QA: 手動設定 `last_triggered_at` → GET /alerts/rules 出現欄位 ✅，前端 build ✅
+
 - [ ] **Cont Admin API 分散式追蹤（OpenTelemetry / Traces）** — Cont 目前無分散式追蹤，AlertEngine/Proxy 請求無關聯 ID
   - Backend: 注入 `trace_id` 到 context，log.Printf 輸出 trace_id，AlertEngine fireAlert 寫入 trace_id
   - Proxy: access.lua 生成或傳遞 `X-Cont-Trace-ID` header
