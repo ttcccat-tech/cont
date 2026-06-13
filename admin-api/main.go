@@ -86,14 +86,15 @@ func main() {
 		auth.PUT("/notifications/:id/read", routes.AuthRequired(jwtSecret), routes.MarkNotificationRead(store))
 		auth.PUT("/notifications/read-all", routes.AuthRequired(jwtSecret), routes.MarkAllNotificationsRead(store))
 		auth.GET("/notifications/unread-count", routes.AuthRequired(jwtSecret), routes.CountUnreadNotifications(store))
-	// OAuth2/OIDC SSO
-	auth.GET("/oauth/providers", routes.ListOAuthProviders(store))
-	auth.GET("/oauth/providers/:provider", routes.GetOAuthProvider(store))
-	auth.POST("/oauth/providers", routes.CreateOAuthProvider(store))
-	auth.PUT("/oauth/providers/:provider", routes.UpdateOAuthProvider(store))
-	auth.DELETE("/oauth/providers/:provider", routes.DeleteOAuthProvider(store))
-	auth.GET("/:provider", routes.InitiateOAuth(store))
-	auth.GET("/:provider/callback", routes.HandleOAuthCallback(store, jwtSecret))
+
+		// OAuth2/OIDC SSO — must be before /:provider wildcard
+		auth.GET("/oauth/providers", routes.ListOAuthProviders(store))
+		auth.GET("/oauth/providers/:provider", routes.GetOAuthProvider(store))
+		auth.POST("/oauth/providers", routes.CreateOAuthProvider(store))
+		auth.PUT("/oauth/providers/:provider", routes.UpdateOAuthProvider(store))
+		auth.DELETE("/oauth/providers/:provider", routes.DeleteOAuthProvider(store))
+		auth.GET("/oauth/:provider", routes.InitiateOAuth(store))
+		auth.GET("/oauth/:provider/callback", routes.HandleOAuthCallback(store, jwtSecret))
 	}
 
 	// Internal endpoint for proxy auth validation (public, no auth)
