@@ -1,14 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Switch, message, Popconfirm, Tooltip, Row, Col } from 'antd'
-import { ReloadOutlined, PlusOutlined, EditOutlined, DeleteOutlined, BellOutlined } from '@ant-design/icons'
+import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Switch, message, Popconfirm, Tooltip, Row, Col, Divider } from 'antd'
+import { ReloadOutlined, PlusOutlined, EditOutlined, DeleteOutlined, BellOutlined, HistoryOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+
+interface Condition {
+  metric_type: 'error_rate' | 'latency'
+  service_name: string
+  threshold_value: number
+  operator: '>' | '<' | '>=' | '<=' | '=='
+  logic: 'AND' | 'OR'
+}
 
 interface AlertRule {
   id: number
   name: string
   description: string
+  conditions: Condition[]
   metric_type: 'error_rate' | 'latency'
   service_name: string
   threshold_value: number
@@ -94,8 +103,18 @@ export default function AlertRulesPage() {
 
   const openEdit = (r: AlertRule) => {
     setEditingRule(r)
+    const conditions = r.conditions && r.conditions.length > 0
+      ? r.conditions
+      : [{
+          metric_type: r.metric_type || 'error_rate',
+          service_name: r.service_name || '',
+          threshold_value: r.threshold_value || 0,
+          operator: r.operator || '>',
+          logic: 'AND',
+        }]
     form.setFieldsValue({
       ...r,
+      conditions,
       notification_channels: Array.isArray(r.notification_channels)
         ? r.notification_channels
         : (r.notification_channels ? r.notification_channels.split(',') : []),
@@ -108,6 +127,26 @@ export default function AlertRulesPage() {
       const values = await form.validateFields()
       values.notification_channels = (values.notification_channels || []).join(',')
       values.enabled = !!values.enabled
+      // Build conditions array from flat fields or use existing conditions
+      if (values.conditions && values.conditions.length > 0) {
+        // Normalize each condition
+        values.conditions = values.conditions.map((c: Condition, idx: number) => ({
+          metric_type: c.metric_type || 'error_rate',
+          service_name: c.service_name || '',
+          threshold_value: c.threshold_value ?? 0,
+          operator: c.operator || '>',
+          logic: idx === 0 ? 'AND' : (c.logic || 'AND'),
+        }))
+      } else {
+        // Fallback: single condition from flat fields
+        values.conditions = [{
+          metric_type: values.metric_type || 'error_rate',
+          service_name: values.service_name || '',
+          threshold_value: values.threshold_value ?? 0,
+          operator: values.operator || '>',
+          logic: 'AND',
+        }]
+      }
       if (editingRule) {
         await apiFetch(`/alerts/rules/${editingRule.id}`, { method: 'PUT', body: JSON.stringify(values) })
         message.success('規則已更新')
@@ -165,10 +204,17 @@ export default function AlertRulesPage() {
     {
       title: '條件',
       key: 'condition',
-      width: 160,
-      render: (_, r) => (
-        <span>{r.threshold_value}{r.metric_type === 'error_rate' ? '%' : 'ms'} {r.operator}</span>
-      ),
+      width: 200,
+      render: (_, r) => {
+        if (r.conditions && r.conditions.length > 0) {
+          const parts = r.conditions.map((c, i) => {
+            const logic = i === 0 ? '' : ` ${c.logic} `
+            return `${logic}${c.metric_type === 'error_rate' ? '錯誤率' : '延遲'} ${c.operator} ${c.threshold_value}`
+          })
+          return <Tooltip title={r.conditions.map(c => `${c.metric_type} ${c.operator} ${c.threshold_value} (${c.service_name})`).join(', ')}><span>{r.conditions.length} 條件</span></Tooltip>
+        }
+        return <span>{r.threshold_value}{r.metric_type === 'error_rate' ? '%' : 'ms'} {r.operator}</span>
+      },
     },
     {
       title: '持續時間',
@@ -237,6 +283,7 @@ export default function AlertRulesPage() {
         title={<><BellOutlined /> 告警規則</>}
         extra={
           <Space>
+            <Button icon={<HistoryOutlined />} onClick={() => window.location.href = '/alert-history'}>歷史</Button>
             <Button icon={<ReloadOutlined />} onClick={fetchRules} loading={loading}>刷新</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增規則</Button>
           </Space>
@@ -257,7 +304,7 @@ export default function AlertRulesPage() {
         open={modalOpen}
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
-        width={600}
+        width={700}
         okText="儲存"
         cancelText="取消"
       >
@@ -279,30 +326,76 @@ export default function AlertRulesPage() {
             <Input.TextArea rows={2} placeholder="規則用途說明..." />
           </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item name="metric_type" label="指標類型" rules={[{ required: true }]} initialValue="error_rate">
-                <Select options={metricOptions} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="service_name" label="服務名稱" rules={[{ required: true, message: '必填' }]}>
-                <Input placeholder="例如: httpbin-service" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="threshold_value" label="閾值" rules={[{ required: true, message: '必填' }]}>
-                <InputNumber style={{ width: '100%' }} placeholder="5" min={0} />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Divider>條件設定</Divider>
+
+          <Form.List name="conditions">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map(({ key, name, ...rest }, idx) => (
+                  <Card key={key} size="small" style={{ marginBottom: 12, background: 'var(--secondary)' }}>
+                    <Row gutter={8} align="middle">
+                      <Col>
+                        <Tag color={idx === 0 ? 'default' : 'blue'} style={{ marginBottom: 0 }}>
+                          {idx === 0 ? '第一條件' : `結合 #${idx + 1}`}
+                        </Tag>
+                      </Col>
+                      {idx > 0 && (
+                        <Col>
+                          <Form.Item {...rest} name={[name, 'logic']} initialValue="AND" style={{ marginBottom: 0 }}>
+                            <Select style={{ width: 80 }} options={[
+                              { value: 'AND', label: 'AND' },
+                              { value: 'OR', label: 'OR' },
+                            ]} />
+                          </Form.Item>
+                        </Col>
+                      )}
+                      <Col flex="auto" />
+                      {idx > 0 && (
+                        <Col>
+                          <Button type="text" danger size="small" onClick={() => remove(name)}>移除</Button>
+                        </Col>
+                      )}
+                    </Row>
+                    <Row gutter={8}>
+                      <Col span={7}>
+                        <Form.Item {...rest} name={[name, 'metric_type']} label="指標" rules={[{ required: true }]} initialValue="error_rate" style={{ marginBottom: 0 }}>
+                          <Select options={metricOptions} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={7}>
+                        <Form.Item {...rest} name={[name, 'service_name']} label="服務名稱" rules={[{ required: true }]} style={{ marginBottom: 0 }}>
+                          <Input placeholder="httpbin-service" />
+                        </Form.Item>
+                      </Col>
+                      <Col span={5}>
+                        <Form.Item {...rest} name={[name, 'operator']} label="比較" rules={[{ required: true }]} initialValue=">" style={{ marginBottom: 0 }}>
+                          <Select options={operatorOptions} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={5}>
+                        <Form.Item {...rest} name={[name, 'threshold_value']} label="閾值" rules={[{ required: true }]} style={{ marginBottom: 0 }}>
+                          <InputNumber style={{ width: '100%' }} min={0} placeholder="5" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  </Card>
+                ))}
+                <Button type="dashed" onClick={() => add({
+                  metric_type: 'error_rate',
+                  service_name: '',
+                  threshold_value: 0,
+                  operator: '>',
+                  logic: 'AND',
+                })} block style={{ marginBottom: 16 }}>
+                  + 新增條件
+                </Button>
+              </>
+            )}
+          </Form.List>
+
+          <Divider>通知設定</Divider>
 
           <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item name="operator" label="比較運算" rules={[{ required: true }]} initialValue=">">
-                <Select options={operatorOptions} />
-              </Form.Item>
-            </Col>
             <Col span={8}>
               <Form.Item name="duration_seconds" label="持續秒數" initialValue={60}>
                 <InputNumber style={{ width: '100%' }} min={1} placeholder="60" />
@@ -313,15 +406,16 @@ export default function AlertRulesPage() {
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="300" />
               </Form.Item>
             </Col>
+            <Col span={8}>
+              <Form.Item name="notification_channels" label="通知頻道" initialValue={['slack']}>
+                <Select mode="multiple" placeholder="選擇通知方式" options={[
+                  { value: 'slack', label: 'Slack' },
+                  { value: 'email', label: 'Email' },
+                  { value: 'discord', label: 'Discord' },
+                ]} />
+              </Form.Item>
+            </Col>
           </Row>
-
-          <Form.Item name="notification_channels" label="通知頻道" initialValue={['slack']}>
-            <Select mode="multiple" placeholder="選擇通知方式" options={[
-              { value: 'slack', label: 'Slack' },
-              { value: 'email', label: 'Email' },
-              { value: 'discord', label: 'Discord' },
-            ]} />
-          </Form.Item>
 
           <Form.Item name="slack_webhook_url" label="Slack Webhook URL">
             <Input placeholder="https://hooks.slack.com/services/..." />
