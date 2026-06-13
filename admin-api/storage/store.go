@@ -2896,3 +2896,61 @@ func (s *Store) SeedGoogleOAuthProvider() error {
 	})
 	return err
 }
+
+// CreateNotification stores a notification record and broadcasts via SSE
+func (s *Store) CreateNotification(n *Notification) (*Notification, error) {
+	var id string
+	err := s.db.QueryRow(`INSERT INTO notifications(user_id, type, payload, read, created_at) VALUES($1, $2, $3, $4, NOW()) RETURNING id`,
+		n.UserID, n.Type, n.Payload, false).Scan(&id)
+	if err != nil {
+		return nil, err
+	}
+	n.ID = id
+	n.Read = false
+	payloadJSON, _ := json.Marshal(map[string]interface{}{
+		"id":         n.ID,
+		"type":       n.Type,
+		"user_id":    n.UserID,
+		"payload":    n.Payload,
+		"created_at": n.CreatedAt,
+	})
+	Hub.BroadcastToUser(n.UserID, n.Type, json.RawMessage(payloadJSON))
+	return n, nil
+}
+
+// ListNotifications returns notifications for a user (unread first)
+func (s *Store) ListNotifications(userID string, limit, offset int) ([]Notification, error) {
+	rows, err := s.db.Query(`SELECT id, user_id, type, payload, read, created_at FROM notifications WHERE user_id = $1 ORDER BY read ASC, created_at DESC LIMIT $2 OFFSET $3`, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var notifs []Notification
+	for rows.Next() {
+		var n Notification
+		if err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.Payload, &n.Read, &n.CreatedAt); err != nil {
+			return nil, err
+		}
+		notifs = append(notifs, n)
+	}
+	return notifs, nil
+}
+
+// MarkNotificationRead marks a notification as read
+func (s *Store) MarkNotificationRead(id, userID string) error {
+	_, err := s.db.Exec(`UPDATE notifications SET read = true WHERE id = $1 AND user_id = $2`, id, userID)
+	return err
+}
+
+// MarkAllNotificationsRead marks all notifications as read for a user
+func (s *Store) MarkAllNotificationsRead(userID string) error {
+	_, err := s.db.Exec(`UPDATE notifications SET read = true WHERE user_id = $1`, userID)
+	return err
+}
+
+// CountUnreadNotifications returns count of unread notifications
+func (s *Store) CountUnreadNotifications(userID string) (int, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read = false`, userID).Scan(&count)
+	return count, err
+}

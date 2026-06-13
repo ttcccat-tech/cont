@@ -80,6 +80,12 @@ func main() {
 		auth.POST("/password-reset/send", routes.SendOTP(store))
 		auth.POST("/password-reset/verify", routes.VerifyOTP(store, jwtSecret))
 		auth.GET("/me", routes.AuthRequired(jwtSecret), routes.GetMe(jwtSecret))
+		// Notifications SSE stream (auth required)
+		auth.GET("/events", routes.AuthRequired(jwtSecret), routes.SSEEvents(store))
+		auth.GET("/notifications", routes.AuthRequired(jwtSecret), routes.ListNotifications(store))
+		auth.PUT("/notifications/:id/read", routes.AuthRequired(jwtSecret), routes.MarkNotificationRead(store))
+		auth.PUT("/notifications/read-all", routes.AuthRequired(jwtSecret), routes.MarkAllNotificationsRead(store))
+		auth.GET("/notifications/unread-count", routes.AuthRequired(jwtSecret), routes.CountUnreadNotifications(store))
 	// OAuth2/OIDC SSO
 	auth.GET("/oauth/providers", routes.ListOAuthProviders(store))
 	auth.GET("/oauth/providers/:provider", routes.GetOAuthProvider(store))

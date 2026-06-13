@@ -401,6 +401,17 @@ type WorkerStatus struct {
 
 var StartTime = time.Now()
 
+// ── Notifications (SSE) ─────────────────────────────────────────────────────
+
+type Notification struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Type      string    `json:"type"`    // api_key_approved, api_key_rejected, subscription_updated, user_invited
+	Payload   string    `json:"payload"` // JSON string of event data
+	Read      bool      `json:"read"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ── Validation helpers ─────────────────────────────────────────────────────
 
 // SanitizeString trims whitespace and rejects control characters

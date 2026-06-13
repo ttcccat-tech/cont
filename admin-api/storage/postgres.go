@@ -425,6 +425,18 @@ func RunMigrations(db *sql.DB) error {
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_org ON subscriptions(org_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_sub ON subscriptions(stripe_subscription_id)`,
+
+		// Notifications (SSE event store)
+		`CREATE TABLE IF NOT EXISTS notifications (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL,
+			type TEXT NOT NULL,
+			payload TEXT DEFAULT '{}',
+			read BOOLEAN DEFAULT false,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {

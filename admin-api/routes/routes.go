@@ -2578,6 +2578,19 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 		})
 		// Send notification (non-blocking)
 		go SendAPIKeyApprovalNotification(store, existing, reviewerStr, "approved")
+		// Store notification in DB and broadcast via SSE
+		payloadJSON, _ := json.Marshal(map[string]interface{}{
+			"key_name":     existing.KeyName,
+			"consumer":     consumerName,
+			"status":       "approved",
+			"reviewed_by":  reviewerStr,
+			"generated_key": generatedKey,
+		})
+		go store.CreateNotification(&storage.Notification{
+			UserID:  existing.ApplicantUserID,
+			Type:    "api_key_approved",
+			Payload: string(payloadJSON),
+		})
 		c.JSON(200, updated)
 	}
 }
@@ -2619,6 +2632,19 @@ func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
 		})
 		// Send notification (non-blocking)
 		go SendAPIKeyApprovalNotification(store, existing, reviewerStr, "rejected")
+		// Store notification in DB and broadcast via SSE
+		payloadJSON, _ := json.Marshal(map[string]interface{}{
+			"key_name":    existing.KeyName,
+			"consumer":    existing.ConsumerName,
+			"status":      "rejected",
+			"reviewed_by": reviewerStr,
+			"reason":      existing.Reason,
+		})
+		go store.CreateNotification(&storage.Notification{
+			UserID:  existing.ApplicantUserID,
+			Type:    "api_key_rejected",
+			Payload: string(payloadJSON),
+		})
 		c.JSON(200, updated)
 	}
 }
@@ -2978,3 +3004,108 @@ func SendAPIKeyApprovalNotification(store *storage.Store, keyReq *storage.APIKey
 		notifyWebhook(emailURL, emailPayload)
 	}
 }
+
+// SSEEvents serves SSE stream for real-time notifications
+func SSEEvents(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		userIDStr, _ := userID.(string)
+
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+		c.Header("X-Accel-Buffering", "no")
+
+		clientID := fmt.Sprintf("%s-%d", userIDStr, time.Now().UnixNano())
+		clientChan := make(chan string, 256)
+		client := storage.SSEClient{
+			ID:     clientID,
+			UserID: userIDStr,
+			Chan:   clientChan,
+		}
+		storage.Hub.Register(client)
+		defer storage.Hub.Unregister(clientID)
+
+		// Send initial heartbeat
+		c.SSEvent("connected", map[string]string{"status": "connected"})
+		c.Writer.Flush()
+
+		heartbeat := time.NewTicker(30 * time.Second)
+		defer heartbeat.Stop()
+
+		clientGone := c.Request.Context().Done()
+		for {
+			select {
+			case <-clientGone:
+				return
+			case msg := <-clientChan:
+				fmt.Fprint(c.Writer, msg)
+				c.Writer.Flush()
+			case <-heartbeat.C:
+				c.SSEvent("heartbeat", map[string]int64{"ts": time.Now().Unix()})
+				c.Writer.Flush()
+			}
+		}
+	}
+}
+
+// ListNotifications lists notifications for the current user
+func ListNotifications(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		userIDStr, _ := userID.(string)
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+		offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+		notifs, err := store.ListNotifications(userIDStr, limit, offset)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		if notifs == nil {
+			notifs = []storage.Notification{}
+		}
+		c.JSON(200, notifs)
+	}
+}
+
+// MarkNotificationRead marks a notification as read
+func MarkNotificationRead(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		userIDStr, _ := userID.(string)
+		id := c.Param("id")
+		if err := store.MarkNotificationRead(id, userIDStr); err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok"})
+	}
+}
+
+// MarkAllNotificationsRead marks all notifications as read
+func MarkAllNotificationsRead(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		userIDStr, _ := userID.(string)
+		if err := store.MarkAllNotificationsRead(userIDStr); err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok"})
+	}
+}
+
+// CountUnreadNotifications returns count of unread notifications
+func CountUnreadNotifications(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		userIDStr, _ := userID.(string)
+		count, err := store.CountUnreadNotifications(userIDStr)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gin.H{"unread": count})
+	}
+}
+
