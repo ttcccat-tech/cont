@@ -71,6 +71,15 @@ export interface UpstreamHealth {
   enabled: boolean; targets: TargetHealth[]
 }
 
+export interface CircuitBreakerConfig {
+  upstream_id: string
+  enabled: boolean
+  trip_threshold: number
+  recovery_timeout: number
+  half_open_max_requests: number
+  half_open_success_rate: number
+}
+
 export interface KongService {
   id?: string; name: string; url?: string; host: string; port: number
   path?: string; protocol?: string; retries?: number; connect_timeout?: number
@@ -342,6 +351,12 @@ export const api = {
     analyticsClient.patch<KongTarget>(wsPrefix(`/upstreams/${upstreamId}/targets/${targetId}`), data).then(r => r.data),
   deleteUpstreamTarget: (upstreamId: string, targetId: string) =>
     analyticsClient.delete(wsPrefix(`/upstreams/${upstreamId}/targets/${targetId}`)),
+
+  // Circuit Breaker
+  getCircuitBreaker: (upstreamId: string) =>
+    analyticsClient.get<CircuitBreakerConfig>(wsPrefix(`/upstreams/${upstreamId}/circuit-breaker`)).then(r => r.data),
+  setCircuitBreaker: (upstreamId: string, data: Partial<CircuitBreakerConfig>) =>
+    analyticsClient.post<CircuitBreakerConfig>(wsPrefix(`/upstreams/${upstreamId}/circuit-breaker`), data).then(r => r.data),
 
   listServices: () => analyticsClient.get<KongService[]>(wsPrefix('/services')).then(r => r.data?.data ?? []),
   getService: (id: string) => analyticsClient.get<KongService>(wsPrefix(`/services/${id}`)).then(r => r.data),

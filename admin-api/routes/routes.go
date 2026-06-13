@@ -759,6 +759,136 @@ func GetUpstreamHealth(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// ── Circuit Breaker Config ──────────────────────────────────────────────────
+
+type CircuitBreakerConfigInput struct {
+	Enabled            *bool `json:"enabled"`
+	TripThreshold      *int  `json:"trip_threshold"`
+	RecoveryTimeout    *int  `json:"recovery_timeout"`
+	HalfOpenMaxRequests *int `json:"half_open_max_requests"`
+	HalfOpenSuccessRate *int `json:"half_open_success_rate"`
+}
+
+func GetCircuitBreakerConfig(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		upstreamID := c.Param("id")
+		orgID := getOrgID(c)
+		upstream, err := store.GetUpstream(upstreamID, orgID)
+		if err == sql.ErrNoRows {
+			notFound(c, "upstream not found")
+			return
+		}
+		if err != nil {
+			internalError(c)
+			return
+		}
+
+		ctx := context.Background()
+		cfg, err := store.Redis().GetCircuitBreakerConfig(ctx, upstreamID)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		if cfg == nil {
+			// Return defaults if not configured
+			cfg = &storage.CircuitBreakerConfig{
+				UpstreamID:          upstreamID,
+				Enabled:             false,
+				TripThreshold:       5,
+				RecoveryTimeout:     30,
+				HalfOpenMaxRequests: 3,
+				HalfOpenSuccessRate: 50,
+			}
+		}
+		c.JSON(200, cfg)
+	}
+}
+
+func SetCircuitBreakerConfig(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		upstreamID := c.Param("id")
+		orgID := getOrgID(c)
+		upstream, err := store.GetUpstream(upstreamID, orgID)
+		if err == sql.ErrNoRows {
+			notFound(c, "upstream not found")
+			return
+		}
+		if err != nil {
+			internalError(c)
+			return
+		}
+
+		var input CircuitBreakerConfigInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			badRequest(c, err)
+			return
+		}
+
+		ctx := context.Background()
+		// Get existing config to merge
+		existing, _ := store.Redis().GetCircuitBreakerConfig(ctx, upstreamID)
+		if existing == nil {
+			existing = &storage.CircuitBreakerConfig{UpstreamID: upstreamID}
+		}
+
+		if input.Enabled != nil {
+			existing.Enabled = *input.Enabled
+		}
+		if input.TripThreshold != nil {
+			if *input.TripThreshold < 1 {
+				badRequestMsg(c, "trip_threshold must be >= 1")
+				return
+			}
+			existing.TripThreshold = *input.TripThreshold
+		}
+		if input.RecoveryTimeout != nil {
+			if *input.RecoveryTimeout < 1 {
+				badRequestMsg(c, "recovery_timeout must be >= 1")
+				return
+			}
+			existing.RecoveryTimeout = *input.RecoveryTimeout
+		}
+		if input.HalfOpenMaxRequests != nil {
+			if *input.HalfOpenMaxRequests < 1 {
+				badRequestMsg(c, "half_open_max_requests must be >= 1")
+				return
+			}
+			existing.HalfOpenMaxRequests = *input.HalfOpenMaxRequests
+		}
+		if input.HalfOpenSuccessRate != nil {
+			if *input.HalfOpenSuccessRate < 0 || *input.HalfOpenSuccessRate > 100 {
+				badRequestMsg(c, "half_open_success_rate must be between 0 and 100")
+				return
+			}
+			existing.HalfOpenSuccessRate = *input.HalfOpenSuccessRate
+		}
+
+		if err := store.Redis().SetCircuitBreakerConfig(ctx, upstreamID, existing); err != nil {
+			internalError(c)
+			return
+		}
+		// Track this upstream in the set of CB-configured upstreams
+		store.Redis().TrackCircuitBreakerUpstream(ctx, upstreamID)
+
+		// Write audit log
+		auditLog(c, "circuit_breaker", "update", upstreamID, upstream.Name, "circuit breaker config updated")
+
+		c.JSON(200, existing)
+	}
+}
+
+func GetAllCircuitBreakerConfigs(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+		configs, err := store.Redis().GetAllCircuitBreakerConfigs(ctx)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gin.H{"circuit_breakers": configs})
+	}
+}
+
 // ── Targets ───────────────────────────────────────────────────────────────
 
 func ListTargets(store *storage.Store) gin.HandlerFunc {

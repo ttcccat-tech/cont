@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -294,4 +295,74 @@ func (r *Redis) GetPluginConfig(ctx context.Context, pluginID string) (string, e
 
 func (r *Redis) SetPluginConfig(ctx context.Context, pluginID string, config string) error {
 	return r.client.Set(ctx, "cont:plugin:"+pluginID, config, 0).Err()
+}
+
+// ── Circuit Breaker Config (synced to proxy shared memory via internal API) ──
+
+type CircuitBreakerConfig struct {
+	UpstreamID         string  `json:"upstream_id"`
+	Enabled            bool    `json:"enabled"`
+	TripThreshold      int     `json:"trip_threshold"`       // consecutive failures to trip
+	RecoveryTimeout    int     `json:"recovery_timeout"`     // seconds before HALF_OPEN probe
+	HalfOpenMaxReqs    int     `json:"half_open_max_requests"` // probe requests in HALF_OPEN
+	HalfOpenSuccessRate int    `json:"half_open_success_rate"` // % successes to close (0-100)
+}
+
+func (r *Redis) SetCircuitBreakerConfig(ctx context.Context, upstreamID string, cfg *CircuitBreakerConfig) error {
+	key := "cont:cb:config:" + upstreamID
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return r.client.Set(ctx, key, data, 0).Err()
+}
+
+func (r *Redis) GetCircuitBreakerConfig(ctx context.Context, upstreamID string) (*CircuitBreakerConfig, error) {
+	key := "cont:cb:config:" + upstreamID
+	val, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var cfg CircuitBreakerConfig
+	if err := json.Unmarshal([]byte(val), &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func (r *Redis) DeleteCircuitBreakerConfig(ctx context.Context, upstreamID string) error {
+	key := "cont:cb:config:" + upstreamID
+	pipe := r.client.Pipeline()
+	pipe.Del(ctx, key)
+	pipe.SRem(ctx, "cont:cb:upstreams", upstreamID)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// GetAllCircuitBreakerConfigs returns all CB configs for all upstreams that have one set
+func (r *Redis) GetAllCircuitBreakerConfigs(ctx context.Context) ([]CircuitBreakerConfig, error) {
+	// Get all upstream IDs that have CB config
+	upstreamIDs, err := r.client.SMembers(ctx, "cont:cb:upstreams").Result()
+	if err != nil {
+		return nil, err
+	}
+	var configs []CircuitBreakerConfig
+	for _, upstreamID := range upstreamIDs {
+		cfg, err := r.GetCircuitBreakerConfig(ctx, upstreamID)
+		if err != nil {
+			continue
+		}
+		if cfg != nil {
+			configs = append(configs, *cfg)
+		}
+	}
+	return configs, nil
+}
+
+// TrackCircuitBreakerUpstream adds an upstream ID to the set of CB-configured upstreams
+func (r *Redis) TrackCircuitBreakerUpstream(ctx context.Context, upstreamID string) error {
+	return r.client.SAdd(ctx, "cont:cb:upstreams", upstreamID).Err()
 }

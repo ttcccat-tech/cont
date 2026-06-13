@@ -434,6 +434,13 @@ elseif service.upstream_id then
     upstream_target = target
     ngx.var.cont_upstream = "http://" .. target
     ngx.var.cont_upstream_host = string.match(target, "([^:]+)")
+
+    -- Run circuit breaker pre_proxy (after target selected, before proxy)
+    local cb = require("cont.plugins.circuit-breaker.handler")
+    cb.pre_proxy({id = service.upstream_id}, service.upstream_id)
+    if ngx.status >= 400 then
+        return
+    end
 end
 
 -- Strip path if route.strip_path

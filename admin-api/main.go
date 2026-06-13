@@ -126,6 +126,7 @@ func main() {
 	r.GET("/internal/plan-quota/:consumer_id", routes.GetPlanQuota(store))
 	r.GET("/internal/plan-quota/default", routes.GetDefaultPlanQuota(store))
 	r.GET("/internal/config/snapshot", routes.GetProxyRuntimeConfig(store))
+	r.GET("/internal/circuit-breaker-configs", routes.GetAllCircuitBreakerConfigs(store))
 
 	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")
@@ -182,6 +183,8 @@ func main() {
 			up.PUT("/:id/targets/:target_id", routes.RequirePermission(store, "targets", true), routes.UpdateTarget(store))
 			up.PATCH("/:id/targets/:target_id", routes.RequirePermission(store, "targets", true), routes.UpdateTarget(store))
 			up.DELETE("/:id/targets/:target_id", routes.RequirePermission(store, "targets", true), routes.DeleteTarget(store))
+			up.GET("/:id/circuit-breaker", routes.RequirePermission(store, "upstreams", false), routes.GetCircuitBreakerConfig(store))
+			up.POST("/:id/circuit-breaker", routes.RequirePermission(store, "upstreams", true), routes.SetCircuitBreakerConfig(store))
 		}
 
 		cons := admin.Group("/consumers")

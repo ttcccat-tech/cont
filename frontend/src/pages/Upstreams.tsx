@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import {
   Table, Button, Space, Tag, message, Modal, Form, Input, Popconfirm,
-  Drawer, Card, Descriptions, Badge, Typography, Divider, InputNumber, Switch, Alert
+  Drawer, Card, Descriptions, Badge, Typography, Divider, InputNumber, Switch, Alert, Tabs
 } from 'antd'
 import {
   PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined,
   NodeIndexOutlined, ArrowUpOutlined, CheckCircleOutlined, CloseCircleOutlined
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import api, { KongUpstream, KongTarget } from '../api/kong'
+import api, { KongUpstream, KongTarget, CircuitBreakerConfig } from '../api/kong'
 import { useAuth } from '../context/AuthContext'
 
 const { Text } = Typography
@@ -24,6 +24,9 @@ export default function UpstreamsPage() {
   const [addTargetModal, setAddTargetModal] = useState(false)
   const [editTargetModal, setEditTargetModal] = useState(false)
   const [editingTarget, setEditingTarget] = useState<KongTarget | null>(null)
+  const [cbConfig, setCbConfig] = useState<CircuitBreakerConfig | null>(null)
+  const [cbLoading, setCbLoading] = useState(false)
+  const [cbForm] = Form.useForm()
   const [form] = Form.useForm()
   const [targetForm] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
@@ -45,6 +48,7 @@ export default function UpstreamsPage() {
     setSelectedUpstream(upstream)
     setDetailDrawer(true)
     fetchTargets(upstream.id!)
+    fetchCircuitBreaker(upstream.id!)
   }
 
   const fetchTargets = (upstreamId: string) => {
@@ -53,6 +57,40 @@ export default function UpstreamsPage() {
       .then(r => setTargets(Array.isArray(r) ? r : []))
       .catch(() => message.error('無法取得目標列表'))
       .finally(() => setTargetsLoading(false))
+  }
+
+  const fetchCircuitBreaker = (upstreamId: string) => {
+    setCbLoading(true)
+    api.getCircuitBreaker(upstreamId)
+      .then(cfg => {
+        setCbConfig(cfg)
+        cbForm.setFieldsValue({
+          enabled: cfg?.enabled ?? false,
+          trip_threshold: cfg?.trip_threshold ?? 5,
+          recovery_timeout: cfg?.recovery_timeout ?? 30,
+          half_open_max_requests: cfg?.half_open_max_requests ?? 3,
+          half_open_success_rate: cfg?.half_open_success_rate ?? 50,
+        })
+      })
+      .catch(() => { setCbConfig(null); cbForm.resetFields() })
+      .finally(() => setCbLoading(false))
+  }
+
+  const saveCircuitBreaker = () => {
+    if (!selectedUpstream?.id) return
+    cbForm.validateFields().then(values => {
+      setSubmitting(true)
+      api.setCircuitBreaker(selectedUpstream.id, {
+        enabled: values.enabled,
+        trip_threshold: values.trip_threshold,
+        recovery_timeout: values.recovery_timeout,
+        half_open_max_requests: values.half_open_max_requests,
+        half_open_success_rate: values.half_open_success_rate,
+      })
+        .then(cfg => { setCbConfig(cfg); message.success('熔斷器設定已儲存') })
+        .catch(err => message.error('儲存失敗: ' + (err.message || err)))
+        .finally(() => setSubmitting(false))
+    })
   }
 
   // ── Create upstream ──────────────────────────────────────────────
@@ -206,7 +244,7 @@ export default function UpstreamsPage() {
 
       {/* Detail drawer */}
       <Drawer title={`上游: ${selectedUpstream?.name || ''}`} open={detailDrawer}
-        onClose={() => { setDetailDrawer(false); setTargets([]) }} width={680}>
+        onClose={() => { setDetailDrawer(false); setTargets([]); setCbConfig(null) }} width={680}>
         <Descriptions column={2} size="small" style={{ marginBottom: 16 }}>
           <Descriptions.Item label="ID">{selectedUpstream?.id?.slice(0, 8)}</Descriptions.Item>
           <Descriptions.Item label="名稱">{selectedUpstream?.name}</Descriptions.Item>
@@ -214,17 +252,53 @@ export default function UpstreamsPage() {
           <Descriptions.Item label="啟用">{selectedUpstream?.enabled ? '是' : '否'}</Descriptions.Item>
         </Descriptions>
 
-        <Divider>目標 (Targets)</Divider>
-
-        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
-          {canWrite && (
-            <Button size="small" type="primary" icon={<PlusOutlined />}
-              onClick={() => setAddTargetModal(true)}>新增目標</Button>
-          )}
-        </div>
-
-        <Table columns={targetColumns} dataSource={targets} rowKey="id"
-          loading={targetsLoading} pagination={{ pageSize: 10 }} size="small" />
+        <Tabs defaultActiveKey="targets" items={[
+          {
+            key: 'targets',
+            label: '目標 (Targets)',
+            children: <>
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                {canWrite && (
+                  <Button size="small" type="primary" icon={<PlusOutlined />}
+                    onClick={() => setAddTargetModal(true)}>新增目標</Button>
+                )}
+              </div>
+              <Table columns={targetColumns} dataSource={targets} rowKey="id"
+                loading={targetsLoading} pagination={{ pageSize: 10 }} size="small" />
+            </>
+          },
+          {
+            key: 'circuit-breaker',
+            label: '熔斷器 (Circuit Breaker)',
+            children: <Form form={cbForm} layout="vertical" style={{ maxWidth: 480 }}>
+              <Form.Item name="enabled" label="啟用熔斷器" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+              <Form.Item name="trip_threshold" label="熔斷閾值 (連續失敗次數)"
+                extra="連續失敗達到此次數即觸發熔斷">
+                <InputNumber min={1} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="recovery_timeout" label="恢復逾時 (秒)"
+                extra="熔斷後等待多久才進入 HALF_OPEN 探測狀態">
+                <InputNumber min={1} max={3600} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="half_open_max_requests" label="HALF_OPEN 探測次數"
+                extra="HALF_OPEN 狀態下允許通過的最大請求數">
+                <InputNumber min={1} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="half_open_success_rate" label="關閉熔斷成功率 (%)"
+                extra="HALF_OPEN 探測中成功率低於此值會重回 OPEN">
+                <InputNumber min={0} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+              {canWrite && (
+                <Button type="primary" onClick={saveCircuitBreaker} loading={submitting}
+                  style={{ marginTop: 8 }}>
+                  儲存熔斷器設定
+                </Button>
+              )}
+            </Form>
+          </>},
+        ]} />
 
         {/* Add target modal */}
         <Modal title="新增目標" open={addTargetModal}

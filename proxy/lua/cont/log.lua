@@ -159,6 +159,15 @@ local function run_plugin_logs()
     for _, plugin in ipairs(cont.plugins) do
         run_plugin_log(plugin)
     end
+
+    -- Circuit breaker: run with upstream context from ngx.ctx
+    local cb_upstream = ngx.ctx.cb_upstream
+    if cb_upstream then
+        local ok, cb = pcall(require, "cont.plugins.circuit-breaker.handler")
+        if ok and cb and cb.log then
+            pcall(cb.log, cb, {})
+        end
+    end
 end
 
 -- ── Main Log Phase ───────────────────────────────────────────────────────────
