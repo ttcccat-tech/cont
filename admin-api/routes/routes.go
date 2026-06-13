@@ -3600,7 +3600,7 @@ func GetDefaultPlanQuota(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
-// GetPlanQuota returns the plan quota and current hourly usage for a consumer.
+// GetPlanQuota returns the plan quota and current monthly usage for a consumer.
 // Called by the Cont proxy's access.lua during rate-limit enforcement.
 // Returns: { request_limit: int, current_usage: int, plan_name: string }
 func GetPlanQuota(store *storage.Store) gin.HandlerFunc {
@@ -3647,9 +3647,8 @@ func GetPlanQuota(store *storage.Store) gin.HandlerFunc {
 			}
 		}
 
-		// Get current hourly usage from Redis
-		// Key format: cont:usage:{org_id}:{YYYYMMDDHH}
-		currentUsage, _ := store.Redis().GetUsage(c.Request.Context(), orgID)
+		// Get current monthly usage (sum of all hourly buckets in current month)
+		currentUsage, _ := store.Redis().GetMonthlyUsage(c.Request.Context(), orgID)
 
 		c.JSON(200, gin.H{
 			"request_limit": requestLimit,
