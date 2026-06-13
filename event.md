@@ -231,9 +231,17 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Alert Rule 進階功能（條件組合 + 觸發歷史）** — Alert engine 已完成
-  - 需要：多條件 AND/OR 組合、AlertRule.LastTriggeredAt/Value（已實作）、前端 AlertHistory 頁面
-  - Backend: AlertRule 條件邏輯增強（multiple conditions）、AlertHistory table
+（空）
+
+## ✅ 已完成
+
+- [x] **Cont Alert Rule 進階功能（條件組合 + 觸發歷史）** — commit `6da50a88`
+  - 前端 AlertRules.tsx 多條件 AND/OR UI（動態 Form.List、新增/移除條件、AND/OR 邏輯選擇）
+  - AlertHistory.tsx 頁面已存在（/alert-history route 已設定）
+  - Backend 支援多條件 AlertRule CRUD（conditions JSONB 欄位）
+  - Backend alerter.go evaluateConditions() 支援 AND/OR 條件組合
+  - Backend fireAlert() 寫入 AlertHistory + 更新 LastTriggeredAt/Value
+  - QA: Multi-condition CREATE → 201 ✅, READ → conditions[] ✅, AlertHistory → 200 ✅
 
 ## ✅ 已完成
 
