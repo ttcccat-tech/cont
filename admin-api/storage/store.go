@@ -1882,7 +1882,7 @@ func (s *Store) ListAlertHistory(limit, offset int) ([]AlertHistory, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var history []AlertHistory
+	history := []AlertHistory{}
 	for rows.Next() {
 		var h AlertHistory
 		if err := rows.Scan(&h.ID, &h.RuleID, &h.RuleName, &h.OrgID, &h.MetricType, &h.Operator, &h.Threshold, &h.ActualValue, &h.TriggeredAt, &h.Message); err != nil {
