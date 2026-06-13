@@ -329,7 +329,21 @@
 
 ## 🟡 預計優化
 
-（無）
+- [ ] **Cont gRPC Protocol Support** — Cont 目前只支援 REST API 管理 Kong，gRPC 是現代微服務主流通訊協議
+  - Backend: 新增 `GET/PUT /grpc-services` (gRPC service mapping)、`POST /grpc-services/:id/methods` (method-level routing)
+  - Frontend: 新增 gRPC Services 頁面（列表/建立/編輯/刪除 gRPC service + method routes）
+  - Proxy: `access.lua` 新增 gRPC-Web 支援（HTTP/2 + protobuf content-type detection）
+  - kong.ts: 新增 gRPC service CRUD API functions
+  - QA: Create→Read→Update→Delete gRPC services, gRPC-Web request → proxy pass ✅
+
+- [ ] **Cont Circuit Breaker Plugin** — Kong upstream 健康狀態驅動的熔斷器，防止連鎖故障
+  - Proxy Lua plugin: `cont/plugins/circuit-breaker/handler.lua`
+  - 邏輯：根據 upstream health status，主動斷開 unhealthy targets，迴避後端故障
+  - 熔斷狀態：CLOSED（正常）→ OPEN（熔斷）→ HALF_OPEN（探測）
+  - 群眾演算法：連續失敗 N 次觸發熔斷，Success rate > X% 關閉熔斷
+  - Backend: `/upstreams/:id/circuit-breaker` 設定 endpoint（trip threshold, half-open success rate）
+  - Frontend: Upstream detail 新增 Circuit Breaker 設定 tab
+  - QA: upstream 全部 target 故障 → 請求被阻擋（503）→ 一個 target 康復 → 請求恢復 ✅
 
 ## 🔴 未完成
 
