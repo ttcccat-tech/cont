@@ -231,16 +231,18 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont 使用量監控與配額執行（Usage Tracking + Quota Enforcement）** — workspace_limit/user_limit/request_limit 已存在於 plans，但未強制執行
-  - 需要：Usage tracking（Redis counter per org/workspace）、Quota check middleware、Exceeded 阻擋 API
-  - Backend: GET /billing/usage, middleware 阻擋超過配額的 API 請求
-  - Frontend: BillingPortal.tsx 新增當前使用量視覺化（usage bar）
-
 - [ ] **Cont Alert Rule 進階功能（條件組合 + 觸發歷史）** — Alert engine 已完成
   - 需要：多條件 AND/OR 組合、AlertRule.LastTriggeredAt/Value（已實作）、前端 AlertHistory 頁面
   - Backend: AlertRule 條件邏輯增強（multiple conditions）、AlertHistory table
 
-- [ ] **Cont 使用者管理精細化（API Key 審批 + Audit Log）** — 見下方已完成
+## ✅ 已完成
+
+- [x] **Cont 使用量監控與配額執行（Usage Tracking + Quota Enforcement）** — commit `d47f0d86` + `8d5ad50e`
+  - Backend: Redis.GetMonthlyUsage() — 當月所有 hourly buckets 總和
+  - Backend: QuotaEnforcer middleware — 超過 RequestLimit 時回 429 + Retry-After header
+  - Backend: GetPlanQuota/GetUsage billing endpoint 改用 monthly usage
+  - Frontend: BillingPortal.tsx usage bar 已存在（已實作）
+  - QA: GET /billing/usage → 200 ✅, GET /internal/plan-quota/default → 200 ✅, Services CRUD → 200 ✅
 
 ## ✅ 已完成
 
