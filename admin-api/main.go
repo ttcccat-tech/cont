@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ttcccat-tech/cont/admin-api/engine"
+	"github.com/ttcccat-tech/cont/admin-api/internal/worker"
 	"github.com/ttcccat-tech/cont/admin-api/routes"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
 )
@@ -53,6 +54,11 @@ func main() {
 	alerter := engine.NewAlerter(store, 30*time.Second, proxyMetricsURL)
 	alerter.Start()
 	defer alerter.Stop()
+
+	// Start webhook delivery worker (max 10 concurrent)
+	webhookWorker := worker.NewWebhookWorker(store, 10)
+	webhookWorker.Start()
+	defer webhookWorker.Stop()
 
 	// JWT secret
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -113,6 +119,7 @@ func main() {
 	r.GET("/internal/validate-jwt/:token", routes.ValidateJWT(store, jwtSecret))
 	r.GET("/internal/plugins", routes.ListInternalPlugins(store))
 	r.GET("/internal/plan-quota/:consumer_id", routes.GetPlanQuota(store))
+	r.GET("/internal/plan-quota/default", routes.GetDefaultPlanQuota(store))
 
 	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")
@@ -301,6 +308,14 @@ func main() {
 		admin.GET("/usage/org/:org_id", routes.GetOrgUsage(store))
 		admin.GET("/usage/consumer/:consumer_id", routes.GetConsumerUsage(store))
 		admin.GET("/usage/summary", routes.GetUsageSummary(store))
+
+		// Webhooks (Reliable)
+		admin.GET("/webhooks", routes.ListWebhooks(store))
+		admin.POST("/webhooks", routes.CreateWebhook(store))
+		admin.GET("/webhooks/:id", routes.GetWebhook(store))
+		admin.DELETE("/webhooks/:id", routes.DeleteWebhook(store))
+		admin.GET("/webhooks/:id/deliveries", routes.ListWebhookDeliveries(store))
+		admin.POST("/webhooks/:id/retry/:deliveryId", routes.RetryWebhookDelivery(store))
 	}
 
 	// Stripe Webhook — public (Stripe signs with secret, no JWT auth)

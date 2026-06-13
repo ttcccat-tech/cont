@@ -3429,6 +3429,18 @@ func CountUnreadNotifications(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// GetDefaultPlanQuota returns the default Free plan quota for anonymous requests.
+// Called by the Cont proxy's access.lua when no authenticated consumer is present.
+func GetDefaultPlanQuota(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"request_limit": 1000,
+			"current_usage": 0,
+			"plan_name":     "free",
+		})
+	}
+}
+
 // GetPlanQuota returns the plan quota and current hourly usage for a consumer.
 // Called by the Cont proxy's access.lua during rate-limit enforcement.
 // Returns: { request_limit: int, current_usage: int, plan_name: string }
@@ -3485,6 +3497,205 @@ func GetPlanQuota(store *storage.Store) gin.HandlerFunc {
 			"current_usage": currentUsage,
 			"plan_name":     planName,
 		})
+	}
+}
+
+// ── Webhooks ───────────────────────────────────────────────────────────────
+
+// ListWebhooks returns all webhook subscriptions for the org
+func ListWebhooks(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if orgID == "" {
+			orgID = "00000000-0000-0000-0000-000000000000"
+		}
+		subs, err := store.ListWebhookSubscriptions(orgID)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		// Strip secrets from response
+		type PublicSub struct {
+			ID         string   `json:"id"`
+			OrgID      string   `json:"org_id"`
+			URL        string   `json:"url"`
+			EventTypes []string `json:"event_types"`
+			Active     bool     `json:"active"`
+			CreatedAt  string   `json:"created_at"`
+		}
+		out := make([]PublicSub, len(subs))
+		for i, s := range subs {
+			out[i] = PublicSub{
+				ID: s.ID, OrgID: s.OrgID, URL: s.URL,
+				EventTypes: s.EventTypes, Active: s.Active,
+				CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			}
+		}
+		c.JSON(200, gin.H{"data": out})
+	}
+}
+
+// CreateWebhook creates a new webhook subscription
+func CreateWebhook(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if orgID == "" {
+			orgID = "00000000-0000-0000-0000-000000000000"
+		}
+		var req struct {
+			URL        string   `json:"url" binding:"required,url"`
+			EventTypes []string `json:"event_types" binding:"required,min=1"`
+			Secret     string   `json:"secret"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			badRequest(c, err)
+			return
+		}
+		// Validate event types
+		validTypes := map[string]bool{
+			"api_key.approved": true, "api_key.rejected": true,
+			"alert.triggered": true, "subscription.expired": true,
+		}
+		for _, t := range req.EventTypes {
+			if !validTypes[t] {
+				badRequestMsg(c, "invalid event_type: "+t)
+				return
+			}
+		}
+		sub := &storage.WebhookSubscription{
+			OrgID: orgID, URL: req.URL,
+			EventTypes: req.EventTypes, Secret: req.Secret,
+		}
+		result, err := store.CreateWebhookSubscription(sub)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(201, gin.H{
+			"id": result.ID, "org_id": result.OrgID,
+			"url": result.URL, "event_types": result.EventTypes,
+			"active": result.Active,
+			"created_at": result.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+}
+
+// GetWebhook returns a single webhook subscription
+func GetWebhook(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if orgID == "" {
+			orgID = "00000000-0000-0000-0000-000000000000"
+		}
+		sub, err := store.GetWebhookSubscription(c.Param("id"), orgID)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		if sub == nil {
+			notFound(c, "webhook not found")
+			return
+		}
+		c.JSON(200, gin.H{
+			"id": sub.ID, "org_id": sub.OrgID,
+			"url": sub.URL, "event_types": sub.EventTypes,
+			"active": sub.Active,
+			"created_at": sub.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+}
+
+// DeleteWebhook deletes a webhook subscription
+func DeleteWebhook(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if orgID == "" {
+			orgID = "00000000-0000-0000-0000-000000000000"
+		}
+		if err := store.DeleteWebhookSubscription(c.Param("id"), orgID); err != nil {
+			internalError(c)
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
+// ListWebhookDeliveries returns delivery history for a webhook
+func ListWebhookDeliveries(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if orgID == "" {
+			orgID = "00000000-0000-0000-0000-000000000000"
+		}
+		size, offset := paginate(c)
+		deliveries, err := store.ListWebhookDeliveries(c.Param("id"), orgID, size, offset)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		type DeliveryResp struct {
+			ID             string  `json:"id"`
+			OrgID          string  `json:"org_id"`
+			WebhookID      string  `json:"webhook_id"`
+			EventType      string  `json:"event_type"`
+			Payload        string  `json:"payload"`
+			Status         string  `json:"status"`
+			Attempts       int     `json:"attempts"`
+			LastAttempt    *string `json:"last_attempt,omitempty"`
+			NextRetry      *string `json:"next_retry,omitempty"`
+			LastError      string  `json:"last_error,omitempty"`
+			ResponseStatus int     `json:"response_status,omitempty"`
+			ResponseBody   string  `json:"response_body,omitempty"`
+			CreatedAt      string  `json:"created_at"`
+		}
+		out := make([]DeliveryResp, len(deliveries))
+		for i, d := range deliveries {
+			out[i] = DeliveryResp{
+				ID: d.ID, OrgID: d.OrgID, WebhookID: d.WebhookID,
+				EventType: d.EventType, Payload: d.Payload,
+				Status: d.Status, Attempts: d.Attempts,
+				LastError: d.LastError, ResponseStatus: d.ResponseStatus,
+				ResponseBody: d.ResponseBody,
+				CreatedAt: d.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			}
+			if d.LastAttempt != nil {
+				s := d.LastAttempt.UTC().Format("2006-01-02T15:04:05Z")
+				out[i].LastAttempt = &s
+			}
+			if d.NextRetry != nil {
+				s := d.NextRetry.UTC().Format("2006-01-02T15:04:05Z")
+				out[i].NextRetry = &s
+			}
+		}
+		c.JSON(200, gin.H{"data": out})
+	}
+}
+
+// RetryWebhookDelivery retries a specific delivery
+func RetryWebhookDelivery(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getOrgID(c)
+		if orgID == "" {
+			orgID = "00000000-0000-0000-0000-000000000000"
+		}
+		deliveryID := c.Param("deliveryId")
+		delivery, err := store.GetWebhookDelivery(deliveryID, orgID)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		if delivery == nil {
+			notFound(c, "delivery not found")
+			return
+		}
+		// Reset to pending for retry
+		delivery.Status = "pending"
+		delivery.NextRetry = nil
+		if err := store.UpdateWebhookDelivery(delivery); err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, gin.H{"message": "delivery queued for retry", "id": delivery.ID})
 	}
 }
 
