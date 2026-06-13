@@ -265,7 +265,7 @@ func (a *Alerter) fireAlert(rule *storage.AlertRule, currentValue float64) {
 	history := &storage.AlertHistory{
 		RuleID:      rule.ID,
 		RuleName:    rule.Name,
-		OrgID:       "", // alerter runs globally, org_id is set per-rule if needed
+		OrgID:       nil, // alerter runs globally, org_id is set per-rule if needed
 		MetricType:  rule.MetricType,
 		Operator:    rule.Operator,
 		Threshold:   rule.ThresholdValue,

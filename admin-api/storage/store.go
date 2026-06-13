@@ -1885,8 +1885,12 @@ func (s *Store) ListAlertHistory(limit, offset int) ([]AlertHistory, error) {
 	history := []AlertHistory{}
 	for rows.Next() {
 		var h AlertHistory
-		if err := rows.Scan(&h.ID, &h.RuleID, &h.RuleName, &h.OrgID, &h.MetricType, &h.Operator, &h.Threshold, &h.ActualValue, &h.TriggeredAt, &h.Message); err != nil {
+		var orgID sql.NullString
+		if err := rows.Scan(&h.ID, &h.RuleID, &h.RuleName, &orgID, &h.MetricType, &h.Operator, &h.Threshold, &h.ActualValue, &h.TriggeredAt, &h.Message); err != nil {
 			return nil, err
+		}
+		if orgID.Valid {
+			h.OrgID = &orgID.String
 		}
 		history = append(history, h)
 	}
