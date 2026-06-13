@@ -1096,6 +1096,13 @@ func jsonScanSlice(out *[]string, data []byte) {
 	}
 }
 
+func jsonMarshal(v interface{}) ([]byte, error) {
+	if v == nil {
+		return []byte("[]"), nil
+	}
+	return json.Marshal(v)
+}
+
 func nullString(s string) interface{} {
 	if s == "" {
 		return nil

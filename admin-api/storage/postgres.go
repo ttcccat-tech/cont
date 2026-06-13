@@ -443,6 +443,37 @@ func RunMigrations(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false`,
+
+		// Webhook Subscriptions
+		`CREATE TABLE IF NOT EXISTS webhook_subscriptions (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			org_id UUID NOT NULL,
+			url TEXT NOT NULL,
+			event_types TEXT[] NOT NULL,
+			secret TEXT,
+			active BOOLEAN DEFAULT true,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_webhook_subscriptions_org ON webhook_subscriptions(org_id)`,
+
+		// Webhook Deliveries
+		`CREATE TABLE IF NOT EXISTS webhook_deliveries (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			org_id UUID NOT NULL,
+			webhook_id UUID NOT NULL REFERENCES webhook_subscriptions(id) ON DELETE CASCADE,
+			event_type TEXT NOT NULL,
+			payload TEXT NOT NULL DEFAULT '{}',
+			status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed', 'retrying')),
+			attempts INT NOT NULL DEFAULT 0,
+			last_attempt TIMESTAMPTZ,
+			next_retry TIMESTAMPTZ,
+			last_error TEXT,
+			response_status INT,
+			response_body TEXT,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status, next_retry)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
