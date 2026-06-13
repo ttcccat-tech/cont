@@ -73,6 +73,17 @@ export function EventListener() {
       } catch {}
     })
 
+    // Handle alert_triggered events (from Alert Engine SSE broadcast)
+    es.addEventListener('alert_triggered', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data)
+        message.error({
+          content: `🚨 告警觸發：${data.rule_name} — ${data.metric_type} ${data.operator} ${data.threshold} (目前: ${data.current_value})`,
+          duration: 8,
+        })
+      } catch {}
+    })
+
     // Handle heartbeat (ignore)
     es.addEventListener('heartbeat', () => {})
 
