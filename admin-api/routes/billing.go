@@ -233,6 +233,14 @@ func CreatePortalSession(store *storage.Store, frontendBaseURL string) gin.Handl
 			return
 		}
 
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "Subscription",
+			TargetID:      subscr.StripeCustomerID,
+			ActorUsername: org.Name,
+			Description:   fmt.Sprintf("Billing portal opened for org %s", orgID),
+		})
+
 		c.JSON(200, gin.H{"url": sess.URL})
 	}
 }
