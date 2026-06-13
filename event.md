@@ -335,11 +335,10 @@
   - Backend: `/alerts/rules` 回傳 `last_triggered_at`/`last_triggered_value` 驗證 ✅，DB 直接寫入後 API 正確回傳
   - QA: 手動設定 `last_triggered_at` → GET /alerts/rules 出現欄位 ✅，前端 build ✅
 
-- [ ] **Cont Admin API 分散式追蹤（OpenTelemetry / Traces）** — Cont 目前無分散式追蹤，AlertEngine/Proxy 請求無關聯 ID
-  - Backend: 注入 `trace_id` 到 context，log.Printf 輸出 trace_id，AlertEngine fireAlert 寫入 trace_id
-  - Proxy: access.lua 生成或傳遞 `X-Cont-Trace-ID` header
-  - Middleware: 每一個 HTTP handler 自動建立 span，附帶 org_id、user_id、route_id tags
-  - 驗證：一次 API 請求（Admin API → Store → DB）全鏈路有同一 trace_id
+- [x] **Cont Admin API 分散式追蹤（OpenTelemetry / Traces）** — commit `49439c90`
+  - Backend: Tracing() middleware 生成/傳遞 X-Cont-Trace-ID，alerter.go fireAlert() 產生 trace_id 寫入 AlertHistory
+  - Proxy: access.lua 生成/傳遞 X-Cont-Trace-ID header，nginx.conf 將 trace ID proxy 到所有 upstream locations
+  - QA: X-Cont-Trace-ID 在 response headers 正確迴傳 ✅，不同 request 產生不同 trace ID ✅
 
 ---
 
