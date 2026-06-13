@@ -341,9 +341,15 @@
 
 ## 🔴 未完成
 
-- [ ] **Admin API build failure — HalfOpenMaxRequests undefined + auditLog undefined** — routes.go:856 references `existing.HalfOpenMaxRequests` (not in CircuitBreakerConfig model) + routes.go:874 uses undefined `auditLog`; pre-existing build blocker
+（無）
 
 ## ✅ 已完成
+
+- [x] **Admin API build failure — HalfOpenMaxRequests undefined + AuditLog fields** — commit `9af61076`
+  - Fix: `HalfOpenMaxRequests` → `HalfOpenMaxReqs` in struct literal (routes.go:789)
+  - Fix: `AuditLog{ActorID/ActorName/Message}` → `AuditLog{ActorUserID/ActorUsername/Description}` (routes.go:847-852)
+  - Fix: Remove unused `upstream` variable in `GetCircuitBreakerConfig`, replace with `_ = getOrgID(c)` (routes.go:775)
+  - QA: Build ✅, GET /upstreams/:id/circuit-breaker → 200 ✅, POST → 200 ✅
 
 - [x] **Cont Plugin SDK 與 Plugin Marketplace** — commit `546809c2` + `40178774`
   - PluginSchema model: name/version/label/description/access_phase/log_phase/pre_proxy/post_proxy/config_schema
