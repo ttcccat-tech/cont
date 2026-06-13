@@ -322,6 +322,21 @@
 
 ---
 
+## 🟡 預計優化
+
+- [ ] **Cont AlertRules.tsx SSE 即時更新 + AlertHistory 聯動** — 當 AlertEngine 觸發 alert_triggered 時，AlertRules.tsx 需更新 last_triggered_at/value；AlertHistory.tsx 需即時新增一筆觸發記錄（目前 AlertRules.tsx 有 SSE 監聽但未真正更新本地 state；AlertHistory.tsx 純 polling 無法即時）
+  - Backend: `GET /alerts/history` 已有，需確認 `GET /alerts/rules` 是否包含 last_triggered_at
+  - Frontend: AlertRules.tsx — `alert_triggered` SSE handler 需呼叫 `fetchRules()` 真正更新 state；AlertHistory.tsx — SSE 監聽 + 即時 prepend 觸發記錄到列表
+  - 驗證：觸發一條 alert rule → AlertRules.tsx 的「最近觸發」應在 30s 內更新、AlertHistory.tsx 應即時出現新列
+
+- [ ] **Cont Admin API 分散式追蹤（OpenTelemetry / Traces）** — Cont 目前無分散式追蹤，AlertEngine/Proxy 請求無關聯 ID
+  - Backend: 注入 `trace_id` 到 context，log.Printf 輸出 trace_id，AlertEngine fireAlert 寫入 trace_id
+  - Proxy: access.lua 生成或傳遞 `X-Cont-Trace-ID` header
+  - Middleware: 每一個 HTTP handler 自動建立 span，附帶 org_id、user_id、route_id tags
+  - 驗證：一次 API 請求（Admin API → Store → DB）全鏈路有同一 trace_id
+
+---
+
 ## 完整開發流程（開發守護遵循）
 
 1. **開發執行** → 逐項處理，每修完一個問題即時 commit
