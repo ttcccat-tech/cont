@@ -1718,7 +1718,8 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 	rows, err := s.db.Query(
 		`SELECT id, name, description, metric_type, service_name, threshold_value, operator,
 		        duration_seconds, enabled, notification_channels, slack_webhook_url,
-		        email_webhook_url, discord_webhook_url, alert_suppress_seconds, created_at, updated_at
+		        email_webhook_url, discord_webhook_url, alert_suppress_seconds,
+		        last_triggered_at, last_triggered_value, created_at, updated_at
 		 FROM alert_rules ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -1729,9 +1730,11 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 		var r AlertRule
 		var desc, svcName, notifCh, slackURL, emailURL, discordURL sql.NullString
 		var createdAt, updatedAt sql.NullString
+		var lastTriggeredAt sql.NullString
+		var lastTriggeredValue sql.NullFloat64
 		if err := rows.Scan(&r.ID, &r.Name, &desc, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
 			&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
-			&r.AlertSuppressSeconds, &createdAt, &updatedAt); err != nil {
+			&r.AlertSuppressSeconds, &lastTriggeredAt, &lastTriggeredValue, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
 		if desc.Valid {
@@ -1751,6 +1754,12 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 		}
 		if discordURL.Valid {
 			r.DiscordWebhookURL = discordURL.String
+		}
+		if lastTriggeredAt.Valid {
+			r.LastTriggeredAt = &lastTriggeredAt.String
+		}
+		if lastTriggeredValue.Valid {
+			r.LastTriggeredValue = &lastTriggeredValue.Float64
 		}
 		if createdAt.Valid {
 			r.CreatedAt = createdAt.String
@@ -1839,6 +1848,16 @@ func (s *Store) UpdateAlertRule(id string, r *AlertRule) (*AlertRule, error) {
 		return nil, err
 	}
 	return r, nil
+}
+
+// UpdateAlertRuleTriggered records the last triggered timestamp and value for an alert rule.
+// Called by the Alert Engine when a rule fires.
+func (s *Store) UpdateAlertRuleTriggered(id int64, triggeredAt string, triggeredValue float64) error {
+	_, err := s.db.Exec(
+		`UPDATE alert_rules SET last_triggered_at=$2, last_triggered_value=$3, updated_at=NOW()
+		 WHERE id=$1`,
+		id, triggeredAt, triggeredValue)
+	return err
 }
 
 func (s *Store) DeleteAlertRule(id string) error {

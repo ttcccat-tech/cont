@@ -210,6 +210,8 @@ func RunMigrations(db *sql.DB) error {
 			email_webhook_url TEXT,
 			discord_webhook_url TEXT,
 			alert_suppress_seconds INTEGER DEFAULT 300,
+			last_triggered_at TIMESTAMPTZ,
+			last_triggered_value REAL,
 			created_at TIMESTAMPTZ DEFAULT NOW(),
 			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
@@ -392,6 +394,10 @@ func RunMigrations(db *sql.DB) error {
 
 		// Phase 4: Plugin Global/Workspace Scoping
 		`ALTER TABLE plugins ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'service' CHECK (scope IN ('global','workspace','service','route','consumer'))`,
+
+		// Alert rule triggered state (added later)
+		`ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS last_triggered_at TIMESTAMPTZ`,
+		`ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS last_triggered_value REAL`,
 		`CREATE INDEX IF NOT EXISTS idx_plugins_scope ON plugins(scope)`,
 
 		// Phase 3: Billing/Plan (Stripe integration)

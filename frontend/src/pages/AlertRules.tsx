@@ -20,6 +20,8 @@ interface AlertRule {
   email_webhook_url: string
   discord_webhook_url: string
   alert_suppress_seconds: number
+  last_triggered_at?: string
+  last_triggered_value?: number
   created_at: string
 }
 
@@ -73,7 +75,20 @@ export default function AlertRulesPage() {
     }
   }
 
-  useEffect(() => { fetchRules() }, [])
+  useEffect(() => {
+    fetchRules()
+
+    // Listen for alert_triggered SSE events to refresh rule status
+    const es = new EventSource(`${API_BASE}/auth/events`)
+    es.addEventListener('alert_triggered', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data)
+        // Refresh rules to show updated last_triggered_at/value
+        fetchRules()
+      } catch {}
+    })
+    return () => { es.close() }
+  }, [])
 
   const openCreate = () => { setEditingRule(null); form.resetFields(); setModalOpen(true) }
 
@@ -172,6 +187,27 @@ export default function AlertRulesPage() {
         return channels.length > 0
           ? channels.map(c => <Tag key={c} style={{margin:1}}>{c}</Tag>)
           : <Tag>無</Tag>
+      },
+    },
+    {
+      title: '最近觸發',
+      key: 'last_triggered',
+      width: 160,
+      render: (_, r) => {
+        if (!r.last_triggered_at) return <Tag>從未</Tag>
+        const date = new Date(r.last_triggered_at)
+        const diff = Math.floor((Date.now() - date.getTime()) / 1000)
+        const label = diff < 60 ? '剛剛' : diff < 3600 ? `${Math.floor(diff/60)}分鐘前` : diff < 86400 ? `${Math.floor(diff/3600)}小時前` : `${Math.floor(diff/86400)}天前`
+        return (
+          <Space direction="vertical" size={0} style={{fontSize:12}}>
+            <Tag color="red">{label}</Tag>
+            {r.last_triggered_value != null && (
+              <span style={{color:'var(--muted)'}}>
+                {r.metric_type === 'error_rate' ? `${r.last_triggered_value}%` : `${r.last_triggered_value}ms`}
+              </span>
+            )}
+          </Space>
+        )
       },
     },
     {

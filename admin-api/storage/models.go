@@ -71,6 +71,8 @@ type AlertRule struct {
 	EmailWebhookURL     string  `json:"email_webhook_url,omitempty"`
 	DiscordWebhookURL   string  `json:"discord_webhook_url,omitempty"`
 	AlertSuppressSeconds int    `json:"alert_suppress_seconds"`
+	LastTriggeredAt     *string `json:"last_triggered_at,omitempty"`
+	LastTriggeredValue  *float64 `json:"last_triggered_value,omitempty"`
 	CreatedAt           string  `json:"created_at,omitempty"`
 	UpdatedAt           string  `json:"updated_at,omitempty"`
 }
