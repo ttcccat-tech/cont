@@ -9,20 +9,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// registry is a private registry to avoid duplicate registration panics
+var registry = prometheus.NewRegistry()
 
 // ── DB Pool Gauges ─────────────────────────────────────────────────────────────
 var (
-	DBPoolMaxConns = promauto.NewGauge(prometheus.GaugeOpts{
+	DBPoolMaxConns = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_db_connections_max",
 		Help: "Max database connections configured",
 	})
-	DBPoolOpenConns = promauto.NewGauge(prometheus.GaugeOpts{
+	DBPoolOpenConns = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_db_connections_active",
 		Help: "Number of active database connections",
 	})
-	DBPoolIdleConns = promauto.NewGauge(prometheus.GaugeOpts{
+	DBPoolIdleConns = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_db_connections_idle",
 		Help: "Number of idle database connections",
 	})
@@ -30,11 +33,11 @@ var (
 
 // ── Redis Pool Gauges ─────────────────────────────────────────────────────────
 var (
-	RedisPoolActiveConns = promauto.NewGauge(prometheus.GaugeOpts{
+	RedisPoolActiveConns = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_redis_connections_active",
 		Help: "Number of active Redis connections",
 	})
-	RedisPoolIdleConns = promauto.NewGauge(prometheus.GaugeOpts{
+	RedisPoolIdleConns = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_redis_connections_idle",
 		Help: "Number of idle Redis connections",
 	})
@@ -56,6 +59,12 @@ type poolStatsProvider interface {
 var poolProvider poolStatsProvider
 var poolUpdateOnce sync.Once
 var poolStopChan = make(chan struct{})
+
+func init() {
+	// Register pool metrics with our private registry (won't conflict with default)
+	registry.MustRegister(DBPoolMaxConns, DBPoolOpenConns, DBPoolIdleConns)
+	registry.MustRegister(RedisPoolActiveConns, RedisPoolIdleConns)
+}
 
 // RegisterPoolStats starts a background goroutine that updates pool metrics every 10s
 func RegisterPoolStats(provider poolStatsProvider) {
@@ -93,7 +102,7 @@ func updatePoolMetrics() {
 
 // Metrics returns a handler that exposes Prometheus metrics including pool stats
 func Metrics() gin.HandlerFunc {
-	h := promhttp.Handler()
+	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 	return func(c *gin.Context) {
 		// Update once at request time to get latest values
 		updatePoolMetrics()

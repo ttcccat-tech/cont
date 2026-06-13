@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ttcccat-tech/cont/admin-api/engine"
 	"github.com/ttcccat-tech/cont/admin-api/internal/worker"
 	"github.com/ttcccat-tech/cont/admin-api/routes"
@@ -81,7 +80,7 @@ func main() {
 	// Health + Metrics
 	r.GET("/status", routes.Status(store))
 	r.GET("/metrics", routes.Metrics())
-	routes.RegisterPoolStats(store.DBPoolStats, store.RedisPoolStats)
+	routes.RegisterPoolStats(store)
 
 	// Swagger docs (public, before auth)
 	r.GET("/docs", func(c *gin.Context) {

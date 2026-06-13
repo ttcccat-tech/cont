@@ -57,7 +57,11 @@ func (s *Store) DBPoolStats() struct {
 	Idle    int
 } {
 	if s.db == nil {
-		return struct{}{}
+		return struct {
+			MaxOpen int
+			Open    int
+			Idle    int
+		}{}
 	}
 	stats := s.db.Stats()
 	return struct {
@@ -73,13 +77,16 @@ func (s *Store) RedisPoolStats() struct {
 	IdleConns  int
 } {
 	if s.rdb == nil || s.rdb.client == nil {
-		return struct{}{}
+		return struct {
+			TotalConns int
+			IdleConns  int
+		}{}
 	}
 	stats := s.rdb.client.PoolStats()
 	return struct {
 		TotalConns int
 		IdleConns  int
-	}{stats.TotalConns, stats.IdleConns}
+	}{int(stats.TotalConns), int(stats.IdleConns)}
 }
 const RoleColumnMigration = `` // DEPRECATED: role column now part of users table creation
 

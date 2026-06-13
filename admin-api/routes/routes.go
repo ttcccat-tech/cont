@@ -17,7 +17,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
 	"github.com/ttcccat-tech/cont/admin-api/tracing"
 	"go.opentelemetry.io/otel/semconv/v1.18.0"
@@ -287,13 +286,6 @@ func Status(store *storage.Store) gin.HandlerFunc {
 				Reachable bool `json:"reachable"`
 			}{Reachable: true},
 		})
-	}
-}
-
-func Metrics() gin.HandlerFunc {
-	h := promhttp.Handler()
-	return func(c *gin.Context) {
-		h.ServeHTTP(c.Writer, c.Request)
 	}
 }
 
