@@ -335,20 +335,21 @@
   - 設定 Alertmanager integration（或使用 Grafana managed alerts）
   - 驗證：觸發一條 alert rule → AlertHistory 出現記錄 + SSE 通知前端
 
-## 🟡 預計優化
+## ✅ 已完成
 
-- [ ] **Cont Observability Enhancement Phase 1：自定義 Prometheus Metrics 儀表化** — commit `18d4f224` + `df04b9f1`
+- [x] **Cont Observability Enhancement Phase 1：自定義 Prometheus Metrics 儀表化** — commit `18d4f224` + `df04b9f1` + `6b104bb0`
   - metrics.lua: 修正 nginx_requests_total 命名不一致，新增 `cont_request_duration_seconds` histogram（latency buckets 5ms-10s）、`cont_upstream_latency_seconds` histogram、`cont_nginx_connections` gauge、`cont_bytes_sent_total` counter、route/consumer per-entity counters
   - prometheus.yml: 直接 scrape cont-proxy:8000 而非透過 admin-api
   - alerts.yml: 修正 metric 引用以匹配實際發出的 metrics（`cont_nginx_requests_total{code="5xx"}` 取代不存在的 `promhttp_metric_handler_requests_total`）
   - routes/metrics.go: 新增 GaugeFuncs for `cont_db_connections_*` / `cont_redis_connections_*`
   - storage/postgres.go: Store 新增 `DBPoolStats()` + `RedisPoolStats()` 方法
   - main.go: 註冊 pool stats 使其出現於 /metrics endpoint
-  - 待完成：QA 驗證 /metrics endpoint 包含所有新 metrics
+  - **Bug fix `6b104bb0`**: resolve duplicate Prometheus MustRegister panic — use private prometheus.Registry instead of default, remove duplicate Metrics() from routes.go, fix promhttp import, fix RegisterPoolStats call signature
+  - QA: `/metrics` → 200 ✅, `cont_db_connections_*` ✅, `cont_redis_connections_*` ✅, proxy `/metrics` ✅
 
-## 🔴 未完成
+## ✅ 已完成
 
-（無）
+- [x] **Cont gRPC Protocol Support（gRPC Service CRUD + gRPC-Web Proxy）** — commit `964d60d7` + `25644b50`
 
 ## ✅ 已完成
 
