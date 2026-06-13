@@ -5,17 +5,17 @@ groups:
       # High Error Rate — 5xx errors > 5% over 5 minutes
       - alert: ContHighErrorRate
         expr: |
-          sum(rate(promhttp_metric_handler_requests_total{status_code=~"5.."}[5m]))
+          cont_nginx_requests_total{code="5xx"}
           /
-          sum(rate(promhttp_metric_handler_requests_total[5m])) > 0.05
+          (cont_nginx_requests_total{code="2xx"} + cont_nginx_requests_total{code="3xx"} + cont_nginx_requests_total{code="4xx"} + cont_nginx_requests_total{code="5xx"}) > 0.05
         for: 2m
         labels:
           severity: critical
         annotations:
           summary: "Cont API high 5xx error rate"
-          description: "5xx error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+          description: "5xx error rate is over 5% over the last 5 minutes"
 
-      # High Latency — p95 > 2s
+      # High Latency — p95 > 2s (using histogram_quantile on custom latency metric)
       - alert: ContHighLatency
         expr: |
           histogram_quantile(0.95,
@@ -26,57 +26,37 @@ groups:
           severity: warning
         annotations:
           summary: "Cont API high latency"
-          description: "p95 latency is {{ $value | humanizeDuration }}"
+          description: "p95 latency is over 2 seconds"
 
-      # Database Connection Exhaustion
-      - alert: ContDBConnectionExhaustion
-        expr: cont_db_connections_active / cont_db_connections_max > 0.85
-        for: 2m
+      # High Upstream Latency — p95 > 5s
+      - alert: ContHighUpstreamLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(cont_upstream_latency_seconds_bucket[5m])) by (le)
+          ) > 5
+        for: 3m
         labels:
-          severity: critical
+          severity: warning
         annotations:
-          summary: "Cont database connection pool near exhaustion"
-          description: "DB connections active: {{ $value | humanize }} / {{ $labels.max }}"
+          summary: "Cont upstream high latency"
+          description: "p95 upstream latency is over 5 seconds"
 
-      # Redis Connection Exhaustion
-      - alert: ContRedisConnectionExhaustion
-        expr: cont_redis_connections_active / cont_redis_connections_max > 0.85
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Cont Redis connection pool near exhaustion"
-          description: "Redis connections active: {{ $value | humanize }} / {{ $labels.max }}"
-
-      # High Memory Usage
+      # High Memory Usage (if Admin API exposes memory metrics via promhttp)
       - alert: ContHighMemoryUsage
-        expr: (go_memstats_alloc_bytes / go_memstats_sys_bytes) > 0.85
+        expr: (process_resident_memory_bytes / process_resident_memory_bytes) > 0.85
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Cont high memory usage"
-          description: "Memory usage is {{ $value | humanizePercentage }}"
+          description: "Memory usage is over 85%"
 
-      # Service Down — no requests for 3 minutes when previously active
+      # Service Down — no requests accepted
       - alert: ContServiceDown
-        expr: |
-          sum(promhttp_metric_handler_requests_total)
-            unless
-          sum(promhttp_metric_handler_requests_total offset 3m) == 0
-        for: 3m
+        expr: cont_nginx_requests_total == 0
+        for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "Cont Admin API appears down"
-          description: "No requests received in the last 3 minutes"
-
-      # Goroutine Leak — goroutines growing without bound
-      - alert: ContGoroutineLeak
-        expr: increase(go_goroutines[10m]) > 100
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Cont potential goroutine leak"
-          description: "Goroutines increased by {{ $value }} over the last 10 minutes"
+          summary: "Cont proxy receiving no traffic"
+          description: "No requests in the last 5 minutes — service may be down"
