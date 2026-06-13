@@ -227,7 +227,8 @@ func RunMigrations(db *sql.DB) error {
 			threshold REAL NOT NULL,
 			actual_value REAL NOT NULL,
 			triggered_at TIMESTAMPTZ DEFAULT NOW(),
-			message TEXT
+			message TEXT,
+			trace_id TEXT
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_alert_history_rule_id ON alert_history(rule_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_alert_history_triggered_at ON alert_history(triggered_at DESC)`,

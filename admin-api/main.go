@@ -72,6 +72,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(corsMiddleware())
+	r.Use(routes.Tracing())
 
 	// Health + Metrics
 	r.GET("/status", routes.Status(store))

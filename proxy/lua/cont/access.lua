@@ -10,9 +10,26 @@ local function get_cont()
     return _G.cont or {}
 end
 
+-- Generate a random trace ID (32 hex chars)
+local function generate_trace_id()
+    local chars = "0123456789abcdef"
+    local id = {}
+    for i = 1, 32 do
+        id[i] = chars:sub(math.random(1, 16), 16)
+    end
+    return table.concat(id)
+end
+
 -- ── Internal Admin API call via ngx.location.capture ──────────────────────────
 local function admin_api_call(path)
-    local res = ngx.location.capture("/__cont_api_internal__" .. path)
+    local trace_id = ngx.var.http_x_cont_trace_id or ""
+    local headers = {}
+    if trace_id ~= "" then
+        headers["X-Cont-Trace-ID"] = trace_id
+    end
+    local res = ngx.location.capture("/__cont_api_internal__" .. path, {
+        headers = headers,
+    })
     return res.status, res.body
 end
 
@@ -272,6 +289,15 @@ if ngx.req.get_method() == "OPTIONS" then
 end
 
 local cont = get_cont()
+
+-- Generate or propagate trace ID for distributed tracing
+local trace_id = ngx.var.http_x_cont_trace_id
+if not trace_id or trace_id == "" then
+    trace_id = generate_trace_id()
+end
+ngx.var.cont_trace_id = trace_id
+ngx.header["X-Cont-Trace-ID"] = trace_id
+
 if not cont.routes or #cont.routes == 0 then
     -- Load config from Admin API if not yet loaded
     local status, body = admin_api_call("/internal/config/snapshot")

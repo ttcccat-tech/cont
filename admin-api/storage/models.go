@@ -99,6 +99,7 @@ type AlertHistory struct {
 	ActualValue float64 `json:"actual_value"`
 	TriggeredAt string  `json:"triggered_at"`
 	Message     string  `json:"message,omitempty"`
+	TraceID     string  `json:"trace_id,omitempty"`
 }
 
 // ── API Key Requests ───────────────────────────────────────────────────────

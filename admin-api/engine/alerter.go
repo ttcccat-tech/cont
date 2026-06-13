@@ -2,6 +2,8 @@ package engine
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -347,8 +349,13 @@ func (a *Alerter) checkCondition(value, threshold float64, operator string) bool
 }
 
 func (a *Alerter) fireAlert(rule *storage.AlertRule, currentValue float64) {
-	log.Printf("[alerter] rule %d (%s) triggered: %s %s %f (current: %f)",
-		rule.ID, rule.Name, rule.MetricType, rule.Operator, rule.ThresholdValue, currentValue)
+	// Generate a trace ID for this alert firing event
+	b := make([]byte, 16)
+	rand.Read(b)
+	traceID := hex.EncodeToString(b)
+
+	log.Printf("[alerter] rule %d (%s) triggered: %s %s %f (current: %f) [trace=%s]",
+		rule.ID, rule.Name, rule.MetricType, rule.Operator, rule.ThresholdValue, currentValue, traceID)
 
 	var wg sync.WaitGroup
 	if rule.SlackWebhookURL != "" {
@@ -403,6 +410,7 @@ func (a *Alerter) fireAlert(rule *storage.AlertRule, currentValue float64) {
 		Threshold:   rule.ThresholdValue,
 		ActualValue: currentValue,
 		Message:     fmt.Sprintf("Alert rule '%s' triggered: %s %s %f (actual: %f)", rule.Name, rule.MetricType, rule.Operator, rule.ThresholdValue, currentValue),
+		TraceID:     traceID,
 	}
 	if err := a.store.CreateAlertHistory(history); err != nil {
 		log.Printf("[alerter] failed to create alert history for rule %d: %v", rule.ID, err)

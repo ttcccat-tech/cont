@@ -22,6 +22,30 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Tracing middleware — generates or propagates a trace ID (X-Cont-Trace-ID) for distributed tracing.
+// The trace ID is stored in gin.Context and included in all log output.
+func Tracing() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		traceID := c.GetHeader("X-Cont-Trace-ID")
+		if traceID == "" {
+			b := make([]byte, 16)
+			rand.Read(b)
+			traceID = hex.EncodeToString(b)
+		}
+		c.Set("trace_id", traceID)
+		c.Header("X-Cont-Trace-ID", traceID)
+		c.Next()
+	}
+}
+
+// GetTraceID returns the trace ID from the gin context, or "unknown" if not set.
+func GetTraceID(c *gin.Context) string {
+	if id, ok := c.Get("trace_id"); ok {
+		return id.(string)
+	}
+	return "unknown"
+}
+
 // AuthRequired returns a gin middleware that validates JWT tokens
 func AuthRequired(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
