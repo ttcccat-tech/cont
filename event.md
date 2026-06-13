@@ -235,6 +235,14 @@
 
 ## ✅ 已完成
 
+- [x] **Cont Alert Engine SSE 即時通知整合** — AlertRule 觸發時廣播 SSE 事件至前端 EventListener，實現即時告警通知
+  - Backend: alerter.go fireAlert() 呼叫 storage.Hub.BroadcastAll("alert_triggered", ...) 在 webhook 通知完成後廣播
+  - Frontend: EventListener.tsx 監聽 alert_triggered 事件，渲染 error Toast（rule_name, metric_type, operator, threshold, current_value）
+  - QA: Go build ✅, frontend build ✅
+  - commit `011f3dfb` + `7245ab24`
+
+## ✅ 已完成
+
 - [x] **Cont API Audit Log 完整覆蓋（Plugin/Workspace/AlertRule/ConfigSnapshot CRUD）** — commit `410372c5`
   - Plugin: Create/Update/Delete audit log
   - Workspace: Create/Update/Delete audit log
