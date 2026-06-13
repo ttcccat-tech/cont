@@ -230,7 +230,7 @@ func (s *Store) CreateGrpcService(gs *GrpcService) (*GrpcService, error) {
 	}
 	err := s.db.QueryRow(`
 		INSERT INTO grpc_services (name, package, proto_file, upstream_id, enabled, org_id)
-		VALUES ($1, $2, $3, NULLIF($4, ''), $5, $6)
+		VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5, $6)
 		RETURNING id, created_at, updated_at`,
 		gs.Name, orString(gs.Package, ""), orString(gs.ProtoFile, ""),
 		gs.UpstreamID, orBool(gs.Enabled, true), orgID,
@@ -270,7 +270,7 @@ func (s *Store) GetGrpcService(id, orgID string) (*GrpcService, error) {
 func (s *Store) UpdateGrpcService(id, orgID string, gs *GrpcService) (*GrpcService, error) {
 	err := s.db.QueryRow(`
 		UPDATE grpc_services SET
-			name=$2, package=$3, proto_file=$4, upstream_id=NULLIF($5, ''), enabled=$6, updated_at=NOW()
+			name=$2, package=$3, proto_file=$4, upstream_id=NULLIF($5, '')::uuid, enabled=$6, updated_at=NOW()
 		WHERE id=$1 AND ($7 = '' OR org_id::text = $7) RETURNING updated_at`,
 		id, gs.Name, orString(gs.Package, ""), orString(gs.ProtoFile, ""),
 		gs.UpstreamID, orBool(gs.Enabled, true), orgID,
@@ -294,7 +294,7 @@ func (s *Store) ListGrpcMethods(serviceID, orgID string) ([]GrpcMethod, error) {
 		SELECT id, service_id, name, method_type, input_type, output_type, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM grpc_methods
-		WHERE service_id = $1 AND ($2 = '' OR org_id::text = $2)
+		WHERE service_id = $1::uuid AND ($2 = '' OR org_id::text = $2)
 		ORDER BY created_at ASC`
 	rows, err := s.db.Query(query, serviceID, orgID)
 	if err != nil {
@@ -330,7 +330,7 @@ func (s *Store) CreateGrpcMethod(gm *GrpcMethod) (*GrpcMethod, error) {
 	}
 	err := s.db.QueryRow(`
 		INSERT INTO grpc_methods (service_id, name, method_type, input_type, output_type, enabled, org_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at`,
 		gm.ServiceID, gm.Name, orString(gm.MethodType, "unary"),
 		orString(gm.InputType, ""), orString(gm.OutputType, ""),
