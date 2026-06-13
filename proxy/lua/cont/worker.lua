@@ -23,6 +23,22 @@ local function sync_plugins()
     ngx.log(ngx.DEBUG, "cont: synced ", #(_G.cont.plugins or {}), " plugins")
 end
 
+-- Fetch plugin schema registry from Admin API
+local function sync_plugin_registry()
+    local res = ngx.location.capture("/__cont_api_internal__/internal/plugin-registry")
+    if res.status ~= 200 then
+        ngx.log(ngx.WARN, "cont: plugin registry sync failed: status=", res.status)
+        return
+    end
+    local ok, data = pcall(cjson.decode, res.body)
+    if not ok then
+        ngx.log(ngx.ERR, "cont: plugin registry JSON decode error: ", data)
+        return
+    end
+    _G.cont.plugin_registry = data.plugins or {}
+    ngx.log(ngx.DEBUG, "cont: synced ", #(_G.cont.plugin_registry or {}), " plugin schemas")
+end
+
 -- Fetch circuit breaker configs from Admin API and write to shared memory
 local function sync_circuit_breakers()
     local res = ngx.location.capture("/__cont_api_internal__/internal/circuit-breaker-configs")
@@ -57,6 +73,7 @@ local function start_config_sync()
     local ok, err = ngx.timer.every(10, function()
         local ok2, err2 = pcall(function()
             sync_plugins()
+            sync_plugin_registry()
             sync_circuit_breakers()
         end)
         if not ok2 then
@@ -83,6 +100,7 @@ end
 
 -- Initial sync on startup
 sync_plugins()
+sync_plugin_registry()
 sync_circuit_breakers()
 
 start_config_sync()

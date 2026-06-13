@@ -123,6 +123,7 @@ func main() {
 	r.GET("/internal/validate-cred/:type/:key", routes.ValidateCredential(store))
 	r.GET("/internal/validate-jwt/:token", routes.ValidateJWT(store, jwtSecret))
 	r.GET("/internal/plugins", routes.ListInternalPlugins(store))
+	r.GET("/internal/plugin-registry", routes.GetPluginRegistry())
 	r.GET("/internal/plan-quota/:consumer_id", routes.GetPlanQuota(store))
 	r.GET("/internal/plan-quota/default", routes.GetDefaultPlanQuota(store))
 	r.GET("/internal/config/snapshot", routes.GetProxyRuntimeConfig(store))

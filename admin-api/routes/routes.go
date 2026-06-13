@@ -1280,6 +1280,15 @@ func ListInternalPlugins(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// GetPluginRegistry returns the built-in plugin schema registry.
+// Called by the proxy's worker.lua to discover available plugins and their interfaces.
+func GetPluginRegistry() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		plugins := storage.BuiltInPlugins()
+		c.JSON(200, gin.H{"plugins": plugins})
+	}
+}
+
 // GetProxyRuntimeConfig returns the full live runtime config for the Lua proxy.
 // Called by access.lua via /__cont_api_internal__/internal/config/snapshot (no auth).
 // This is separate from the admin /config/snapshots CRUD endpoints.

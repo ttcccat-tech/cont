@@ -330,6 +330,20 @@ type PluginScope struct {
 	ID string `json:"id"`
 }
 
+// PluginSchema defines the interface and configuration schema for a Cont plugin
+type PluginSchema struct {
+	Name        string                 `json:"name"`                  // unique plugin identifier
+	Version     string                 `json:"version,omitempty"`      // semver
+	Label       string                 `json:"label,omitempty"`       // human-readable name
+	Description string                 `json:"description,omitempty"` // what the plugin does
+	AccessPhase bool                   `json:"access_phase"`          // runs in access phase
+	LogPhase    bool                   `json:"log_phase"`             // runs in log phase
+	PreProxy    bool                   `json:"pre_proxy,omitempty"`   // runs after upstream selected, before proxy
+	PostProxy   bool                   `json:"post_proxy,omitempty"`  // runs after proxy response
+	ConfigSchema map[string]interface{} `json:"config_schema,omitempty"` // JSON Schema for config validation
+}
+
+// Plugin represents a configured plugin instance attached to a route/service/consumer
 type Plugin struct {
 	ID         string          `json:"id"`
 	Name       string          `json:"name,omitempty" binding:"omitempty,max=255"`
@@ -340,6 +354,7 @@ type Plugin struct {
 	Enabled    bool            `json:"enabled"`
 	OrgID      string          `json:"org_id,omitempty"`
 	Scope      string          `json:"scope,omitempty"` // global, workspace, service, route, consumer
+	Schema     *PluginSchema   `json:"schema,omitempty"` // plugin type schema (populated from registry)
 	CreatedAt  string          `json:"created_at,omitempty"`
 	UpdatedAt  string          `json:"updated_at,omitempty"`
 }
