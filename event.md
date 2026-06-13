@@ -322,6 +322,11 @@
 
 ---
 
+- [ ] **Cont Grafana Alerting Rules（Prometheus alerting）** — Cont 已有 Prometheus metrics + Grafana dashboard，但缺少實際的 alerting rules
+  - 定義 Prometheus alerting rules: HighErrorRate, HighLatency, DBConnectionExhaustion, RedisConnectionExhaustion, HighMemoryUsage, ServiceDown
+  - 設定 Alertmanager integration（或使用 Grafana managed alerts）
+  - 驗證：觸發一條 alert rule → AlertHistory 出現記錄 + SSE 通知前端
+
 ## 🟡 預計優化
 
 - [x] **Cont AlertRules.tsx SSE 即時更新 + AlertHistory 聯動** — commit `28cccd5b`

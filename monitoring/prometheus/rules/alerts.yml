@@ -1,0 +1,82 @@
+# Cont API Gateway Alerting Rules
+groups:
+  - name: cont_alerts
+    rules:
+      # High Error Rate — 5xx errors > 5% over 5 minutes
+      - alert: ContHighErrorRate
+        expr: |
+          sum(rate(promhttp_metric_handler_requests_total{status_code=~"5.."}[5m]))
+          /
+          sum(rate(promhttp_metric_handler_requests_total[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cont API high 5xx error rate"
+          description: "5xx error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+
+      # High Latency — p95 > 2s
+      - alert: ContHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(cont_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cont API high latency"
+          description: "p95 latency is {{ $value | humanizeDuration }}"
+
+      # Database Connection Exhaustion
+      - alert: ContDBConnectionExhaustion
+        expr: cont_db_connections_active / cont_db_connections_max > 0.85
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cont database connection pool near exhaustion"
+          description: "DB connections active: {{ $value | humanize }} / {{ $labels.max }}"
+
+      # Redis Connection Exhaustion
+      - alert: ContRedisConnectionExhaustion
+        expr: cont_redis_connections_active / cont_redis_connections_max > 0.85
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cont Redis connection pool near exhaustion"
+          description: "Redis connections active: {{ $value | humanize }} / {{ $labels.max }}"
+
+      # High Memory Usage
+      - alert: ContHighMemoryUsage
+        expr: (go_memstats_alloc_bytes / go_memstats_sys_bytes) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cont high memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      # Service Down — no requests for 3 minutes when previously active
+      - alert: ContServiceDown
+        expr: |
+          sum(promhttp_metric_handler_requests_total)
+            unless
+          sum(promhttp_metric_handler_requests_total offset 3m) == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cont Admin API appears down"
+          description: "No requests received in the last 3 minutes"
+
+      # Goroutine Leak — goroutines growing without bound
+      - alert: ContGoroutineLeak
+        expr: increase(go_goroutines[10m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cont potential goroutine leak"
+          description: "Goroutines increased by {{ $value }} over the last 10 minutes"
