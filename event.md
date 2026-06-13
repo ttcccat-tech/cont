@@ -322,12 +322,30 @@
 
 ---
 
-- [ ] **Cont Grafana Alerting Rules（Prometheus alerting）** — Cont 已有 Prometheus metrics + Grafana dashboard，但缺少實際的 alerting rules
+- [x] **Cont Grafana Alerting Rules（Prometheus alerting）** — commit `f9e404bb`
   - 定義 Prometheus alerting rules: HighErrorRate, HighLatency, DBConnectionExhaustion, RedisConnectionExhaustion, HighMemoryUsage, ServiceDown
   - 設定 Alertmanager integration（或使用 Grafana managed alerts）
   - 驗證：觸發一條 alert rule → AlertHistory 出現記錄 + SSE 通知前端
 
 ## 🟡 預計優化
+
+- [ ] **Cont Admin API OpenTelemetry Tracing 實作** — Cont 已有 X-Cont-Trace-ID 生成，但缺少實際的 spans / OTLP export
+  - Backend: 整合 OpenTelemetry SDK (go.opentelemetry.io/otel)，替換現有 Tracing() middleware 為 otelgin middleware
+  - 支援 OTLP exporter (OTEL_EXPORTER_OTLP_ENDPOINT) 匯出 traces 至 Jaeger / Grafana Tempo / OTEL Collector
+  - 替換手動 rand.Read trace ID 為 SDK trace/span model
+  - Proxy: access.lua 已生成 X-Cont-Trace-ID，需整合 OpenTelemetry propagation (W3C TraceContext)
+  - 驗證：API request → spans 出現在 Jaeger/Grafana Tempo UI
+
+## 🔴 未完成
+
+（無）
+
+## ✅ 已完成
+
+- [x] **usage-tracking plugin latency 為 0** — commit `6052037e`
+  - access.lua 未設定 `request_start_time`，log phase 計算 latency 時永遠為 0
+  - 修復：access.lua 在 plugin access chain 之前設定 `ngx.ctx.request_start_time = ngx.now() * 1000`
+  - usage-tracking handler log phase 現在正確使用 request_start_time 計算實際延遲
 
 - [x] **Cont AlertRules.tsx SSE 即時更新 + AlertHistory 聯動** — commit `28cccd5b`
   - AlertRules.tsx: `fetchRulesRef` stable ref 避免 SSE handler stale closure，`alert_triggered` 事件觸發 `fetchRulesRef.current()` 真正刷新列表
