@@ -722,6 +722,10 @@ func (s *Store) UpdateConsumerCredential(consumerID, credentialType, credentialI
 		args = append(args, *expiresAt)
 		argIdx++
 	}
+	// Nothing to update
+	if argIdx == 1 {
+		return nil
+	}
 	// Remove trailing comma
 	query = query[:len(query)-2]
 	query += fmt.Sprintf(" WHERE id=$%d AND consumer_id=$%d AND credential_type=$%d", argIdx, argIdx+1, argIdx+2)
