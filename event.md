@@ -337,20 +337,25 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Circuit Breaker Plugin** — Kong upstream 健康狀態驅動的熔斷器，防止連鎖故障
-  - Proxy Lua plugin: `cont/plugins/circuit-breaker/handler.lua`
-  - 邏輯：根據 upstream health status，主動斷開 unhealthy targets，迴避後端故障
-  - 熔斷狀態：CLOSED（正常）→ OPEN（熔斷）→ HALF_OPEN（探測）
-  - 群眾演算法：連續失敗 N 次觸發熔斷，Success rate > X% 關閉熔斷
-  - Backend: `/upstreams/:id/circuit-breaker` 設定 endpoint（trip threshold, half-open success rate）
-  - Frontend: Upstream detail 新增 Circuit Breaker 設定 tab
-  - QA: upstream 全部 target 故障 → 請求被阻擋（503）→ 一個 target 康復 → 請求恢復 ✅
+（無）
 
 ## 🔴 未完成
 
 （無）
 
 ## ✅ 已完成
+
+- [x] **Cont Circuit Breaker Plugin** — commit `5b8d8bf9`
+  - Proxy Lua: `cont/plugins/circuit-breaker/handler.lua` — CLOSED/OPEN/HALF_OPEN 狀態機，Redis 持久化狀態
+  - Backend: `GET/POST /upstreams/:id/circuit-breaker` 設定端點（trip_threshold/recovery_timeout/half_open_max_requests/half_open_success_rate）
+  - Backend: `GET /internal/circuit-breaker-configs` 供 proxy 同步 CB 設定
+  - Redis storage: `CircuitBreakerConfig` CRUD + upstream ID tracking set
+  - worker.lua: 每10s同步CB設定至 shared memory
+  - access.lua: upstream target選擇後執行 CB pre_proxy
+  - log.lua: CB log phase 記錄成功/失敗，觸發狀態轉換
+  - nginx.conf: 新增 `cont_circuit_breaker_config`/`cont_circuit_breaker_state` shared dicts
+  - Frontend: Upstreams.tsx detail drawer 新增「熔斷器」tab（5項參數設定）
+  - kong.ts: `CircuitBreakerConfig` interface + `getCircuitBreaker`/`setCircuitBreaker` API
 
 - [x] **Cont Admin API OpenTelemetry Tracing 實作** — commit `93ea9186`
   - Backend: `tracing/tracing.go` — Init() 設定 OTel TracerProvider，支援 OTLP exporter (OTEL_EXPORTER_OTLP_ENDPOINT)、W3C TraceContext + Baggage propagation，無 endpoint 時使用 in-memory fallback
