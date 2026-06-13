@@ -71,6 +71,58 @@ func UsageTracker(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// QuotaEnforcer blocks requests when the org has exceeded its monthly API quota.
+// Returns 429 Too Many Requests with a Retry-After header when quota is exceeded.
+// Skips if no org_id is set or plan is unlimited (-1).
+func QuotaEnforcer(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := c.GetString("org_id")
+		if orgID == "" || orgID == "00000000-0000-0000-0000-000000000000" {
+			c.Next()
+			return
+		}
+
+		// Get plan limit
+		org, err := store.GetOrganization(orgID)
+		if err != nil || org == nil {
+			c.Next()
+			return
+		}
+
+		plan, err := store.GetPlanByName(org.Plan)
+		if err != nil || plan == nil {
+			c.Next()
+			return
+		}
+
+		limit := plan.RequestLimit
+		if limit == -1 {
+			c.Next()
+			return
+		}
+
+		// Get current monthly usage
+		used, err := store.Redis().GetMonthlyUsage(c.Request.Context(), orgID)
+		if err != nil {
+			log.Printf("[quota] GetMonthlyUsage failed for org %s: %v", orgID, err)
+			c.Next()
+			return
+		}
+
+		if used >= limit {
+			c.Header("Retry-After", "3600")
+			c.JSON(429, gin.H{
+				"code":    "QUOTA_EXCEEDED",
+				"message": fmt.Sprintf("Monthly API quota exceeded (%d/%d). Resets at the start of next month.", used, limit),
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 func paginate(c *gin.Context) (int, int) {

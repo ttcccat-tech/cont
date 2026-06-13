@@ -126,6 +126,7 @@ func main() {
 	admin := r.Group("/")
 	admin.Use(routes.AuthRequired(jwtSecret))
 	admin.Use(routes.UsageTracker(store))
+	admin.Use(routes.QuotaEnforcer(store))
 	{
 		svcs := admin.Group("/services")
 		{

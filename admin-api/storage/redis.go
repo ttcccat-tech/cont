@@ -114,6 +114,28 @@ func (r *Redis) GetUsage(ctx context.Context, orgID string) (int64, error) {
 	return val, err
 }
 
+// GetMonthlyUsage returns the total API request count for the current calendar month.
+// Sums all hourly buckets from the 1st of the month to the current hour.
+func (r *Redis) GetMonthlyUsage(ctx context.Context, orgID string) (int64, error) {
+	now := time.Now()
+	// Start of current month
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	end := now
+
+	var total int64
+	current := start
+	for current.Before(end) {
+		hour := current.Format("2006010215")
+		key := fmt.Sprintf("cont:usage:%s:%s", orgID, hour)
+		val, err := r.client.Get(ctx, key).Int64()
+		if err == nil {
+			total += val
+		}
+		current = current.Add(time.Hour)
+	}
+	return total, nil
+}
+
 // HourlyUsage represents a single hour's usage data point
 type HourlyUsage struct {
 	Hour  string `json:"hour"`  // YYYYMMDDHH format

@@ -519,7 +519,8 @@ func GetUsage(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 
-		used, err := store.Redis().GetUsage(c.Request.Context(), orgID)
+		// Get current monthly usage (sum of all hourly buckets in current month)
+		used, err := store.Redis().GetMonthlyUsage(c.Request.Context(), orgID)
 		if err != nil {
 			log.Printf("[usage] GetUsage failed for org %s: %v", orgID, err)
 			used = 0
