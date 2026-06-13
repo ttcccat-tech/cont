@@ -414,6 +414,7 @@ func RunMigrations(db *sql.DB) error {
 		// Alert rule triggered state (added later)
 		`ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS last_triggered_at TIMESTAMPTZ`,
 		`ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS last_triggered_value REAL`,
+		`ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS conditions JSONB DEFAULT '[{"metric_type":"","service_name":"","threshold_value":0,"operator":">","logic":"AND"}]'::jsonb`,
 		`CREATE INDEX IF NOT EXISTS idx_plugins_scope ON plugins(scope)`,
 
 		// Phase 3: Billing/Plan (Stripe integration)

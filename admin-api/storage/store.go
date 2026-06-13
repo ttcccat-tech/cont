@@ -1723,7 +1723,7 @@ func (s *Store) CreateAuditLog(l *AuditLog) error {
 
 func (s *Store) ListAlertRules() ([]AlertRule, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, description, metric_type, service_name, threshold_value, operator,
+		`SELECT id, name, description, conditions, metric_type, service_name, threshold_value, operator,
 		        duration_seconds, enabled, notification_channels, slack_webhook_url,
 		        email_webhook_url, discord_webhook_url, alert_suppress_seconds,
 		        last_triggered_at, last_triggered_value, created_at, updated_at
@@ -1739,13 +1739,17 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 		var createdAt, updatedAt sql.NullString
 		var lastTriggeredAt sql.NullString
 		var lastTriggeredValue sql.NullFloat64
-		if err := rows.Scan(&r.ID, &r.Name, &desc, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
+		var conditionsJSON []byte
+		if err := rows.Scan(&r.ID, &r.Name, &desc, &conditionsJSON, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
 			&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
 			&r.AlertSuppressSeconds, &lastTriggeredAt, &lastTriggeredValue, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
 		if desc.Valid {
 			r.Description = desc.String
+		}
+		if len(conditionsJSON) > 0 {
+			json.Unmarshal(conditionsJSON, &r.Conditions)
 		}
 		if svcName.Valid {
 			r.ServiceName = svcName.String
@@ -1781,12 +1785,13 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 
 func (s *Store) CreateAlertRule(r *AlertRule) (*AlertRule, error) {
 	var outID int64
+	conditionsJSON, _ := json.Marshal(r.Conditions)
 	err := s.db.QueryRow(
-		`INSERT INTO alert_rules (name, description, metric_type, service_name, threshold_value, operator,
+		`INSERT INTO alert_rules (name, description, conditions, metric_type, service_name, threshold_value, operator,
 		 duration_seconds, enabled, notification_channels, slack_webhook_url, email_webhook_url,
-		 discord_webhook_url, alert_suppress_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		 discord_webhook_url, alert_suppress_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		 RETURNING id, created_at, updated_at`,
-		r.Name, nullString(r.Description), r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
+		r.Name, nullString(r.Description), conditionsJSON, r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
 		r.Operator, r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
 		nullString(r.SlackWebhookURL), nullString(r.EmailWebhookURL), nullString(r.DiscordWebhookURL),
 		r.AlertSuppressSeconds,
@@ -1802,12 +1807,13 @@ func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
 	var r AlertRule
 	var desc, svcName, notifCh, slackURL, emailURL, discordURL sql.NullString
 	var createdAt, updatedAt sql.NullString
+	var conditionsJSON []byte
 	err := s.db.QueryRow(
-		`SELECT id, name, description, metric_type, service_name, threshold_value, operator,
+		`SELECT id, name, description, conditions, metric_type, service_name, threshold_value, operator,
 		        duration_seconds, enabled, notification_channels, slack_webhook_url,
 		        email_webhook_url, discord_webhook_url, alert_suppress_seconds, created_at, updated_at
 		 FROM alert_rules WHERE id=$1`, id,
-	).Scan(&r.ID, &r.Name, &desc, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
+	).Scan(&r.ID, &r.Name, &desc, &conditionsJSON, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
 		&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
 		&r.AlertSuppressSeconds, &createdAt, &updatedAt)
 	if err != nil {
@@ -1815,6 +1821,9 @@ func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
 	}
 	if desc.Valid {
 		r.Description = desc.String
+	}
+	if len(conditionsJSON) > 0 {
+		json.Unmarshal(conditionsJSON, &r.Conditions)
 	}
 	if svcName.Valid {
 		r.ServiceName = svcName.String
@@ -1841,12 +1850,13 @@ func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
 }
 
 func (s *Store) UpdateAlertRule(id string, r *AlertRule) (*AlertRule, error) {
+	conditionsJSON, _ := json.Marshal(r.Conditions)
 	err := s.db.QueryRow(
-		`UPDATE alert_rules SET name=$2, description=$3, metric_type=$4, service_name=$5, threshold_value=$6,
-		 operator=$7, duration_seconds=$8, enabled=$9, notification_channels=$10, slack_webhook_url=$11,
-		 email_webhook_url=$12, discord_webhook_url=$13, alert_suppress_seconds=$14, updated_at=NOW()
+		`UPDATE alert_rules SET name=$2, description=$3, conditions=$4, metric_type=$5, service_name=$6, threshold_value=$7,
+		 operator=$8, duration_seconds=$9, enabled=$10, notification_channels=$11, slack_webhook_url=$12,
+		 email_webhook_url=$13, discord_webhook_url=$14, alert_suppress_seconds=$15, updated_at=NOW()
 		 WHERE id=$1 RETURNING updated_at`,
-		id, r.Name, nullString(r.Description), r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
+		id, r.Name, nullString(r.Description), conditionsJSON, r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
 		r.Operator, r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
 		nullString(r.SlackWebhookURL), nullString(r.EmailWebhookURL), nullString(r.DiscordWebhookURL),
 		r.AlertSuppressSeconds,

@@ -91,21 +91,116 @@ func (a *Alerter) evaluateRule(rule *storage.AlertRule) {
 		}
 	}
 
-	// Fetch metric value from proxy metrics endpoint
-	value, err := a.fetchMetric(rule)
-	if err != nil {
-		log.Printf("[alerter] rule %d (%s): failed to fetch metric: %v", rule.ID, rule.Name, err)
-		return
+	var triggered bool
+	var triggeredValue float64
+
+	if len(rule.Conditions) > 0 {
+		// Multi-condition mode: evaluate all conditions with AND/OR logic
+		triggered = a.evaluateConditions(rule)
+		if triggered {
+			// Use the primary metric value for notification
+			val, _ := a.fetchConditionMetric(rule.Conditions[0])
+			triggeredValue = val
+		}
+	} else {
+		// Legacy single-condition mode
+		value, err := a.fetchMetric(rule)
+		if err != nil {
+			log.Printf("[alerter] rule %d (%s): failed to fetch metric: %v", rule.ID, rule.Name, err)
+			return
+		}
+		triggered = a.checkCondition(value, rule.ThresholdValue, rule.Operator)
+		triggeredValue = value
 	}
 
-	// Evaluate condition
-	triggered := a.checkCondition(value, rule.ThresholdValue, rule.Operator)
 	if !triggered {
 		return
 	}
 
 	// Fire notification
-	a.fireAlert(rule, value)
+	a.fireAlert(rule, triggeredValue)
+}
+
+// evaluateConditions evaluates multiple conditions with AND/OR logic.
+// The Logic field of each condition (except the last) determines how it combines
+// with the next condition. Default logic is AND.
+func (a *Alerter) evaluateConditions(rule *storage.AlertRule) bool {
+	if len(rule.Conditions) == 0 {
+		return false
+	}
+
+	// Evaluate first condition
+	cond := rule.Conditions[0]
+	firstValue, err := a.fetchConditionMetric(cond)
+	if err != nil {
+		log.Printf("[alerter] rule %d (%s): failed to fetch metric for condition: %v", rule.ID, rule.Name, err)
+		return false
+	}
+	result := a.checkCondition(firstValue, cond.ThresholdValue, cond.Operator)
+
+	// Evaluate remaining conditions with AND/OR logic
+	for i := 1; i < len(rule.Conditions); i++ {
+		cond := rule.Conditions[i]
+		value, err := a.fetchConditionMetric(cond)
+		if err != nil {
+			log.Printf("[alerter] rule %d (%s): failed to fetch metric for condition %d: %v", rule.ID, rule.Name, i, err)
+			return false
+		}
+		condResult := a.checkCondition(value, cond.ThresholdValue, cond.Operator)
+
+		// Determine logic from previous condition
+		prevLogic := "AND"
+		if i-1 < len(rule.Conditions) {
+			prevLogic = rule.Conditions[i-1].Logic
+		}
+
+		switch prevLogic {
+		case "OR":
+			result = result || condResult
+		default: // AND
+			result = result && condResult
+		}
+	}
+
+	return result
+}
+
+// fetchConditionMetric fetches the metric value for a single condition.
+func (a *Alerter) fetchConditionMetric(cond storage.Condition) (float64, error) {
+	if a.metricsURL != "" {
+		// Fetch from Prometheus endpoint
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Get(a.metricsURL)
+		if err != nil {
+			return 0, fmt.Errorf("metrics request failed: %w", err)
+		}
+		defer resp.Body.Close()
+		var buf bytes.Buffer
+		if _, err := buf.ReadFrom(resp.Body); err != nil {
+			return 0, fmt.Errorf("read body failed: %w", err)
+		}
+		return parseMetricFromPrometheusWithCond(buf.Bytes(), cond)
+	}
+	// Fallback: compute from proxy metrics
+	return a.computeConditionMetric(cond)
+}
+
+// computeConditionMetric computes metric value for a condition from proxy metrics.
+func (a *Alerter) computeConditionMetric(cond storage.Condition) (float64, error) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	if cond.MetricType == "error_rate" || cond.MetricType == "latency" {
+		resp, err := client.Get("http://localhost:18000/metrics")
+		if err != nil {
+			return 0, fmt.Errorf("proxy metrics request failed: %w", err)
+		}
+		defer resp.Body.Close()
+		var buf bytes.Buffer
+		if _, err := buf.ReadFrom(resp.Body); err != nil {
+			return 0, fmt.Errorf("read proxy metrics failed: %w", err)
+		}
+		return parseMetricFromPrometheusWithCond(buf.Bytes(), cond)
+	}
+	return 0.0, fmt.Errorf("unknown metric type: %s", cond.MetricType)
 }
 
 func (a *Alerter) fetchMetric(rule *storage.AlertRule) (float64, error) {
@@ -193,6 +288,43 @@ func parseMetricFromPrometheus(body []byte, rule *storage.AlertRule) (float64, e
 	}
 
 	// Default value when metric not found (assume healthy/zero error)
+	return 0.0, nil
+}
+
+// parseMetricFromPrometheusWithCond extracts a metric value for a specific condition.
+func parseMetricFromPrometheusWithCond(body []byte, cond storage.Condition) (float64, error) {
+	metricName := cond.MetricType
+	if cond.MetricType == "error_rate" {
+		metricName = "cont_upstream_target_up"
+	} else if cond.MetricType == "latency" {
+		metricName = "cont_nginx_requests_total"
+	}
+
+	serviceLabel := cond.ServiceName
+
+	lines := strings.Split(string(body), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, metricName) {
+			continue
+		}
+		if serviceLabel != "" {
+			if !strings.Contains(line, `service_name="`+serviceLabel+`"`) {
+				continue
+			}
+		}
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		valStr := strings.TrimSpace(parts[1])
+		var val float64
+		if _, err := fmt.Sscanf(valStr, "%f", &val); err == nil {
+			return val, nil
+		}
+	}
 	return 0.0, nil
 }
 

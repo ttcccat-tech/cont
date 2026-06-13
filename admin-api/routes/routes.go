@@ -2629,20 +2629,29 @@ func ListAuditLogs(store *storage.Store) gin.HandlerFunc {
 
 // ── Alert Rules ──────────────────────────────────────────────────────────────
 
+type Condition struct {
+	MetricType     string  `json:"metric_type" binding:"omitempty,oneof=error_rate latency"`
+	ServiceName    string  `json:"service_name"`
+	ThresholdValue float64 `json:"threshold_value"`
+	Operator       string  `json:"operator" binding:"omitempty,oneof=> < >= <= =="`
+	Logic          string  `json:"logic" binding:"omitempty,oneof=AND OR"`
+}
+
 type UpdateAlertRuleRequest struct {
-	Name                 string  `json:"name" binding:"omitempty,max=255"`
-	Description          string  `json:"description,omitempty"`
-	MetricType           string  `json:"metric_type" binding:"omitempty,oneof=error_rate latency"`
-	ServiceName          string  `json:"service_name"`
-	ThresholdValue       float64 `json:"threshold_value"`
-	Operator             string  `json:"operator" binding:"omitempty,oneof=> < >= <= =="`
-	DurationSeconds      int     `json:"duration_seconds" binding:"omitempty,min=1"`
-	Enabled              *bool   `json:"enabled"`
-	NotificationChannels string  `json:"notification_channels,omitempty"`
-	SlackWebhookURL      string  `json:"slack_webhook_url,omitempty"`
-	EmailWebhookURL      string  `json:"email_webhook_url,omitempty"`
-	DiscordWebhookURL    string  `json:"discord_webhook_url,omitempty"`
-	AlertSuppressSeconds int     `json:"alert_suppress_seconds"`
+	Name                 string      `json:"name" binding:"omitempty,max=255"`
+	Description          string      `json:"description,omitempty"`
+	Conditions           []Condition `json:"conditions,omitempty"`
+	MetricType           string      `json:"metric_type" binding:"omitempty,oneof=error_rate latency"`
+	ServiceName          string      `json:"service_name"`
+	ThresholdValue       float64     `json:"threshold_value"`
+	Operator             string      `json:"operator" binding:"omitempty,oneof=> < >= <= =="`
+	DurationSeconds      int         `json:"duration_seconds" binding:"omitempty,min=1"`
+	Enabled              *bool       `json:"enabled"`
+	NotificationChannels string      `json:"notification_channels,omitempty"`
+	SlackWebhookURL      string      `json:"slack_webhook_url,omitempty"`
+	EmailWebhookURL      string      `json:"email_webhook_url,omitempty"`
+	DiscordWebhookURL    string      `json:"discord_webhook_url,omitempty"`
+	AlertSuppressSeconds int         `json:"alert_suppress_seconds"`
 }
 
 func ListAlertRules(store *storage.Store) gin.HandlerFunc {
@@ -2799,6 +2808,20 @@ func UpdateAlertRule(store *storage.Store) gin.HandlerFunc {
 		existing.EmailWebhookURL = req.EmailWebhookURL
 		existing.DiscordWebhookURL = req.DiscordWebhookURL
 		existing.AlertSuppressSeconds = req.AlertSuppressSeconds
+		// Update multi-conditions if provided
+		if req.Conditions != nil {
+			conds := make([]storage.Condition, len(req.Conditions))
+			for i, c := range req.Conditions {
+				conds[i] = storage.Condition{
+					MetricType:     c.MetricType,
+					ServiceName:    c.ServiceName,
+					ThresholdValue: c.ThresholdValue,
+					Operator:       c.Operator,
+					Logic:          c.Logic,
+				}
+			}
+			existing.Conditions = conds
+		}
 		updated, err := store.UpdateAlertRule(id, existing)
 		if err != nil {
 			internalError(c)

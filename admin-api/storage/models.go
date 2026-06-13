@@ -56,25 +56,34 @@ type AuditLog struct {
 
 // ── Alert Rules ────────────────────────────────────────────────────────────
 
+type Condition struct {
+	MetricType     string  `json:"metric_type"`
+	ServiceName    string  `json:"service_name"`
+	ThresholdValue float64 `json:"threshold_value"`
+	Operator       string  `json:"operator"`
+	Logic          string  `json:"logic"` // "AND" or "OR", applies between this and next condition
+}
+
 type AlertRule struct {
-	ID                  int64   `json:"id"`
-	Name                string  `json:"name" binding:"required,max=255"`
-	Description         string  `json:"description,omitempty"`
-	MetricType          string  `json:"metric_type" binding:"required,oneof=error_rate latency"`
-	ServiceName         string  `json:"service_name"`
-	ThresholdValue      float64 `json:"threshold_value"`
-	Operator            string  `json:"operator" binding:"required,oneof=> < >= <= =="`
-	DurationSeconds     int     `json:"duration_seconds" binding:"min=1"`
-	Enabled             bool    `json:"enabled"`
-	NotificationChannels string `json:"notification_channels,omitempty"`
-	SlackWebhookURL     string  `json:"slack_webhook_url,omitempty"`
-	EmailWebhookURL     string  `json:"email_webhook_url,omitempty"`
-	DiscordWebhookURL   string  `json:"discord_webhook_url,omitempty"`
-	AlertSuppressSeconds int    `json:"alert_suppress_seconds"`
-	LastTriggeredAt     *string `json:"last_triggered_at,omitempty"`
-	LastTriggeredValue  *float64 `json:"last_triggered_value,omitempty"`
-	CreatedAt           string  `json:"created_at,omitempty"`
-	UpdatedAt           string  `json:"updated_at,omitempty"`
+	ID                   int64       `json:"id"`
+	Name                 string      `json:"name" binding:"required,max=255"`
+	Description          string      `json:"description,omitempty"`
+	Conditions           []Condition `json:"conditions,omitempty"` // Multi-condition support; if empty, falls back to single-condition fields below
+	MetricType           string      `json:"metric_type" binding:"omitempty,oneof=error_rate latency"`
+	ServiceName          string      `json:"service_name"`
+	ThresholdValue       float64     `json:"threshold_value"`
+	Operator             string      `json:"operator" binding:"omitempty,oneof=> < >= <="`
+	DurationSeconds      int         `json:"duration_seconds" binding:"min=1"`
+	Enabled              bool        `json:"enabled"`
+	NotificationChannels string      `json:"notification_channels,omitempty"`
+	SlackWebhookURL      string      `json:"slack_webhook_url,omitempty"`
+	EmailWebhookURL      string      `json:"email_webhook_url,omitempty"`
+	DiscordWebhookURL    string      `json:"discord_webhook_url,omitempty"`
+	AlertSuppressSeconds int         `json:"alert_suppress_seconds"`
+	LastTriggeredAt      *string     `json:"last_triggered_at,omitempty"`
+	LastTriggeredValue   *float64    `json:"last_triggered_value,omitempty"`
+	CreatedAt            string      `json:"created_at,omitempty"`
+	UpdatedAt            string      `json:"updated_at,omitempty"`
 }
 
 // ── Alert History ──────────────────────────────────────────────────────────
