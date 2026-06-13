@@ -337,7 +337,14 @@
 
 ## 🟡 預計優化
 
-（無）
+- [ ] **Cont Observability Enhancement Phase 1：自定義 Prometheus Metrics 儀表化** — commit `18d4f224` + `df04b9f1`
+  - metrics.lua: 修正 nginx_requests_total 命名不一致，新增 `cont_request_duration_seconds` histogram（latency buckets 5ms-10s）、`cont_upstream_latency_seconds` histogram、`cont_nginx_connections` gauge、`cont_bytes_sent_total` counter、route/consumer per-entity counters
+  - prometheus.yml: 直接 scrape cont-proxy:8000 而非透過 admin-api
+  - alerts.yml: 修正 metric 引用以匹配實際發出的 metrics（`cont_nginx_requests_total{code="5xx"}` 取代不存在的 `promhttp_metric_handler_requests_total`）
+  - routes/metrics.go: 新增 GaugeFuncs for `cont_db_connections_*` / `cont_redis_connections_*`
+  - storage/postgres.go: Store 新增 `DBPoolStats()` + `RedisPoolStats()` 方法
+  - main.go: 註冊 pool stats 使其出現於 /metrics endpoint
+  - 待完成：QA 驗證 /metrics endpoint 包含所有新 metrics
 
 ## 🔴 未完成
 
