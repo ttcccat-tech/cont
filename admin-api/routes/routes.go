@@ -59,6 +59,18 @@ func AuthRequired(jwtSecret string) gin.HandlerFunc {
 	}
 }
 
+// UsageTracker increments the monthly API request counter for the authenticated org.
+// Safe to use as a middleware — skips silently if no org_id is set.
+func UsageTracker(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := c.GetString("org_id")
+		if orgID != "" {
+			store.Redis().IncrementUsage(c.Request.Context(), orgID)
+		}
+		c.Next()
+	}
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 func paginate(c *gin.Context) (int, int) {

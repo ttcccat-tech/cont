@@ -116,6 +116,7 @@ func main() {
 	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")
 	admin.Use(routes.AuthRequired(jwtSecret))
+	admin.Use(routes.UsageTracker(store))
 	{
 		svcs := admin.Group("/services")
 		{
@@ -293,6 +294,7 @@ func main() {
 		admin.POST("/billing/checkout", routes.CreateCheckoutSession(store, frontendBaseURL))
 		admin.POST("/billing/portal", routes.CreatePortalSession(store, frontendBaseURL))
 		admin.GET("/billing/subscriptions", routes.ListSubscriptions(store))
+		admin.GET("/billing/usage", routes.GetUsage(store))
 	}
 
 	// Stripe Webhook — public (Stripe signs with secret, no JWT auth)

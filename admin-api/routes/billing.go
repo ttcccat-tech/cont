@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v76"
@@ -489,5 +491,67 @@ func ListSubscriptions(store *storage.Store) gin.HandlerFunc {
 			subs = []storage.Subscription{}
 		}
 		c.JSON(200, subs)
+	}
+}
+
+// ── GET /billing/usage ────────────────────────────────────────────────────────
+
+type UsageResponse struct {
+	OrgID         string `json:"org_id"`
+	Plan          string `json:"plan"`
+	Used          int64  `json:"used"`
+	Limit         int64  `json:"limit"` // -1 = unlimited
+	PercentUsed   float64 `json:"percent_used"`
+	ResetAt       string `json:"reset_at"` // first day of next month, RFC3339
+}
+
+func GetUsage(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := c.GetString("org_id")
+		if orgID == "" {
+			c.JSON(400, gin.H{"code": "BAD_REQUEST", "message": "org_id required"})
+			return
+		}
+
+		org, err := store.GetOrganization(orgID)
+		if err != nil || org == nil {
+			c.JSON(404, gin.H{"code": "NOT_FOUND", "message": "organization not found"})
+			return
+		}
+
+		used, err := store.Redis().GetUsage(c.Request.Context(), orgID)
+		if err != nil {
+			log.Printf("[usage] GetUsage failed for org %s: %v", orgID, err)
+			used = 0
+		}
+
+		// Get plan limits
+		plan, err := store.GetPlanByName(org.Plan)
+		if err != nil || plan == nil {
+			// Default to free plan limits if no plan found
+			plan = &storage.Plan{RequestLimit: 100000, WorkspaceLimit: 3, UserLimit: 5}
+		}
+
+		limit := plan.RequestLimit
+		var percentUsed float64
+		if limit > 0 {
+			percentUsed = float64(used) / float64(limit) * 100
+		} else if limit == -1 {
+			percentUsed = 0
+		}
+
+		// Reset date: first day of next month
+		now := time.Now()
+		nextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location())
+		resetAt := nextMonth.Format(time.RFC3339)
+
+		c.JSON(200, UsageResponse{
+			OrgID:       orgID,
+			Plan:        org.Plan,
+			Used:        used,
+			Limit:       limit,
+			PercentUsed: math.Round(percentUsed*100) / 100,
+			ResetAt:     resetAt,
+		})
 	}
 }

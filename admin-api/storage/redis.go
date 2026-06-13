@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -36,6 +37,33 @@ func (r *Redis) IncrRateLimit(ctx context.Context, key string, windowSec int64) 
 		return 0, err
 	}
 	return incr.Val(), nil
+}
+
+// IncrementUsage increments the monthly API request counter for an org.
+// Key format: cont:usage:{org_id}:{YYYY-MM}
+// TTL: 62 days (covers month boundary + buffer)
+func (r *Redis) IncrementUsage(ctx context.Context, orgID string) (int64, error) {
+	month := time.Now().Format("2006-01")
+	key := fmt.Sprintf("cont:usage:%s:%s", orgID, month)
+	pipe := r.client.Pipeline()
+	incr := pipe.Incr(ctx, key)
+	pipe.Expire(ctx, key, 62*24*60*60) // 62 days TTL
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return incr.Val(), nil
+}
+
+// GetUsage returns the current monthly API request count for an org.
+func (r *Redis) GetUsage(ctx context.Context, orgID string) (int64, error) {
+	month := time.Now().Format("2006-01")
+	key := fmt.Sprintf("cont:usage:%s:%s", orgID, month)
+	val, err := r.client.Get(ctx, key).Int64()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	return val, err
 }
 
 // Upstream target health

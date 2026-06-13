@@ -112,6 +112,23 @@ func (s *Store) ListPlans() ([]Plan, error) {
 	return out, rows.Err()
 }
 
+// GetPlanByName returns a plan by its name (free/pro/enterprise).
+func (s *Store) GetPlanByName(name string) (*Plan, error) {
+	row := s.db.QueryRow(`
+		SELECT id, name, display_name, price_monthly, price_yearly, features, workspace_limit, user_limit, request_limit, created_at
+		FROM plans WHERE name=$1`, name)
+	var p Plan
+	err := row.Scan(&p.ID, &p.Name, &p.DisplayName, &p.PriceMonthly, &p.PriceYearly,
+		&p.Features, &p.WorkspaceLimit, &p.UserLimit, &p.RequestLimit, &p.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 // ── Subscription store methods ─────────────────────────────────────────────
 
 func (s *Store) GetSubscriptionByOrg(orgID string) (*Subscription, error) {
