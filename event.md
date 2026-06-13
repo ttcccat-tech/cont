@@ -231,6 +231,15 @@
 
 ## 🟡 預計優化
 
+- [ ] **Cont 使用量監控與配額執行（Usage Tracking + Quota Enforcement）** — workspace_limit/user_limit/request_limit 已存在於 plans，但未強制執行
+  - 需要：Usage tracking（Redis counter per org/workspace）、Quota check middleware、Exceeded 阻擋 API
+  - Backend: GET /billing/usage, middleware 阻擋超過配額的 API 請求
+  - Frontend: BillingPortal.tsx 新增當前使用量視覺化（usage bar）
+
+- [ ] **Cont Alert Rule 進階功能（條件組合 + 觸發歷史）** — Alert engine 已完成
+  - 需要：多條件 AND/OR 組合、AlertRule.LastTriggeredAt/Value（已實作）、前端 AlertHistory 頁面
+  - Backend: AlertRule 條件邏輯增強（multiple conditions）、AlertHistory table
+
 - [ ] **Cont 使用者管理精細化（API Key 審批 + Audit Log）** — 見下方已完成
 
 ## ✅ 已完成
@@ -284,6 +293,13 @@
   - Backend: 盤點並修正 routes.go(28處)、oauth.go(14處)、billing.go(13處)、crypto.go(2處) 的錯誤回應格式
   - Error codes: BAD_REQUEST/UNAUTHORIZED/FORBIDDEN/NOT_FOUND/CONFLICT/INTERNAL_ERROR/VALIDATION_ERROR/BAD_GATEWAY/INVALID_JSON/MISSING_FIELD/ALREADY_EXISTS
   - QA: 所有錯誤情境（400/401/404/500）回應格式一致 `{code, message, details?}` ✅
+
+- [x] **Cont Alert Rule Triggered State 持久化** — commit `742b4e07`
+  - AlertRule model: 新增 LastTriggeredAt、LastTriggeredValue 欄位
+  - postgres.go: alert_rules 表新增 last_triggered_at/last_triggered_value columns
+  - store.go: UpdateAlertRuleTriggered() 寫入觸發狀態至 DB
+  - alerter.go: fireAlert() 廣播 SSE 後寫入 DB
+  - AlertRules.tsx: 新增「最近觸發」欄位（相對時間 + 數值）
 
 ---
 
