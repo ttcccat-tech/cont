@@ -265,11 +265,13 @@ func (s *Store) UpdateWebhookDelivery(d *WebhookDelivery) error {
 	}
 	var lastError *string
 	if d.LastError != "" {
-		lastError = &d.LastError
+		s := d.LastError
+		lastError = &s
 	}
 	var responseBody *string
 	if d.ResponseBody != "" {
-		responseBody = &d.ResponseBody
+		s := d.ResponseBody
+		responseBody = &s
 	}
 	_, err := s.db.Exec(`
 		UPDATE webhook_deliveries SET
