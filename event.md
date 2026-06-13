@@ -234,6 +234,13 @@
 
 ## ✅ 已完成
 
+- [x] **Cont Audit Log 進階查詢 UI** — Backend `ListAuditLogsFiltered(store.go)` + `ExportAuditLogsCSV(routes.go)`；GET /audit 新增 `start_time/end_time/audit_type/target_type/actor` filters，回傳 `{data, total}`；GET /audit/export CSV streaming 下載；Frontend `AuditLog.tsx` RangePicker + 操作者搜尋 + 匯出按鈕。QA: `/audit` → `{data,total}` ✅, filters ✅, CSV export → 200 text/csv ✅
+  - commit `7a3f9e1b`
+
+---
+
+## ✅ 已完成
+
 - [x] **Cont Admin API Async Notification System（WebSocket/SSE）** — Backend SSE endpoint `/auth/events` + Notifications CRUD + `CreateNotification` broadcast；Frontend `EventListener.tsx` Toast 通知；`ApproveAPIKey`/`RejectAPIKey` 已觸發 notification。QA: `/auth/events` 200 streaming ✅, `/auth/notifications` 200 ✅
   - commit `a1b2c3d4` (system-generated — SSE infrastructure already existed in code, verified working end-to-end)
 
