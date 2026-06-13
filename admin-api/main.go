@@ -46,7 +46,11 @@ func main() {
 	}
 
 	// Start alert engine (evaluates rules every 30s)
-	alerter := engine.NewAlerter(store, 30*time.Second, "")
+	proxyMetricsURL := os.Getenv("PROXY_METRICS_URL")
+	if proxyMetricsURL == "" {
+		proxyMetricsURL = "http://cont-proxy:8000/metrics"
+	}
+	alerter := engine.NewAlerter(store, 30*time.Second, proxyMetricsURL)
 	alerter.Start()
 	defer alerter.Stop()
 
