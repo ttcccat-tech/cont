@@ -415,6 +415,16 @@
   - `oauth_handler_test.go`: 17 tests for OAuth handler logic (OAuthState/OAuthUserInfo/tokenResponse JSON, client_secret hidden in JSON, callback URL HTTP/HTTPS, state generation, default scopes/auth URL, redirect params, JWT claims validation)
   - Total: 54 new unit tests for routes package
 
+## 🟡 預計優化
+
+- [ ] **Cont Database Migration System（版本化 + Rollback）** — commit `d5ef8760`
+  - `migrator/migrator.go`: Manager struct with Register/Run/Rollback/Status APIs
+  - `migrator/migrations.go`: 22 versioned migrations (v1-v22) covering all schema — each with Up+Down SQL
+  - `migrator/migrator_test.go`: unit test for Run/Rollback/Status lifecycle
+  - `storage/postgres.go`: RunMigrations() now delegates to migrator.Migrate()
+  - Backward compat: detectExistingSchema() records all v1-v22 as applied on first run against existing DB (schema_migrations table empty but tables already exist), so existing deployments are unaffected
+  - Next: CLI tool for pending migration status + one-click rollback
+
 ---
 
 ## 完整開發流程（開發守護遵循）
