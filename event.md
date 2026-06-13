@@ -223,16 +223,18 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Alert Rule 實際觸發機制** — AlertRule CRUD 已完成但缺少觸發/通知 execution engine
-  - Backend: AlertRule{conditions, slack_webhook_url, email_webhook_url, discord_webhook_url, alert_suppress_seconds} 已存在
-  - Backend: 建立 `engine/alerter.go` — 定時跑 conditions 評估，滿足條件時發送 webhook（Slack/Email/Discord）
-  - Backend: AlertRule 模型缺少 `enabled` 欄位，需補 migration
-  - Backend: 現有 metrics endpoint 可作為 condition 資料來源（upstream health, API latency, error rate）
-  - QA: 建立 AlertRule → 模擬 condition 觸發 → webhook 收到通知 ✅
-
----
+- [ ] **Cont API 完整 CRUD 動作者追蹤（Audit Log Enhancement）** — 目前 Audit Log 覆蓋主要 routes，但缺少針對 Plugin/Snapshot/Rollback/AlertRule 操作的完整 audit trail，需在所有關鍵 mutation operations 補上 audit log 寫入
 
 ## ✅ 已完成
+
+- [x] **Cont Alert Rule 實際觸發機制（Execution Engine）** — commit `ff44a94c` + `a5f9f824` + `8722f5c9`
+  - `admin-api/engine/alerter.go`: NewAlerter background goroutine，每30s評估 enabled AlertRules
+  - 支援 conditions 評估（>, <, >=, <=, == against threshold_value）
+  - 支援 Slack/Discord/Email webhook 並發通知
+  - suppression window 防止短時間重複觸發
+  - `main.go` 啟動時啟用 alerter，關閉時優雅停止
+  - AlertRule.Enabled 欄位已存在（無需 migration）
+  - QA: alerter goroutine 正常啟動，定期評估規則
 
 - [x] **Cont Audit Log 覆蓋率補全（OAuth / Billing / API Key routes）** — commit `9fa270de`
   - oauth.go: OAuth provider CRUD + Google OAuth initiation/callback → audit log ✅（本已存在）
