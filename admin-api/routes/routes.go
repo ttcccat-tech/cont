@@ -891,11 +891,29 @@ badRequest(c, err)
 		if orgID != "" {
 			p.OrgID = orgID
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
 		result, err := store.CreatePlugin(&p)
 		if err != nil {
 			internalError(c)
 			return
 		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "Plugin",
+			TargetID:      result.ID,
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Created plugin: " + result.Name,
+		})
 		c.JSON(201, result)
 	}
 }
@@ -933,6 +951,24 @@ badRequest(c, err)
 			internalError(c)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "update",
+			TargetType:    "Plugin",
+			TargetID:      c.Param("id"),
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Updated plugin: " + result.Name,
+		})
 		c.JSON(200, result)
 	}
 }
@@ -944,6 +980,24 @@ func DeletePlugin(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "delete",
+			TargetType:    "Plugin",
+			TargetID:      c.Param("id"),
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Deleted plugin",
+		})
 		c.Status(http.StatusNoContent)
 	}
 }
@@ -969,11 +1023,29 @@ func CreateWorkspace(store *storage.Store) gin.HandlerFunc {
 badRequest(c, err)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
 		result, err := store.CreateWorkspace(&w)
 		if err != nil {
 			internalError(c)
 			return
 		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "Workspace",
+			TargetID:      result.ID,
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Created workspace: " + result.Name,
+		})
 		c.JSON(201, result)
 	}
 }
@@ -1055,6 +1127,24 @@ func UpdateWorkspace(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "update",
+			TargetType:    "Workspace",
+			TargetID:      c.Param("id"),
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Updated workspace: " + result.Name,
+		})
 		c.JSON(200, result)
 	}
 }
@@ -1066,6 +1156,24 @@ func DeleteWorkspace(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "delete",
+			TargetType:    "Workspace",
+			TargetID:      c.Param("id"),
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Deleted workspace",
+		})
 		c.Status(http.StatusNoContent)
 	}
 }
@@ -2473,11 +2581,29 @@ func CreateAlertRule(store *storage.Store) gin.HandlerFunc {
 			badRequest(c, err)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
 		created, err := store.CreateAlertRule(&r)
 		if err != nil {
 			internalError(c)
 			return
 		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "AlertRule",
+			TargetID:      fmt.Sprintf("%d", created.ID),
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Created alert rule: " + created.Name,
+		})
 		c.JSON(201, created)
 	}
 }
@@ -2537,6 +2663,24 @@ func UpdateAlertRule(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "update",
+			TargetType:    "AlertRule",
+			TargetID:      id,
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Updated alert rule: " + updated.Name,
+		})
 		c.JSON(200, updated)
 	}
 }
@@ -2553,6 +2697,28 @@ func DeleteAlertRule(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
+		existingName := ""
+		if existing != nil {
+			existingName = existing.Name
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "delete",
+			TargetType:    "AlertRule",
+			TargetID:      id,
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Deleted alert rule: " + existingName,
+		})
 		c.JSON(204, nil)
 	}
 }
@@ -2920,11 +3086,29 @@ func CreateConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 			badRequest(c, err)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
 		created, err := store.CreateConfigSnapshot(&sn)
 		if err != nil {
 			internalError(c)
 			return
 		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "ConfigSnapshot",
+			TargetID:      fmt.Sprintf("%d", created.ID),
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Created config snapshot",
+		})
 		c.JSON(201, created)
 	}
 }
@@ -2941,6 +3125,24 @@ func DeleteConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "delete",
+			TargetType:    "ConfigSnapshot",
+			TargetID:      id,
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Deleted config snapshot",
+		})
 		c.JSON(204, nil)
 	}
 }
@@ -2965,11 +3167,29 @@ func DiffConfigSnapshots(store *storage.Store) gin.HandlerFunc {
 func RollbackConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+		userIDStr := ""
+		if userID != nil {
+			userIDStr = userID.(string)
+		}
+		actorStr := ""
+		if username != nil {
+			actorStr = username.(string)
+		}
 		errors, err := store.RollbackConfigSnapshot(id)
 		if err != nil {
 			badRequestMsg(c, err.Error())
 			return
 		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "rollback",
+			TargetType:    "ConfigSnapshot",
+			TargetID:      id,
+			ActorUserID:   userIDStr,
+			ActorUsername: actorStr,
+			Description:   "Rolled back config snapshot",
+		})
 		if len(errors) > 0 {
 			c.JSON(200, gin.H{"success": true, "errors": errors})
 			return
