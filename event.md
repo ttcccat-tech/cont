@@ -324,11 +324,6 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont AlertRules.tsx SSE 即時更新 + AlertHistory 聯動** — 當 AlertEngine 觸發 alert_triggered 時，AlertRules.tsx 需更新 last_triggered_at/value；AlertHistory.tsx 需即時新增一筆觸發記錄（目前 AlertRules.tsx 有 SSE 監聽但未真正更新本地 state；AlertHistory.tsx 純 polling 無法即時）
-  - Backend: `GET /alerts/history` 已有，需確認 `GET /alerts/rules` 是否包含 last_triggered_at
-  - Frontend: AlertRules.tsx — `alert_triggered` SSE handler 需呼叫 `fetchRules()` 真正更新 state；AlertHistory.tsx — SSE 監聽 + 即時 prepend 觸發記錄到列表
-  - 驗證：觸發一條 alert rule → AlertRules.tsx 的「最近觸發」應在 30s 內更新、AlertHistory.tsx 應即時出現新列
-
 - [x] **Cont AlertRules.tsx SSE 即時更新 + AlertHistory 聯動** — commit `28cccd5b`
   - AlertRules.tsx: `fetchRulesRef` stable ref 避免 SSE handler stale closure，`alert_triggered` 事件觸發 `fetchRulesRef.current()` 真正刷新列表
   - AlertHistory.tsx: 新增 SSE `alert_triggered` 監聽，即時 prepend 觸發記錄到列表頂端，並 toast 通知使用者
