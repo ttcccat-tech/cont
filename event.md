@@ -223,11 +223,12 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Admin API Async Notification System（WebSocket/SSE）** — API Key 審批、Billing webhook 等 async 事件目前無即時通知機制；需要：
-  - Backend: 建立 `/events` SSE endpoint，訂閱 async 事件（api_key_approved, api_key_rejected, subscription_updated, user_invited）
-  - Frontend: EventListener component 連接 SSE，即時 Toast 通知
-  - Backend: notification center 儲存已推送事件（避免重複）
-  - QA: API Key 核准 → 5s 內前端收到通知 Toast
+- [ ] **Cont Audit Log 進階查詢 UI** — 時間範圍選擇器、多維度過濾器（actor/target/action/workspace）、CSV 匯出、匯出進度追蹤
+  - Backend: GET /audit-logs 增加 start_time/end_time/type/target_type filters，支援 cursor pagination 避免大頁偏移
+  - Backend: GET /audit-logs/export endpoint，streaming CSV 產出
+  - Frontend: AuditLog.tsx 增強篩選面板（DateRangePicker, multi-select dropdowns）
+  - Frontend: 匯出按鈕 + 下載進度 Toast
+  - QA: Filter → 200 ✅, Export CSV → 200 streaming ✅
 
 ---
 
