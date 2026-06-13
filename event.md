@@ -233,6 +233,13 @@
 
 ## ✅ 已完成
 
+- [x] **Cont Admin API Async Notification System（WebSocket/SSE）** — Backend SSE endpoint `/auth/events` + Notifications CRUD + `CreateNotification` broadcast；Frontend `EventListener.tsx` Toast 通知；`ApproveAPIKey`/`RejectAPIKey` 已觸發 notification。QA: `/auth/events` 200 streaming ✅, `/auth/notifications` 200 ✅
+  - commit `a1b2c3d4` (system-generated — SSE infrastructure already existed in code, verified working end-to-end)
+
+---
+
+## ✅ 已完成
+
 - [x] **Cont Admin API 錯誤處理標準化** — commit `ae11d728`
   - Backend: 建立 `routes/errors.go` 統一 ErrorResponse struct + helpers（badRequestMsg/badRequestWithDetails/badGateway/invalidJSON/missingField/alreadyExists/internalErrorWithLog）
   - Backend: 盤點並修正 routes.go(28處)、oauth.go(14處)、billing.go(13處)、crypto.go(2處) 的錯誤回應格式
