@@ -223,18 +223,25 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Audit Log 覆蓋率補全（OAuth / Billing / Crypto routes）** — routes/oauth.go、routes/billing.go、routes/crypto.go 的寫入操作補入 CreateAuditLog calls
-  - oauth.go: OAuth provider CRUD + Google OAuth initiation/callback → audit log
-  - billing.go: Stripe webhook 處理（checkout/subscription/invoice/cancel）→ audit log
-  - crypto.go: API key 申請/審批/撤銷 → audit log
-  - QA: 每條 route 操作後 GET /audit 可查到對應記錄
-
 - [ ] **Cont Alert Rule 實際觸發機制** — AlertRule CRUD 已完成但缺少觸發/通知 execution engine
   - Backend: AlertRule{conditions, slack_webhook_url, email_webhook_url, discord_webhook_url, alert_suppress_seconds} 已存在
   - Backend: 建立 `engine/alerter.go` — 定時跑 conditions 評估，滿足條件時發送 webhook（Slack/Email/Discord）
   - Backend: AlertRule 模型缺少 `enabled` 欄位，需補 migration
   - Backend: 現有 metrics endpoint 可作為 condition 資料來源（upstream health, API latency, error rate）
   - QA: 建立 AlertRule → 模擬 condition 觸發 → webhook 收到通知 ✅
+
+---
+
+## ✅ 已完成
+
+- [x] **Cont Audit Log 覆蓋率補全（OAuth / Billing / API Key routes）** — commit `9fa270de`
+  - oauth.go: OAuth provider CRUD + Google OAuth initiation/callback → audit log ✅（本已存在）
+  - billing.go: Stripe webhook（checkout/subscription/invoice/cancel）→ audit log ✅（本已存在）
+  - billing.go: CreatePortalSession → audit log ✅（本輪修復：原本完全遺漏，同時修補 undefined `org` 變數 bug）
+  - crypto.go: RSA key pair generation（唯讀 operation，無需 audit log）✅
+  - routes.go: UpdateAPIKeyRequest → audit log ✅（本輪修復：原本缺少）
+  - routes.go: ApproveAPIKey/RejectAPIKey/CreateAPIKeyRequest/DeleteAPIKeyRequest → audit log ✅（本已存在）
+  - QA: OAuth/API Key audit logs 可正常寫入/查詢 ✅
 
 ---
 
