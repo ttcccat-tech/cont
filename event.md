@@ -223,19 +223,18 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Audit Log 進階查詢 UI** — 時間範圍選擇器、多維度過濾器（actor/target/action/workspace）、CSV 匯出、匯出進度追蹤
-  - Backend: GET /audit-logs 增加 start_time/end_time/type/target_type filters，支援 cursor pagination 避免大頁偏移
-  - Backend: GET /audit-logs/export endpoint，streaming CSV 產出
-  - Frontend: AuditLog.tsx 增強篩選面板（DateRangePicker, multi-select dropdowns）
-  - Frontend: 匯出按鈕 + 下載進度 Toast
-  - QA: Filter → 200 ✅, Export CSV → 200 streaming ✅
+- [ ] **Cont Audit Log 覆蓋率補全（OAuth / Billing / Crypto routes）** — routes/oauth.go、routes/billing.go、routes/crypto.go 的寫入操作補入 CreateAuditLog calls
+  - oauth.go: OAuth provider CRUD + Google OAuth initiation/callback → audit log
+  - billing.go: Stripe webhook 處理（checkout/subscription/invoice/cancel）→ audit log
+  - crypto.go: API key 申請/審批/撤銷 → audit log
+  - QA: 每條 route 操作後 GET /audit 可查到對應記錄
 
----
-
-## ✅ 已完成
-
-- [x] **Cont Audit Log 進階查詢 UI** — Backend `ListAuditLogsFiltered(store.go)` + `ExportAuditLogsCSV(routes.go)`；GET /audit 新增 `start_time/end_time/audit_type/target_type/actor` filters，回傳 `{data, total}`；GET /audit/export CSV streaming 下載；Frontend `AuditLog.tsx` RangePicker + 操作者搜尋 + 匯出按鈕。QA: `/audit` → `{data,total}` ✅, filters ✅, CSV export → 200 text/csv ✅
-  - commit `7a3f9e1b`
+- [ ] **Cont Alert Rule 實際觸發機制** — AlertRule CRUD 已完成但缺少觸發/通知 execution engine
+  - Backend: AlertRule{conditions, slack_webhook_url, email_webhook_url, discord_webhook_url, alert_suppress_seconds} 已存在
+  - Backend: 建立 `engine/alerter.go` — 定時跑 conditions 評估，滿足條件時發送 webhook（Slack/Email/Discord）
+  - Backend: AlertRule 模型缺少 `enabled` 欄位，需補 migration
+  - Backend: 現有 metrics endpoint 可作為 condition 資料來源（upstream health, API latency, error rate）
+  - QA: 建立 AlertRule → 模擬 condition 觸發 → webhook 收到通知 ✅
 
 ---
 
