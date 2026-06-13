@@ -154,6 +154,24 @@ export const login = (username: string, password: string) =>
   analyticsClient.post('/auth/login', { username, password }).then(r => r.data)
 export const getMe = () => analyticsClient.get('/auth/me').then(r => r.data)
 
+// Notifications
+export interface Notification {
+  id: string
+  user_id: string
+  type: string
+  payload: string
+  read: boolean
+  created_at: string
+}
+export const listNotifications = (limit = 50, offset = 0) =>
+  analyticsClient.get<Notification[]>(`/auth/notifications?limit=${limit}&offset=${offset}`).then(r => r.data)
+export const markNotificationRead = (id: string) =>
+  analyticsClient.put(`/auth/notifications/${id}/read`).then(r => r.data)
+export const markAllNotificationsRead = () =>
+  analyticsClient.put('/auth/notifications/read-all').then(r => r.data)
+export const getUnreadCount = () =>
+  analyticsClient.get<{ unread: number }>('/auth/notifications/unread-count').then(r => r.data)
+
 // OAuth2 Provider Management
 export interface OAuth2Provider {
   id?: string

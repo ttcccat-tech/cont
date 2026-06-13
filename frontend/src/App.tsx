@@ -25,6 +25,7 @@ import Workspaces from './pages/Workspaces'
 import { getToken, clearAuth } from './api/kong'
 import { WorkspaceProvider } from './context/WorkspaceContext'
 import { AuthProvider } from './context/AuthContext'
+import { EventListener } from './components/EventListener'
 
 const { Header, Content } = Layout
 
@@ -101,6 +102,7 @@ export default function App() {
             <WorkspaceProvider>
               <AuthProvider>
                 <AppLayout>
+                  <EventListener />
                   <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
