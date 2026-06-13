@@ -227,7 +227,18 @@ export const getUserWorkspaces = (userId: string) =>
 
 export const listResources = () => analyticsClient.get<{ resources: Resource[] }>('/resources').then(r => r.data?.resources ?? [])
 
-export const getAuditLogs = () => analyticsClient.get<AuditEntry[]>('/audit').then(r => r.data)
+export const getAuditLogs = (params?: Record<string, string>) => {
+  const searchParams = new URLSearchParams(params || {})
+  const query = searchParams.toString() ? '?' + searchParams.toString() : ''
+  return analyticsClient.get<{ data: AuditEntry[]; total: number }>(`/audit${query}`).then(r => r.data)
+}
+
+export const exportAuditLogsCSV = (params?: Record<string, string>) => {
+  const searchParams = new URLSearchParams(params || {})
+  const query = searchParams.toString() ? '?' + searchParams.toString() : ''
+  const url = `${analyticsClient.getUri()}/audit/export${query}`
+  window.open(url, '_blank')
+}
 
 export const getAlertRules = () => analyticsClient.get('/alerts/rules').then(r => r.data)
 export const createAlertRule = (payload: Record<string, unknown>) => analyticsClient.post('/alerts/rules', payload).then(r => r.data)

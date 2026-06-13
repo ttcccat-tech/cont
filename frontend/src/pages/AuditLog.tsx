@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Table, Tag, Space, Button, Select, Card, Spin, message } from 'antd'
-import { ReloadOutlined, FilterOutlined } from '@ant-design/icons'
+import { Table, Tag, Space, Button, Select, Card, Spin, message, DatePicker, Row, Col } from 'antd'
+import { ReloadOutlined, FilterOutlined, DownloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { getAuditLogs } from '../api/kong'
+import { getAuditLogs, exportAuditLogsCSV } from '../api/kong'
+import dayjs, { Dayjs } from 'dayjs'
 
 const { Option } = Select
+const { RangePicker } = DatePicker
 
 // Local view model — maps API fields to page display fields
 interface AuditView {
@@ -17,17 +19,44 @@ interface AuditView {
   user: string
 }
 
+interface AuditFilters {
+  audit_type?: string
+  target_type?: string
+  actor?: string
+  start_time?: string
+  end_time?: string
+}
+
 export default function AuditLogPage() {
   const [entries, setEntries] = useState<AuditView[]>([])
   const [filtered, setFiltered] = useState<AuditView[]>([])
   const [filterAction, setFilterAction] = useState<string>('all')
   const [filterResource, setFilterResource] = useState<string>('all')
+  const [filterActor, setFilterActor] = useState<string>('')
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
   const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(0)
+
+  const buildParams = (): Record<string, string> => {
+    const p: Record<string, string> = {}
+    if (filterAction !== 'all') p.audit_type = filterAction
+    if (filterResource !== 'all') p.target_type = filterResource
+    if (filterActor.trim()) p.actor = filterActor.trim()
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      p.start_time = dateRange[0].startOf('day').toISOString()
+      p.end_time = dateRange[1].endOf('day').toISOString()
+    }
+    return p
+  }
 
   const load = async () => {
     setLoading(true)
     try {
-      const rows = await getAuditLogs()
+      const params = buildParams()
+      const result = await getAuditLogs(params)
+      const rows = result?.data ?? []
+      const totalCount = result?.total ?? rows.length
+      setTotal(totalCount)
       const mapped: AuditView[] = rows.map(r => ({
         id: r.id,
         timestamp: r.created_at,
@@ -48,12 +77,18 @@ export default function AuditLogPage() {
 
   useEffect(() => { load() }, [])
 
+  // Client-side secondary filter (audit_type / target_type already applied server-side)
   useEffect(() => {
     let result = entries
     if (filterAction !== 'all') result = result.filter(e => e.action === filterAction)
     if (filterResource !== 'all') result = result.filter(e => e.resource === filterResource)
     setFiltered(result)
   }, [filterAction, filterResource, entries])
+
+  const handleExport = () => {
+    const params = buildParams()
+    exportAuditLogsCSV(params)
+  }
 
   const actionColor = (a: string) => {
     if (a === 'CREATE') return 'green'
@@ -124,35 +159,75 @@ export default function AuditLogPage() {
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
         <h1>審計日誌</h1>
         <Space>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>匯出 CSV</Button>
           <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>刷新</Button>
         </Space>
       </div>
 
       {/* Filters */}
       <Card style={{ background:'var(--secondary)', border:'none', marginBottom:16, padding:'12px 16px' }}>
-        <Space wrap>
-          <span style={{color:'var(--muted)', fontSize:13}}><FilterOutlined /> 篩選：</span>
-          <Select value={filterAction} onChange={setFilterAction} style={{width:120}}
-            dropdownStyle={{ background:'var(--secondary)' }}>
-            <Option value="all">全部操作</Option>
-            <Option value="CREATE">新增</Option>
-            <Option value="UPDATE">更新</Option>
-            <Option value="DELETE">刪除</Option>
-          </Select>
-          <Select value={filterResource} onChange={setFilterResource} style={{width:140}}
-            dropdownStyle={{ background:'var(--secondary)' }}>
-            <Option value="all">全部資源</Option>
-            <Option value="User">使用者</Option>
-            <Option value="Group">群組</Option>
-            <Option value="Workspace">工作區</Option>
-            <Option value="Service">服務</Option>
-            <Option value="Route">路由</Option>
-            <Option value="Plugin">插件</Option>
-            <Option value="Consumer">消費者</Option>
-            <Option value="Credential">憑證</Option>
-          </Select>
-          <span style={{color:'var(--muted)', fontSize:12}}>共 {filtered.length} 筆</span>
-        </Space>
+        <Row gutter={[12, 12]} align="middle">
+          <Col>
+            <span style={{color:'var(--muted)', fontSize:13}}><FilterOutlined /> 篩選：</span>
+          </Col>
+          <Col>
+            <RangePicker
+              value={dateRange}
+              onChange={(dates) => setDateRange(dates as [Dayjs | null, Dayjs | null] | null)}
+              style={{ width: 280 }}
+              placeholder={['起始日期', '結束日期']}
+            />
+          </Col>
+          <Col>
+            <Select value={filterAction} onChange={v => { setFilterAction(v); load() }} style={{width:120}}
+              dropdownStyle={{ background:'var(--secondary)' }}>
+              <Option value="all">全部操作</Option>
+              <Option value="CREATE">新增</Option>
+              <Option value="UPDATE">更新</Option>
+              <Option value="DELETE">刪除</Option>
+            </Select>
+          </Col>
+          <Col>
+            <Select value={filterResource} onChange={v => { setFilterResource(v); load() }} style={{width:140}}
+              dropdownStyle={{ background:'var(--secondary)' }}>
+              <Option value="all">全部資源</Option>
+              <Option value="User">使用者</Option>
+              <Option value="Group">群組</Option>
+              <Option value="Workspace">工作區</Option>
+              <Option value="Service">服務</Option>
+              <Option value="Route">路由</Option>
+              <Option value="Plugin">插件</Option>
+              <Option value="Consumer">消費者</Option>
+              <Option value="Credential">憑證</Option>
+            </Select>
+          </Col>
+          <Col>
+            <DatePicker
+              value={null}
+              picker="week"
+              placeholder="週"
+              style={{display:'none'}}
+            />
+          </Col>
+          <Col>
+            <Space>
+              <input
+                placeholder="操作者"
+                value={filterActor}
+                onChange={e => setFilterActor(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && load()}
+                style={{
+                  background:'var(--primary)', border:'1px solid var(--accent)',
+                  color:'var(--text)', borderRadius:6, padding:'4px 10px', width:120, fontSize:13
+                }}
+              />
+              <Button size="small" onClick={load} style={{background:'var(--secondary)', color:'var(--text)'}}>搜尋</Button>
+            </Space>
+          </Col>
+          <Col>
+            <span style={{color:'var(--muted)', fontSize:12}}>共 {total} 筆（顯示 {filtered.length} 筆）</span>
+          </Col>
+        </Row>
       </Card>
 
       <Spin spinning={loading}>
@@ -160,14 +235,18 @@ export default function AuditLogPage() {
           columns={columns}
           dataSource={filtered as any}
           rowKey="id"
-          pagination={{ pageSize: 15, showSizeChanger: true }}
+          pagination={{ pageSize: 15, showSizeChanger: true, total }}
           locale={{ emptyText: '尚無操作記錄' }}
           size="small"
+          onChange={(pagination) => {
+            // Simple reload on page change
+            if (pagination.current) load()
+          }}
         />
       </Spin>
 
       <div style={{ marginTop: 16, fontSize: 12, color: 'var(--muted)' }}>
-        ※ 審計日誌由 analytics-api 統一記錄，記錄使用者、群組、工作區的新增/更新/刪除操作。
+        ※ 審計日誌由 analytics-api 統一記錄，記錄使用者、群組、工作區的新增/更新/刪除操作。匯出包含目前篩選條件下的所有記錄（最多 10,000 筆）。
       </div>
     </div>
   )

@@ -2346,7 +2346,27 @@ func DeleteResource(store *storage.Store) gin.HandlerFunc {
 func ListAuditLogs(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		size, offset := paginate(c)
-		logs, err := store.ListAuditLogs(size, offset)
+
+		filter := storage.AuditLogFilter{
+			Limit:      size,
+			Offset:     offset,
+			AuditType:  c.Query("audit_type"),
+			TargetType: c.Query("target_type"),
+			Actor:      c.Query("actor"),
+		}
+
+		if start := c.Query("start_time"); start != "" {
+			if t, err := time.Parse(time.RFC3339, start); err == nil {
+				filter.StartTime = &t
+			}
+		}
+		if end := c.Query("end_time"); end != "" {
+			if t, err := time.Parse(time.RFC3339, end); err == nil {
+				filter.EndTime = &t
+			}
+		}
+
+		logs, total, err := store.ListAuditLogsFiltered(filter)
 		if err != nil {
 			internalError(c)
 			return
@@ -2354,11 +2374,11 @@ func ListAuditLogs(store *storage.Store) gin.HandlerFunc {
 		if logs == nil {
 			logs = []storage.AuditLog{}
 		}
-		c.JSON(200, logs)
+		c.JSON(200, gin.H{"data": logs, "total": total})
 	}
 }
 
-// ── Alert Rules ─────────────────────────────────────────────────────────────
+// ── Alert Rules ──────────────────────────────────────────────────────────────
 
 type UpdateAlertRuleRequest struct {
 	Name                 string  `json:"name" binding:"omitempty,max=255"`
@@ -2387,6 +2407,62 @@ func ListAlertRules(store *storage.Store) gin.HandlerFunc {
 			rules = []storage.AlertRule{}
 		}
 		c.JSON(200, rules)
+	}
+}
+
+type AuditLogCSVRow struct {
+	ID            int       `json:"id"`
+	AuditType     string    `json:"audit_type"`
+	TargetType    string    `json:"target_type"`
+	TargetID      string    `json:"target_id"`
+	ActorUserID   string    `json:"actor_user_id"`
+	ActorUsername string    `json:"actor_username"`
+	Description   string    `json:"description"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// ExportAuditLogsCSV streams a CSV of audit logs matching the filter criteria
+func ExportAuditLogsCSV(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		filter := storage.AuditLogFilter{
+			Limit:      10000,
+			Offset:     0,
+			AuditType:  c.Query("audit_type"),
+			TargetType: c.Query("target_type"),
+			Actor:      c.Query("actor"),
+		}
+		if start := c.Query("start_time"); start != "" {
+			if t, err := time.Parse(time.RFC3339, start); err == nil {
+				filter.StartTime = &t
+			}
+		}
+		if end := c.Query("end_time"); end != "" {
+			if t, err := time.Parse(time.RFC3339, end); err == nil {
+				filter.EndTime = &t
+			}
+		}
+
+		logs, _, err := store.ListAuditLogsFiltered(filter)
+		if err != nil {
+			internalError(c)
+			return
+		}
+
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=audit-log-%s.csv", time.Now().Format("20060102-150405")))
+		c.Header("Cache-Control", "no-cache")
+
+		c.Writer.Write([]byte("ID,AuditType,TargetType,TargetID,ActorUserID,ActorUsername,Description,CreatedAt\n"))
+		for _, l := range logs {
+			createdAt := l.CreatedAt
+			// If it's already RFC3339 string use as-is, otherwise format
+			row := fmt.Sprintf("%d,%s,%s,%s,%s,%s,\"%s\",%s\n",
+				l.ID, l.AuditType, l.TargetType, l.TargetID,
+				l.ActorUserID, l.ActorUsername,
+				strings.ReplaceAll(l.Description, "\"", "\"\""),
+				createdAt)
+			c.Writer.Write([]byte(row))
+		}
 	}
 }
 

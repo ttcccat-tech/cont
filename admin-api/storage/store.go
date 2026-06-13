@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
@@ -1615,6 +1616,91 @@ func (s *Store) ListAuditLogs(limit, offset int) ([]AuditLog, error) {
 		logs = append(logs, l)
 	}
 	return logs, nil
+}
+
+// AuditLogFilter holds filter criteria for ListAuditLogsFiltered
+type AuditLogFilter struct {
+	StartTime  *time.Time
+	EndTime    *time.Time
+	AuditType  string
+	TargetType string
+	Actor      string
+	Limit      int
+	Offset     int
+}
+
+func (s *Store) ListAuditLogsFiltered(f AuditLogFilter) ([]AuditLog, int, error) {
+	where, args := []string{}, []interface{}{}
+	argIdx := 1
+
+	if f.StartTime != nil {
+		where = append(where, fmt.Sprintf("created_at >= $%d", argIdx))
+		args = append(args, *f.StartTime)
+		argIdx++
+	}
+	if f.EndTime != nil {
+		where = append(where, fmt.Sprintf("created_at <= $%d", argIdx))
+		args = append(args, *f.EndTime)
+		argIdx++
+	}
+	if f.AuditType != "" && f.AuditType != "all" {
+		where = append(where, fmt.Sprintf("audit_type = $%d", argIdx))
+		args = append(args, f.AuditType)
+		argIdx++
+	}
+	if f.TargetType != "" && f.TargetType != "all" {
+		where = append(where, fmt.Sprintf("target_type = $%d", argIdx))
+		args = append(args, f.TargetType)
+		argIdx++
+	}
+	if f.Actor != "" {
+		where = append(where, fmt.Sprintf("(actor_username ILIKE $%d OR actor_user_id = $%d)", argIdx, argIdx))
+		args = append(args, "%"+f.Actor+"%")
+		argIdx++
+	}
+
+	whereClause := ""
+	if len(where) > 0 {
+		whereClause = "WHERE " + strings.Join(where, " AND ")
+	}
+
+	// Count total
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM audit_logs %s`, whereClause)
+	var total int
+	if err := s.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	// Fetch rows
+	query := fmt.Sprintf(`SELECT id, audit_type, target_type, target_id, actor_user_id, actor_username, description, created_at
+		FROM audit_logs %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d`,
+		whereClause, argIdx, argIdx+1)
+	args = append(args, f.Limit, f.Offset)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var logs []AuditLog
+	for rows.Next() {
+		var l AuditLog
+		var actorUID, actorUname sql.NullString
+		if err := rows.Scan(&l.ID, &l.AuditType, &l.TargetType, &l.TargetID, &actorUID, &actorUname, &l.Description, &l.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		if actorUID.Valid {
+			l.ActorUserID = actorUID.String
+		}
+		if actorUname.Valid {
+			l.ActorUsername = actorUname.String
+		}
+		logs = append(logs, l)
+	}
+	if logs == nil {
+		logs = []AuditLog{}
+	}
+	return logs, total, nil
 }
 
 func (s *Store) CreateAuditLog(l *AuditLog) error {

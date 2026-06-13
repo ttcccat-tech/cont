@@ -230,6 +230,7 @@ func main() {
 
 		// Audit Logs
 		admin.GET("/audit", routes.RequirePermission(store, "groups", false), routes.ListAuditLogs(store))
+		admin.GET("/audit/export", routes.AuthRequired(jwtSecret), routes.ExportAuditLogsCSV(store))
 
 		// Alert Rules
 		alerts := admin.Group("/alerts")
