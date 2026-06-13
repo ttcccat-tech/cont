@@ -719,7 +719,12 @@ func (s *Store) UpdateConsumerCredential(consumerID, credentialType, credentialI
 	}
 	if expiresAt != nil {
 		query += fmt.Sprintf("expires_at=$%d, ", argIdx)
-		args = append(args, *expiresAt)
+		if *expiresAt == "" {
+			// Empty string means clear the expiry (set to NULL)
+			args = append(args, nil)
+		} else {
+			args = append(args, *expiresAt)
+		}
 		argIdx++
 	}
 	// Nothing to update
