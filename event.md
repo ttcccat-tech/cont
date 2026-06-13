@@ -223,9 +223,16 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont API 完整 CRUD 動作者追蹤（Audit Log Enhancement）** — 目前 Audit Log 覆蓋主要 routes，但缺少針對 Plugin/Snapshot/Rollback/AlertRule 操作的完整 audit trail，需在所有關鍵 mutation operations 補上 audit log 寫入
+- [ ] **Cont 使用者管理精細化（API Key 審批 + Audit Log）** — 見下方已完成
 
 ## ✅ 已完成
+
+- [x] **Cont API Audit Log 完整覆蓋（Plugin/Workspace/AlertRule/ConfigSnapshot CRUD）** — commit `410372c5`
+  - Plugin: Create/Update/Delete audit log
+  - Workspace: Create/Update/Delete audit log
+  - AlertRule: Create/Update/Delete audit log
+  - ConfigSnapshot: Create/Delete/Rollback audit log
+  - QA: Plugin/Workspace/AlertRule/ConfigSnapshot CRUD audit logs ✅ (actor=admin)
 
 - [x] **Cont Alert Rule 實際觸發機制（Execution Engine）** — commit `ff44a94c` + `a5f9f824` + `8722f5c9`
   - `admin-api/engine/alerter.go`: NewAlerter background goroutine，每30s評估 enabled AlertRules
