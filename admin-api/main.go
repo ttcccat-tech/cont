@@ -176,12 +176,15 @@ func main() {
 			cred := cons.Group("/:id")
 			cred.GET("/key-auth/credentials", routes.RequirePermission(store, "consumers", false), routes.ListCredentials(store, "key-auth"))
 			cred.POST("/key-auth/credentials", routes.RequirePermission(store, "consumers", true), routes.CreateCredential(store, "key-auth"))
+			cred.PATCH("/key-auth/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.UpdateCredential(store, "key-auth"))
 			cred.DELETE("/key-auth/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.DeleteCredential(store, "key-auth"))
 			cred.GET("/basic-auth/credentials", routes.RequirePermission(store, "consumers", false), routes.ListCredentials(store, "basic-auth"))
 			cred.POST("/basic-auth/credentials", routes.RequirePermission(store, "consumers", true), routes.CreateCredential(store, "basic-auth"))
+			cred.PATCH("/basic-auth/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.UpdateCredential(store, "basic-auth"))
 			cred.DELETE("/basic-auth/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.DeleteCredential(store, "basic-auth"))
 			cred.GET("/hmac-auth/credentials", routes.RequirePermission(store, "consumers", false), routes.ListCredentials(store, "hmac-auth"))
 			cred.POST("/hmac-auth/credentials", routes.RequirePermission(store, "consumers", true), routes.CreateCredential(store, "hmac-auth"))
+			cred.PATCH("/hmac-auth/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.UpdateCredential(store, "hmac-auth"))
 			cred.DELETE("/hmac-auth/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.DeleteCredential(store, "hmac-auth"))
 		}
 

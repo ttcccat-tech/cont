@@ -775,8 +775,9 @@ func CreateCredential(store *storage.Store, credentialType string) gin.HandlerFu
 			return
 		}
 		var req struct {
-			Key    string `json:"key" binding:"required"`
-			Secret string `json:"secret,omitempty"`
+			Key       string  `json:"key" binding:"required"`
+			Secret    string  `json:"secret,omitempty"`
+			ExpiresAt *string `json:"expires_at,omitempty"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			badRequest(c, err)
@@ -792,6 +793,7 @@ func CreateCredential(store *storage.Store, credentialType string) gin.HandlerFu
 			Key:            req.Key,
 			Secret:         req.Secret,
 			Enabled:        true,
+			ExpiresAt:      req.ExpiresAt,
 		}
 		result, err := store.CreateConsumerCredential(cred)
 		if err != nil {
@@ -818,6 +820,44 @@ func DeleteCredential(store *storage.Store, credentialType string) gin.HandlerFu
 	}
 }
 
+func UpdateCredential(store *storage.Store, credentialType string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		consumerID := c.Param("id")
+		credID := c.Param("credId")
+		// Verify consumer exists
+		if _, err := store.GetConsumer(consumerID, getOrgID(c)); err != nil {
+			if err == sql.ErrNoRows {
+				notFound(c, "consumer not found")
+				return
+			}
+			internalError(c)
+			return
+		}
+		var req struct {
+			Enabled   *bool   `json:"enabled,omitempty"`
+			ExpiresAt *string `json:"expires_at,omitempty"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			badRequest(c, err)
+			return
+		}
+		if err := store.UpdateConsumerCredential(consumerID, credentialType, credID, req.Enabled, req.ExpiresAt); err != nil {
+			if err == sql.ErrNoRows {
+				notFound(c, "credential not found")
+				return
+			}
+			internalError(c)
+			return
+		}
+		updated, err := store.GetConsumerCredential(consumerID, credentialType, credID)
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, updated.ToResponse())
+	}
+}
+
 // ValidateCredential is an internal endpoint for proxy auth validation
 func ValidateCredential(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -835,6 +875,14 @@ func ValidateCredential(store *storage.Store) gin.HandlerFunc {
 			}
 			internalError(c)
 			return
+		}
+		// Check expiration
+		if cred.ExpiresAt != nil {
+			expiryTime, parseErr := time.Parse(time.RFC3339, *cred.ExpiresAt)
+			if parseErr == nil && time.Now().After(expiryTime) {
+				unauthorized(c, "credentials expired")
+				return
+			}
 		}
 		c.JSON(200, gin.H{"consumer_id": cred.ConsumerID})
 	}

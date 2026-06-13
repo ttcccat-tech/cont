@@ -613,7 +613,7 @@ func (s *Store) DeleteConsumer(id, orgID string) error {
 // ListConsumerCredentials returns all credentials for a consumer of a given type
 func (s *Store) ListConsumerCredentials(consumerID, credentialType string) ([]ConsumerCredential, error) {
 	rows, err := s.db.Query(`
-		SELECT id, consumer_id, credential_type, key, secret, enabled, created_at
+		SELECT id, consumer_id, credential_type, key, secret, enabled, expires_at, created_at
 		FROM consumer_credentials
 		WHERE consumer_id=$1 AND credential_type=$2
 		ORDER BY created_at DESC`,
@@ -625,13 +625,15 @@ func (s *Store) ListConsumerCredentials(consumerID, credentialType string) ([]Co
 	var out []ConsumerCredential
 	for rows.Next() {
 		var c ConsumerCredential
-		var secret sql.NullString
-		var created sql.NullString
-		if err := rows.Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &created); err != nil {
+		var secret, expires, created sql.NullString
+		if err := rows.Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &expires, &created); err != nil {
 			return nil, err
 		}
 		if secret.Valid {
 			c.Secret = secret.String
+		}
+		if expires.Valid {
+			c.ExpiresAt = &expires.String
 		}
 		if created.Valid {
 			c.CreatedAt = created.String
@@ -644,10 +646,10 @@ func (s *Store) ListConsumerCredentials(consumerID, credentialType string) ([]Co
 // CreateConsumerCredential creates a new credential for a consumer
 func (s *Store) CreateConsumerCredential(c *ConsumerCredential) (*ConsumerCredential, error) {
 	err := s.db.QueryRow(`
-		INSERT INTO consumer_credentials (consumer_id, credential_type, key, secret, enabled)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO consumer_credentials (consumer_id, credential_type, key, secret, enabled, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at`,
-		c.ConsumerID, c.CredentialType, c.Key, c.Secret, orBool(c.Enabled, true),
+		c.ConsumerID, c.CredentialType, c.Key, c.Secret, orBool(c.Enabled, true), c.ExpiresAt,
 	).Scan(&c.ID, &c.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -658,24 +660,82 @@ func (s *Store) CreateConsumerCredential(c *ConsumerCredential) (*ConsumerCreden
 // GetConsumerCredentialByKey looks up a credential by type and key (for auth middleware)
 func (s *Store) GetConsumerCredentialByKey(credentialType, key string) (*ConsumerCredential, error) {
 	var c ConsumerCredential
-	var secret sql.NullString
-	var created sql.NullString
+	var secret, expires, created sql.NullString
 	err := s.db.QueryRow(`
-		SELECT id, consumer_id, credential_type, key, secret, enabled, created_at
+		SELECT id, consumer_id, credential_type, key, secret, enabled, expires_at, created_at
 		FROM consumer_credentials
 		WHERE credential_type=$1 AND key=$2 AND enabled=true`,
 		credentialType, key,
-	).Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &created)
+	).Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &expires, &created)
 	if err != nil {
 		return nil, err
 	}
 	if secret.Valid {
 		c.Secret = secret.String
 	}
+	if expires.Valid {
+		c.ExpiresAt = &expires.String
+	}
 	if created.Valid {
 		c.CreatedAt = created.String
 	}
 	return &c, nil
+}
+
+// GetConsumerCredential fetches a credential by ID for a consumer
+func (s *Store) GetConsumerCredential(consumerID, credentialType, credentialID string) (*ConsumerCredential, error) {
+	var c ConsumerCredential
+	var secret, expires, created sql.NullString
+	err := s.db.QueryRow(`
+		SELECT id, consumer_id, credential_type, key, secret, enabled, expires_at, created_at
+		FROM consumer_credentials
+		WHERE id=$1 AND consumer_id=$2 AND credential_type=$3`,
+		credentialID, consumerID, credentialType,
+	).Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &expires, &created)
+	if err != nil {
+		return nil, err
+	}
+	if secret.Valid {
+		c.Secret = secret.String
+	}
+	if expires.Valid {
+		c.ExpiresAt = &expires.String
+	}
+	if created.Valid {
+		c.CreatedAt = created.String
+	}
+	return &c, nil
+}
+
+// UpdateConsumerCredential updates a credential's enabled and expires_at fields
+func (s *Store) UpdateConsumerCredential(consumerID, credentialType, credentialID string, enabled *bool, expiresAt *string) error {
+	query := `UPDATE consumer_credentials SET `
+	args := []interface{}{}
+	argIdx := 1
+	if enabled != nil {
+		query += fmt.Sprintf("enabled=$%d, ", argIdx)
+		args = append(args, *enabled)
+		argIdx++
+	}
+	if expiresAt != nil {
+		query += fmt.Sprintf("expires_at=$%d, ", argIdx)
+		args = append(args, *expiresAt)
+		argIdx++
+	}
+	// Remove trailing comma
+	query = query[:len(query)-2]
+	query += fmt.Sprintf(" WHERE id=$%d AND consumer_id=$%d AND credential_type=$%d", argIdx, argIdx+1, argIdx+2)
+	args = append(args, credentialID, consumerID, credentialType)
+
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // DeleteConsumerCredential deletes a specific credential

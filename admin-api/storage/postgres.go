@@ -323,6 +323,9 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_consumer_cred_key_type ON consumer_credentials(credential_type, key)`,
 		`CREATE INDEX IF NOT EXISTS idx_consumer_cred_consumer ON consumer_credentials(consumer_id)`,
 
+		// Consumer credential TTL
+		`ALTER TABLE consumer_credentials ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`,
+
 		// Workspace AuthGroups binding (many-to-many with role)
 		`CREATE TABLE IF NOT EXISTS workspace_auth_groups (
 			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
