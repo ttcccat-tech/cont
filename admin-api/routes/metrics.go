@@ -101,11 +101,12 @@ func RegisterPoolStats(getDB func() dbStatProvider, getRedis func() redisPoolInf
 		redisPoolStats = getRedis()
 	}
 	// Register pool GaugeFuncs so they appear in /metrics
-	prometheus.MustRegister(DBPoolMax)
-	prometheus.MustRegister(DBPoolOpen)
-	prometheus.MustRegister(DBPoolIdle)
-	prometheus.MustRegister(RedisPoolActive)
-	prometheus.MustRegister(RedisPoolIdle)
+	// Use Register (not MustRegister) — safe if called multiple times
+	prometheus.DefaultRegisterer.Register(DBPoolMax)
+	prometheus.DefaultRegisterer.Register(DBPoolOpen)
+	prometheus.DefaultRegisterer.Register(DBPoolIdle)
+	prometheus.DefaultRegisterer.Register(RedisPoolActive)
+	prometheus.DefaultRegisterer.Register(RedisPoolIdle)
 }
 
 // Metrics returns a handler that exposes Prometheus metrics including pool stats
