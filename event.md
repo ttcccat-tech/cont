@@ -114,6 +114,14 @@
   - Go integration tests (29 tests), Lua tests (23 tests)
   - QA: Upstreams/Targets/Consumers/AuthGroups CRUD ✅
 
+- [x] **Cont 單元測試覆蓋率提升 Phase 4（storage + routes）** — commit `f1f60721` + `8085fea7`
+  - `admin-api/storage/store_test.go` 新增：ComputeConfigDiff 完整單元測試（12 cases：add/delete/update/unchanged for services/routes/plugins/consumers；invalid JSON handling）
+  - `admin-api/storage/models_test.go` 新增：SanitizeString（10 cases）、IsValidTarget（20 cases）、isValidPort（12 cases）、IsValidHostname（14 cases）、ConsumerCredential.ToResponse（secret hiding 驗證）
+  - `admin-api/routes/oauth_test.go` 新增：OAuth ListResponse（secret field 排除驗證）、State Generation（32-byte entropy）、Callback URL 建構、Auth URL params 完整性、Provider defaults（scope/authURL）
+  - QA: Go storage/routes tests PASS ✅, Lua busted 40 tests PASS ✅
+  - **Bug found**: SanitizeString 使用 strings.TrimSpace 會 strip 內部 whitespace（含 \n），文件記錄為預期行為
+  - **Note**: 覆蓋率仍低（storage 8.0%, routes 3.5%）— 需要 sqlmock 或 DB-independent store interface 重構才能大幅提升
+
 - [x] **Cont SaaS Phase 2：Workspace 綁定 Organization + 多租戶資料隔離** — commit `d390a3b6`
   - store.go: 所有 CRUD methods 新增 orgID WHERE 過濾, routes.go: getOrgID(c)
   - QA: Workspace Create→201 ✅, Read→200 ✅, Update→200 ✅, Delete→204 ✅
