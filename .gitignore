@@ -5,3 +5,7 @@ admin-api/*.exe
 
 # Environment secrets
 .env
+
+# Binaries
+admin-api/cont-admin-api-new
+admin-api/cont-admin-api-test
