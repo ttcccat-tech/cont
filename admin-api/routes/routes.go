@@ -20,7 +20,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
 	"github.com/ttcccat-tech/cont/admin-api/tracing"
-	"go.opentelemetry.io/otel/semconv/v1.24.0"
+	"go.opentelemetry.io/otel/semconv/v1.18.0"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -772,17 +772,7 @@ type CircuitBreakerConfigInput struct {
 func GetCircuitBreakerConfig(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		upstreamID := c.Param("id")
-		orgID := getOrgID(c)
-		upstream, err := store.GetUpstream(upstreamID, orgID)
-		if err == sql.ErrNoRows {
-			notFound(c, "upstream not found")
-			return
-		}
-		if err != nil {
-			internalError(c)
-			return
-		}
-
+		_ = getOrgID(c) // auth context
 		ctx := context.Background()
 		cfg, err := store.Redis().GetCircuitBreakerConfig(ctx, upstreamID)
 		if err != nil {
@@ -796,7 +786,7 @@ func GetCircuitBreakerConfig(store *storage.Store) gin.HandlerFunc {
 				Enabled:             false,
 				TripThreshold:       5,
 				RecoveryTimeout:     30,
-				HalfOpenMaxRequests: 3,
+				HalfOpenMaxReqs:     3,
 				HalfOpenSuccessRate: 50,
 			}
 		}
@@ -808,7 +798,7 @@ func SetCircuitBreakerConfig(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		upstreamID := c.Param("id")
 		orgID := getOrgID(c)
-		upstream, err := store.GetUpstream(upstreamID, orgID)
+		_, err := store.GetUpstream(upstreamID, orgID)
 		if err == sql.ErrNoRows {
 			notFound(c, "upstream not found")
 			return
@@ -853,7 +843,7 @@ func SetCircuitBreakerConfig(store *storage.Store) gin.HandlerFunc {
 				badRequestMsg(c, "half_open_max_requests must be >= 1")
 				return
 			}
-			existing.HalfOpenMaxRequests = *input.HalfOpenMaxRequests
+			existing.HalfOpenMaxReqs = *input.HalfOpenMaxRequests
 		}
 		if input.HalfOpenSuccessRate != nil {
 			if *input.HalfOpenSuccessRate < 0 || *input.HalfOpenSuccessRate > 100 {
@@ -871,7 +861,14 @@ func SetCircuitBreakerConfig(store *storage.Store) gin.HandlerFunc {
 		store.Redis().TrackCircuitBreakerUpstream(ctx, upstreamID)
 
 		// Write audit log
-		auditLog(c, "circuit_breaker", "update", upstreamID, upstream.Name, "circuit breaker config updated")
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "update",
+			TargetType:    "circuit_breaker",
+			TargetID:      upstreamID,
+			ActorUserID:   c.GetString("user_id"),
+			ActorUsername: c.GetString("username"),
+			Description:   "circuit breaker config updated",
+		})
 
 		c.JSON(200, existing)
 	}

@@ -337,15 +337,23 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Plugin SDK 與 Plugin Marketplace** — 定義標準 Plugin Interface，支援第三方擴展
-  - Plugin schema: 定義 Plugin 結構（name/config/access_phase/log_phase/pre_proxy/post_proxy）
-  - Plugin registry: `GET /internal/plugin-registry` 供 proxy 動態載入
-  - Plugin 範例: 參考現有 rate-limiting-advanced/proxy-cache-advanced/circuit-breaker 實作文件
-  - Frontend Plugin gallery: 預設提供可安裝的 plugin 清單
-  - Backend: plugin 啟用/停用 CRUD 已有，缺 schema registry
+（無）
 
 ## 🔴 未完成
 
+- [ ] **Admin API build failure — HalfOpenMaxRequests undefined + auditLog undefined** — routes.go:856 references `existing.HalfOpenMaxRequests` (not in CircuitBreakerConfig model) + routes.go:874 uses undefined `auditLog`; pre-existing build blocker
+
+## ✅ 已完成
+
+- [x] **Cont Plugin SDK 與 Plugin Marketplace** — commit `546809c2` + `40178774`
+  - PluginSchema model: name/version/label/description/access_phase/log_phase/pre_proxy/post_proxy/config_schema
+  - BuiltInPlugins(): 5 built-in plugin schemas (rate-limiting-advanced, proxy-cache-advanced, circuit-breaker, usage-tracking, rate-limiting-basic)
+  - GetPluginSchema(name): lookup helper
+  - Plugin.MarshalJSON: auto-populates schema from registry
+  - GET /internal/plugin-registry: new internal endpoint for proxy + frontend discovery
+  - worker.lua: sync_plugin_registry() on startup + every 10s
+  - Frontend Plugin Gallery: browse available plugin types + one-click install
+  - docs/PLUGIN_SDK.md: full plugin development guide
 （無）
 
 ## ✅ 已完成
