@@ -399,6 +399,14 @@
   - Proxy: access.lua 生成/傳遞 X-Cont-Trace-ID header，nginx.conf 將 trace ID proxy 到所有 upstream locations
   - QA: X-Cont-Trace-ID 在 response headers 正確迴傳 ✅，不同 request 產生不同 trace ID ✅
 
+- [x] **Cont Admin API Routes 單元測試覆蓋率提升 Phase 5（errors/billing/crypto/usage/oauth handlers）** — commit `aa165675`
+  - `errors_test.go`: 12 tests covering all error helper functions (badRequestMsg/WithDetails/Validation, unauthorized, forbidden, notFound, conflict, badGateway, invalidJSON, missingField, alreadyExists, internalError, internalErrorWithLog)
+  - `billing_test.go`: 13 tests covering billing handlers edge cases (stripe not configured, org_id required, invalid JSON, invalid plan/billing cycle, webhook missing body)
+  - `crypto_test.go`: 3 tests for RSA key pair generation (success, 2048-bit key size verification, public/private key matching via math/rsa)
+  - `usage_test.go`: 9 tests for usage endpoints (org_id/consumer_id required, OrgUsageResponse/ConsumerUsageResponse/HourlyUsageItem JSON serialization, time format, query params)
+  - `oauth_handler_test.go`: 17 tests for OAuth handler logic (OAuthState/OAuthUserInfo/tokenResponse JSON, client_secret hidden in JSON, callback URL HTTP/HTTPS, state generation, default scopes/auth URL, redirect params, JWT claims validation)
+  - Total: 54 new unit tests for routes package
+
 ---
 
 ## 完整開發流程（開發守護遵循）
