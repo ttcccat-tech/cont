@@ -243,6 +243,18 @@ func (a *Alerter) fireAlert(rule *storage.AlertRule, currentValue float64) {
 
 	wg.Wait()
 
+	// Broadcast SSE event to all connected admin clients
+	storage.Hub.BroadcastAll("alert_triggered", map[string]interface{}{
+		"rule_id":        rule.ID,
+		"rule_name":      rule.Name,
+		"metric_type":    rule.MetricType,
+		"operator":       rule.Operator,
+		"threshold":      rule.ThresholdValue,
+		"current_value":  currentValue,
+		"service_name":   rule.ServiceName,
+		"triggered_at":   time.Now().UTC().Format(time.RFC3339),
+	})
+
 	// Update last fired timestamp
 	a.mu.Lock()
 	a.lastFiredAt[rule.ID] = time.Now()
