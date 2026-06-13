@@ -51,6 +51,7 @@ services:
       PROXY_PORT: "8000"
       POSTGRES_URL: "postgres://kong:kongpass@cont-postgres:5432/cont?sslmode=disable"
       REDIS_URL: "cont-redis:6379"
+      PROXY_METRICS_URL: "http://cont-proxy:8000/metrics"
       JWT_SECRET: ${JWT_SECRET:-cont-dev-jwt-secret-change-in-prod}
       CONT_URL: ${CONT_URL:-}
       # Stripe Billing (required for paid plans)
