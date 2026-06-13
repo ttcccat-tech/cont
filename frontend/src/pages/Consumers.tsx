@@ -20,6 +20,8 @@ interface KeyAuthCredential {
   key: string
   consumer_id?: string
   created_at?: number
+  expires_at?: string
+  enabled?: boolean
 }
 
 export default function ConsumersPage() {
@@ -160,6 +162,14 @@ export default function ConsumersPage() {
     } catch (e: any) { message.error('刪除失敗: ' + (e.message || '')) }
   }
 
+  const handleEditKeyAuth = async (consumerId: string, credId: string, values: { expires_at?: string; enabled?: boolean }) => {
+    try {
+      await api.updateKeyAuthCredential(consumerId, credId, values)
+      message.success('API Key 已更新')
+      fetchCredentials(consumerId)
+    } catch (e: any) { message.error('更新失敗: ' + (e.message || '')) }
+  }
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => message.success(`${label} 已複製`))
   }
@@ -220,13 +230,75 @@ export default function ConsumersPage() {
         </Space>
       )
     },
+    {
+      title: '過期時間', dataIndex: 'expires_at', render: (v: string) => {
+        if (!v) return <Tag color="green">永不過期</Tag>
+        const expiry = new Date(v)
+        const now = new Date()
+        const isExpired = now > expiry
+        const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        if (isExpired) return <Tag color="red">已過期</Tag>
+        if (daysLeft <= 7) return <Tag color="orange">即將過期（{daysLeft}天）</Tag>
+        return <Tag color="blue">{expiry.toLocaleString('zh-TW')}</Tag>
+      }
+    },
     { title: '建立時間', dataIndex: 'created_at', render: v => v ? new Date(v).toLocaleString('zh-TW') : '-' },
     {
-      title: '操作', width: 100,
+      title: '操作', width: 120,
       render: (_, r) => (
-        <Popconfirm title="刪除此 API Key？" onConfirm={() => selectedConsumer?.id && handleDeleteKeyAuth(selectedConsumer.id, r.id)}>
-          <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
-        </Popconfirm>
+        <Space direction="vertical" size={4}>
+          <Button size="small" icon={<KeyOutlined />} onClick={() => {
+            // Edit expiry modal
+            Modal.confirm({
+              title: '設定 API Key 過期時間',
+              content: (
+                <div style={{ marginTop: 12 }}>
+                  <p style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    目前過期時間：{r.expires_at ? new Date(r.expires_at).toLocaleString('zh-TW') : '永不過期'}
+                  </p>
+                  <Input
+                    type="datetime-local"
+                    id={`expiry-${r.id}`}
+                    defaultValue={r.expires_at ? r.expires_at.slice(0, 16) : ''}
+                    style={{ marginTop: 8 }}
+                  />
+                  <Button
+                    size="small"
+                    style={{ marginTop: 8 }}
+                    onClick={() => {
+                      const input = document.getElementById(`expiry-${r.id}`) as HTMLInputElement
+                      const val = input?.value
+                      selectedConsumer?.id && handleEditKeyAuth(selectedConsumer.id, r.id, {
+                        expires_at: val ? new Date(val).toISOString() : '',
+                      })
+                      Modal.destroyAll()
+                    }}
+                  >
+                    儲存
+                  </Button>
+                  {r.expires_at && (
+                    <Button
+                      size="small"
+                      style={{ marginTop: 4 }}
+                      onClick={() => {
+                        selectedConsumer?.id && handleEditKeyAuth(selectedConsumer.id, r.id, { expires_at: '' })
+                        Modal.destroyAll()
+                      }}
+                    >
+                      移除過期時間
+                    </Button>
+                  )}
+                </div>
+              ),
+              okText: '取消',
+              cancelText: '關閉',
+              width: 400,
+            })
+          }}>編輯過期</Button>
+          <Popconfirm title="刪除此 API Key？" onConfirm={() => selectedConsumer?.id && handleDeleteKeyAuth(selectedConsumer.id, r.id)}>
+            <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
+          </Popconfirm>
+        </Space>
       )
     }
   ]

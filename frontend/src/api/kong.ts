@@ -363,11 +363,13 @@ export const api = {
     analyticsClient.delete(wsPrefix(`/consumers/${consumerId}/jwt/${credentialId}`)),
 
   listKeyAuthCredentials: (consumerId: string) =>
-    analyticsClient.get<unknown[]>(wsPrefix(`/consumers/${consumerId}/key-auth`)).then(r => r.data?.data ?? []),
+    analyticsClient.get<unknown[]>(wsPrefix(`/consumers/${consumerId}/key-auth/credentials`)).then(r => r.data ?? []),
   createKeyAuthCredential: (consumerId: string, data?: unknown) =>
-    analyticsClient.post(wsPrefix(`/consumers/${consumerId}/key-auth`), data || {}).then(r => r.data),
+    analyticsClient.post(wsPrefix(`/consumers/${consumerId}/key-auth/credentials`), data || {}).then(r => r.data),
+  updateKeyAuthCredential: (consumerId: string, credentialId: string, data: unknown) =>
+    analyticsClient.patch(wsPrefix(`/consumers/${consumerId}/key-auth/credentials/${credentialId}`), data).then(r => r.data),
   deleteKeyAuthCredential: (consumerId: string, credentialId: string) =>
-    analyticsClient.delete(wsPrefix(`/consumers/${consumerId}/key-auth/${credentialId}`)),
+    analyticsClient.delete(wsPrefix(`/consumers/${consumerId}/key-auth/credentials/${credentialId}`)),
 }
 
 export default api
