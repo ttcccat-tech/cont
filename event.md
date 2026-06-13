@@ -337,7 +337,12 @@
 
 ## 🟡 預計優化
 
-（無）
+- [ ] **Cont Plugin SDK 與 Plugin Marketplace** — 定義標準 Plugin Interface，支援第三方擴展
+  - Plugin schema: 定義 Plugin 結構（name/config/access_phase/log_phase/pre_proxy/post_proxy）
+  - Plugin registry: `GET /internal/plugin-registry` 供 proxy 動態載入
+  - Plugin 範例: 參考現有 rate-limiting-advanced/proxy-cache-advanced/circuit-breaker 實作文件
+  - Frontend Plugin gallery: 預設提供可安裝的 plugin 清單
+  - Backend: plugin 啟用/停用 CRUD 已有，缺 schema registry
 
 ## 🔴 未完成
 
