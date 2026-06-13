@@ -229,15 +229,16 @@
 - [x] **Cont E2E Tests 接入 GitHub Actions CI** — commit `fdcd1b5f`
   - `test/e2e-runner.sh` 共 60+ E2E tests, QA: 20/20 billing E2E tests PASS
 
-## 🟡 預計優化
+## ✅ 已完成
 
-- [ ] **Consumer Credential 過期機制（TTL / Expiry）**
+- [x] **Consumer Credential 過期機制（TTL / Expiry）** — commit `c91ea93b` + `1e9c8654` + `115b5560`
   - Backend: `consumer_credentials` 表新增 `expires_at` TIMESTAMPTZ 欄位（可為 NULL 表示不過期）
   - Backend: CreateCredential / UpdateCredential 支援 `expires_at` 參數
   - Backend: `/internal/validate-cred/:type/:key` 需檢查 expires_at，過期返回 401
   - Backend: ListCredentials 回傳時一併顯示 expires_at 欄位
   - Frontend: Credentials 列表顯示過期狀態（正常/已過期/即將過期），編輯 Modal 支援設定過期時間
-  - QA: Create credential with expires_at → List shows expiry → expired cred → 401
+  - **Bug fix `115b5560`**: PATCH `expires_at: ""`（null JSON）被 Go `*string` 接收為空字串而非 nil → UPDATE 寫入空字串而非 NULL。修復：`*expiresAt == ""` 時寫入 SQL NULL
+  - QA: Create credential with expires_at → List shows expiry → PATCH expires_at="" → null ✅, expired cred → /internal/validate-cred → 401 ✅
 
 ---
 
