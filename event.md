@@ -231,7 +231,15 @@
 
 ## 🟡 預計優化
 
-（空）
+- [ ] **Consumer Credential 過期機制（TTL / Expiry）**
+  - Backend: `consumer_credentials` 表新增 `expires_at` TIMESTAMPTZ 欄位（可為 NULL 表示不過期）
+  - Backend: CreateCredential / UpdateCredential 支援 `expires_at` 參數
+  - Backend: `/internal/validate-cred/:type/:key` 需檢查 expires_at，過期返回 401
+  - Backend: ListCredentials 回傳時一併顯示 expires_at 欄位
+  - Frontend: Credentials 列表顯示過期狀態（正常/已過期/即將過期），編輯 Modal 支援設定過期時間
+  - QA: Create credential with expires_at → List shows expiry → expired cred → 401
+
+---
 
 ## ✅ 已完成
 
