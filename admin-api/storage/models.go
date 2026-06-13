@@ -314,6 +314,7 @@ type User struct {
 	Role      string `json:"role" binding:"required,oneof=admin editor viewer"`
 	Enabled   bool   `json:"enabled"`
 	OrgID     string `json:"org_id,omitempty"` // Organization ID for multi-tenancy
+	LastLoginAt string `json:"last_login_at,omitempty"` // Last successful login timestamp
 	CreatedAt string `json:"created_at,omitempty"`
 	UpdatedAt string `json:"updated_at,omitempty"`
 	// PasswordHash is never returned via JSON

@@ -1244,6 +1244,11 @@ func (s *Store) UpdateUserPassword(id, passwordHash string) error {
 	return err
 }
 
+func (s *Store) UpdateUserLastLogin(id string) error {
+	_, err := s.db.Exec(`UPDATE users SET last_login_at=NOW() WHERE id=$1`, id)
+	return err
+}
+
 // ── Organizations (SaaS multi-tenancy) ───────────────────────────────────
 
 func (s *Store) CreateOrganization(org *Organization) (*Organization, error) {

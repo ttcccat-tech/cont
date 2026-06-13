@@ -1294,6 +1294,9 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 		// Successful login: clear failed attempts
 		store.ClearFailedLogins(req.Username)
 
+		// Update last login timestamp
+		store.UpdateUserLastLogin(user.ID)
+
 		// Generate JWT
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"sub":     user.ID,

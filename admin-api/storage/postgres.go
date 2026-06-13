@@ -371,6 +371,9 @@ func RunMigrations(db *sql.DB) error {
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_users_org ON users(org_id)`,
 
+		// Add last_login_at for tracking user last login timestamp
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ`,
+
 		// Phase 2: Add org_id to entity tables for multi-tenant isolation
 		`ALTER TABLE services   ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
 		`ALTER TABLE routes      ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
