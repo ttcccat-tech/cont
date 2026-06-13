@@ -733,6 +733,7 @@ export default function Login() {
               忘記密碼？
             </Button>
           </div>
+        </Form>
 
         <Divider style={{ margin: '24px 0 16px', color: 'var(--muted)', borderColor: 'var(--accent)' }}>
           <span style={{ fontSize: 12, padding: '0 8px' }}>or</span>
