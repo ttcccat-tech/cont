@@ -121,6 +121,18 @@ func CreateOAuthProvider(store *storage.Store) gin.HandlerFunc {
 			badRequestMsg(c, err.Error())
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "create",
+			TargetType:    "OAuthProvider",
+			TargetID:      created.Provider,
+			ActorUsername: actorStr,
+			Description:   "Created OAuth provider: " + created.Provider,
+		})
 		c.JSON(201, created)
 	}
 }
@@ -160,6 +172,18 @@ func UpdateOAuthProvider(store *storage.Store) gin.HandlerFunc {
 			notFound(c, "provider not found")
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "update",
+			TargetType:    "OAuthProvider",
+			TargetID:      provider,
+			ActorUsername: actorStr,
+			Description:   "Updated OAuth provider: " + provider,
+		})
 		c.JSON(200, updated)
 	}
 }
@@ -172,6 +196,18 @@ func DeleteOAuthProvider(store *storage.Store) gin.HandlerFunc {
 			notFound(c, "provider not found")
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "delete",
+			TargetType:    "OAuthProvider",
+			TargetID:      provider,
+			ActorUsername: actorStr,
+			Description:   "Deleted OAuth provider: " + provider,
+		})
 		c.Status(204)
 	}
 }
@@ -235,6 +271,15 @@ func InitiateOAuth(store *storage.Store) gin.HandlerFunc {
 		params.Set("state", state)
 		params.Set("access_type", "online")
 		params.Set("prompt", "select_account")
+
+		// Audit log: OAuth initiation (login attempt)
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "login",
+			TargetType:    "OAuthProvider",
+			TargetID:      provider,
+			ActorUsername: "anonymous",
+			Description:   "OAuth login initiated with " + provider,
+		})
 
 		c.Redirect(http.StatusFound, authURL+"?"+params.Encode())
 	}
@@ -309,6 +354,15 @@ func HandleOAuthCallback(store *storage.Store, jwtSecret string) gin.HandlerFunc
 			internalError(c)
 			return
 		}
+
+		// Audit log: OAuth login success
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "login",
+			TargetType:    "User",
+			TargetID:      user.ID,
+			ActorUsername: user.Username,
+			Description:   "OAuth login successful via " + provider,
+		})
 
 		// Generate JWT
 		token, err := generateOAuthJWT(user, jwtSecret)
