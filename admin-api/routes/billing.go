@@ -218,6 +218,12 @@ func CreatePortalSession(store *storage.Store, frontendBaseURL string) gin.Handl
 			return
 		}
 
+		org, _ := store.GetOrganization(orgID)
+		orgName := orgID
+		if org != nil {
+			orgName = org.Name
+		}
+
 		baseURL := frontendBaseURL
 		if baseURL == "" {
 			baseURL = "http://localhost:5173"
@@ -237,7 +243,7 @@ func CreatePortalSession(store *storage.Store, frontendBaseURL string) gin.Handl
 			AuditType:     "create",
 			TargetType:    "Subscription",
 			TargetID:      subscr.StripeCustomerID,
-			ActorUsername: org.Name,
+			ActorUsername: orgName,
 			Description:   fmt.Sprintf("Billing portal opened for org %s", orgID),
 		})
 

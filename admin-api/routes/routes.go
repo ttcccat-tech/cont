@@ -2847,6 +2847,18 @@ func UpdateAPIKeyRequest(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
+		actor, _ := c.Get("username")
+		actorStr := ""
+		if actor != nil {
+			actorStr = actor.(string)
+		}
+		store.CreateAuditLog(&storage.AuditLog{
+			AuditType:     "update",
+			TargetType:    "APIKeyRequest",
+			TargetID:      id,
+			ActorUsername: actorStr,
+			Description:   "Updated API key request: " + existing.KeyName,
+		})
 		c.JSON(200, updated)
 	}
 }
