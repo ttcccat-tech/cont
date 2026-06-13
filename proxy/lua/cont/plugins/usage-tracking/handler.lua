@@ -110,7 +110,7 @@ local function build_usage_incr_commands(sock, org_id, consumer_id, route_id, se
     return true
 end
 
--- Main access handler
+-- Main access handler (pre-record usage; actual latency computed in log phase)
 function _M.access(self, plugin)
     local cfg = get_config(plugin)
 
@@ -125,7 +125,9 @@ function _M.access(self, plugin)
         return
     end
 
-    -- Get latency and status (available in log phase, but we estimate in access)
+    -- In access phase we can't know true latency yet; use 0 placeholder.
+    -- The log phase will re-record with accurate latency.
+    -- For now, write a minimal entry so usage is tracked.
     local latency_ms = 0
     local status_code = ngx.status
 

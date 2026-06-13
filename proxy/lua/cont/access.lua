@@ -393,6 +393,9 @@ if cred_type then
     end
 end
 
+-- Record request start time for latency tracking in plugins
+ngx.ctx.request_start_time = ngx.now() * 1000
+
 -- Run per-plugin access()
 for _, plugin in ipairs(get_applicable_plugins(route.id, service_id)) do
     if plugin.name == "jwt" or plugin.name == "key-auth"
