@@ -4,118 +4,99 @@
 package routes
 
 import (
+	"sync"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// ── DB Pool Stats ─────────────────────────────────────────────────────────────
-type dbStatProvider interface {
-	MaxOpenConnections() int
-	OpenConnections() int
-	Idle() int
-}
-
-var dbStats dbStatProvider
-
-// ── Redis Pool Stats ──────────────────────────────────────────────────────────
-type redisPoolInfo interface {
-	TotalConns() int
-	IdleConns() int
-}
-
-var redisPoolStats redisPoolInfo
-
-// ── Prometheus GaugeFuncs ──────────────────────────────────────────────────────
-var DBPoolMax = prometheus.NewGaugeFunc(
-	prometheus.GaugeOpts{
+// ── DB Pool Gauges ─────────────────────────────────────────────────────────────
+var (
+	DBPoolMaxConns = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_db_connections_max",
 		Help: "Max database connections configured",
-	},
-	func() float64 {
-		if dbStats != nil {
-			return float64(dbStats.MaxOpenConnections())
-		}
-		return 0
-	},
-)
-
-var DBPoolOpen = prometheus.NewGaugeFunc(
-	prometheus.GaugeOpts{
+	})
+	DBPoolOpenConns = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_db_connections_active",
 		Help: "Number of active database connections",
-	},
-	func() float64 {
-		if dbStats != nil {
-			return float64(dbStats.OpenConnections())
-		}
-		return 0
-	},
-)
-
-var DBPoolIdle = prometheus.NewGaugeFunc(
-	prometheus.GaugeOpts{
+	})
+	DBPoolIdleConns = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_db_connections_idle",
 		Help: "Number of idle database connections",
-	},
-	func() float64 {
-		if dbStats != nil {
-			return float64(dbStats.Idle())
-		}
-		return 0
-	},
+	})
 )
 
-var RedisPoolActive = prometheus.NewGaugeFunc(
-	prometheus.GaugeOpts{
+// ── Redis Pool Gauges ─────────────────────────────────────────────────────────
+var (
+	RedisPoolActiveConns = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_redis_connections_active",
 		Help: "Number of active Redis connections",
-	},
-	func() float64 {
-		if redisPoolStats != nil {
-			return float64(redisPoolStats.TotalConns())
-		}
-		return 0
-	},
-)
-
-var RedisPoolIdle = prometheus.NewGaugeFunc(
-	prometheus.GaugeOpts{
+	})
+	RedisPoolIdleConns = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "cont_redis_connections_idle",
 		Help: "Number of idle Redis connections",
-	},
-	func() float64 {
-		if redisPoolStats != nil {
-			return float64(redisPoolStats.IdleConns())
-		}
-		return 0
-	},
+	})
 )
 
-// RegisterPoolStats registers DB and Redis pool stat suppliers and registers pool metric gauges.
-func RegisterPoolStats(getDB func() dbStatProvider, getRedis func() redisPoolInfo) {
-	if getDB != nil {
-		dbStats = getDB()
+// ── Pool Stats Updater ────────────────────────────────────────────────────────
+type poolStatsProvider interface {
+	DBPoolStats() struct {
+		MaxOpen int
+		Open    int
+		Idle    int
 	}
-	if getRedis != nil {
-		redisPoolStats = getRedis()
+	RedisPoolStats() struct {
+		TotalConns int
+		IdleConns  int
 	}
-	// Register pool GaugeFuncs so they appear in /metrics
-	// Use Register (not MustRegister) — safe if called multiple times
-	prometheus.DefaultRegisterer.Register(DBPoolMax)
-	prometheus.DefaultRegisterer.Register(DBPoolOpen)
-	prometheus.DefaultRegisterer.Register(DBPoolIdle)
-	prometheus.DefaultRegisterer.Register(RedisPoolActive)
-	prometheus.DefaultRegisterer.Register(RedisPoolIdle)
+}
+
+var poolProvider poolStatsProvider
+var poolUpdateOnce sync.Once
+var poolStopChan = make(chan struct{})
+
+// RegisterPoolStats starts a background goroutine that updates pool metrics every 10s
+func RegisterPoolStats(provider poolStatsProvider) {
+	poolProvider = provider
+	poolUpdateOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+			updatePoolMetrics()
+			for {
+				select {
+				case <-ticker.C:
+					updatePoolMetrics()
+				case <-poolStopChan:
+					return
+				}
+			}
+		}()
+	})
+}
+
+func updatePoolMetrics() {
+	if poolProvider == nil {
+		return
+	}
+	dbStats := poolProvider.DBPoolStats()
+	DBPoolMaxConns.Set(float64(dbStats.MaxOpen))
+	DBPoolOpenConns.Set(float64(dbStats.Open))
+	DBPoolIdleConns.Set(float64(dbStats.Idle))
+
+	redisStats := poolProvider.RedisPoolStats()
+	RedisPoolActiveConns.Set(float64(redisStats.TotalConns))
+	RedisPoolIdleConns.Set(float64(redisStats.IdleConns))
 }
 
 // Metrics returns a handler that exposes Prometheus metrics including pool stats
 func Metrics() gin.HandlerFunc {
-	h := promhttp.HandlerFor(
-		prometheus.DefaultGatherer,
-		promhttp.HandlerOpts{EnableOpenMetrics: true},
-	)
+	h := promhttp.Handler()
 	return func(c *gin.Context) {
+		// Update once at request time to get latest values
+		updatePoolMetrics()
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }
