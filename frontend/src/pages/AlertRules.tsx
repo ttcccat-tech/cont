@@ -84,17 +84,18 @@ export default function AlertRulesPage() {
     }
   }
 
+  // Stable ref for fetchRules to avoid stale closure in SSE handler
+  const fetchRulesRef = React.useRef(fetchRules)
+  React.useEffect(() => { fetchRulesRef.current = fetchRules }, [fetchRules])
+
   useEffect(() => {
-    fetchRules()
+    fetchRulesRef.current()
 
     // Listen for alert_triggered SSE events to refresh rule status
     const es = new EventSource(`${API_BASE}/auth/events`)
-    es.addEventListener('alert_triggered', (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data)
-        // Refresh rules to show updated last_triggered_at/value
-        fetchRules()
-      } catch {}
+    es.addEventListener('alert_triggered', () => {
+      // Refresh rules to show updated last_triggered_at/value
+      fetchRulesRef.current()
     })
     return () => { es.close() }
   }, [])

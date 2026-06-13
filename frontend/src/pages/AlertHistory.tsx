@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Table, Tag, Space, Card, Typography, Spin, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { analyticsClient } from '../api/kong'
+import { analyticsClient, getToken } from '../api/kong'
 
 const { Title } = Typography
+
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 interface AlertHistoryItem {
   id: number
@@ -39,7 +41,40 @@ export default function AlertHistory() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+
+    // Listen for SSE alert_triggered events to prepend new history entries immediately
+    const token = getToken()
+    if (!token) return
+
+    const es = new EventSource(`${API_BASE}/auth/events`)
+    es.addEventListener('alert_triggered', (e: MessageEvent) => {
+      try {
+        const evt = JSON.parse(e.data)
+        // Prepend new trigger entry to the top of the list
+        const newEntry: AlertHistoryItem = {
+          id: Date.now(), // temporary ID; server will assign real ID on next load
+          rule_id: evt.rule_id || 0,
+          rule_name: evt.rule_name || '未知規則',
+          org_id: '',
+          metric_type: evt.metric_type || '',
+          operator: evt.operator || '>',
+          threshold: evt.threshold || 0,
+          actual_value: typeof evt.current_value === 'number' ? evt.current_value : 0,
+          triggered_at: evt.triggered_at || new Date().toISOString(),
+          message: `${evt.rule_name || '規則'} — ${evt.metric_type || ''} ${evt.operator || '>' } ${evt.threshold || 0} (目前: ${evt.current_value})`,
+        }
+        setData(prev => [newEntry, ...prev])
+        setTotal(prev => prev + 1)
+        message.info({
+          content: `📋 告警歷史已即時更新：${evt.rule_name}`,
+          duration: 4,
+        })
+      } catch {}
+    })
+    return () => { es.close() }
+  }, [])
 
   const columns = [
     {
