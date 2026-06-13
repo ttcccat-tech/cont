@@ -223,16 +223,21 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Admin API 錯誤處理標準化** — 當前後端錯誤回應格式不一致（有些 `{message, errors[]}`、有些 `{error}`、有些直接 500 text）；需要統一定義 `ErrorResponse` 結構、建立 `badRequest()`/`unauthorized()`/`forbidden()`/`notFound()`/`internalError()` helpers、盤點並修正所有 handlers 的錯誤回應格式
-  - Backend: 建立 `routes/errors.go` 統一錯誤類型與 helpers
-  - Backend: 盤點 30+ handlers 的 error response 格式並修正
-  - QA: 所有錯誤情境（400/401/403/404/500）回應格式一致 `{code, message, details?}`
-
 - [ ] **Cont Admin API Async Notification System（WebSocket/SSE）** — API Key 審批、Billing webhook 等 async 事件目前無即時通知機制；需要：
   - Backend: 建立 `/events` SSE endpoint，訂閱 async 事件（api_key_approved, api_key_rejected, subscription_updated, user_invited）
   - Frontend: EventListener component 連接 SSE，即時 Toast 通知
   - Backend: notification center 儲存已推送事件（避免重複）
   - QA: API Key 核准 → 5s 內前端收到通知 Toast
+
+---
+
+## ✅ 已完成
+
+- [x] **Cont Admin API 錯誤處理標準化** — commit `ae11d728`
+  - Backend: 建立 `routes/errors.go` 統一 ErrorResponse struct + helpers（badRequestMsg/badRequestWithDetails/badGateway/invalidJSON/missingField/alreadyExists/internalErrorWithLog）
+  - Backend: 盤點並修正 routes.go(28處)、oauth.go(14處)、billing.go(13處)、crypto.go(2處) 的錯誤回應格式
+  - Error codes: BAD_REQUEST/UNAUTHORIZED/FORBIDDEN/NOT_FOUND/CONFLICT/INTERNAL_ERROR/VALIDATION_ERROR/BAD_GATEWAY/INVALID_JSON/MISSING_FIELD/ALREADY_EXISTS
+  - QA: 所有錯誤情境（400/401/404/500）回應格式一致 `{code, message, details?}` ✅
 
 ---
 
