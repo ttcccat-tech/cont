@@ -80,7 +80,8 @@ func main() {
 
 	// Health + Metrics
 	r.GET("/status", routes.Status(store))
-	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.GET("/metrics", routes.Metrics())
+	routes.RegisterPoolStats(store.DBPoolStats, store.RedisPoolStats)
 
 	// Swagger docs (public, before auth)
 	r.GET("/docs", func(c *gin.Context) {

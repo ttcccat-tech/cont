@@ -49,6 +49,38 @@ func (s *Store) PingRedis() error {
 	}
 	return s.rdb.Ping(context.Background())
 }
+
+// DBPoolStats returns database connection pool statistics
+func (s *Store) DBPoolStats() struct {
+	MaxOpen int
+	Open    int
+	Idle    int
+} {
+	if s.db == nil {
+		return struct{}{}
+	}
+	stats := s.db.Stats()
+	return struct {
+		MaxOpen int
+		Open    int
+		Idle    int
+	}{stats.MaxOpenConnections, stats.OpenConnections, stats.Idle}
+}
+
+// RedisPoolStats returns Redis connection pool statistics
+func (s *Store) RedisPoolStats() struct {
+	TotalConns int
+	IdleConns  int
+} {
+	if s.rdb == nil || s.rdb.client == nil {
+		return struct{}{}
+	}
+	stats := s.rdb.client.PoolStats()
+	return struct {
+		TotalConns int
+		IdleConns  int
+	}{stats.TotalConns, stats.IdleConns}
+}
 const RoleColumnMigration = `` // DEPRECATED: role column now part of users table creation
 
 func RunMigrations(db *sql.DB) error {
