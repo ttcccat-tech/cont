@@ -1192,9 +1192,9 @@ func (s *Store) ListUsers() ([]User, error) {
 }
 
 func (s *Store) GetUser(id string) (*User, error) {
-	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at FROM users WHERE id = $1`, id)
+	row := s.db.QueryRow(`SELECT id, username, password_hash, display_name, email, role, enabled, created_at, updated_at, last_login_at FROM users WHERE id = $1`, id)
 	var u User
-	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt); err == sql.ErrNoRows {
+	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.Role, &u.Enabled, &u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt); err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
