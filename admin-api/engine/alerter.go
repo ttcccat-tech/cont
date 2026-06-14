@@ -80,6 +80,107 @@ func (a *Alerter) evaluate() {
 		}
 		a.evaluateRule(&rule)
 	}
+
+	// Check usage quota for all orgs (≥80% trigger)
+	a.evaluateUsageQuota()
+}
+
+// evaluateUsageQuota checks all orgs' monthly usage vs quota and fires alerts at ≥80%.
+func (a *Alerter) evaluateUsageQuota() {
+	orgs, err := a.store.ListOrganizations()
+	if err != nil {
+		log.Printf("[alerter] evaluateUsageQuota: failed to list orgs: %v", err)
+		return
+	}
+
+	for _, org := range orgs {
+		a.checkOrgUsageQuota(&org)
+	}
+}
+
+// checkOrgUsageQuota checks a single org's usage vs quota and fires alert if ≥80%.
+func (a *Alerter) checkOrgUsageQuota(org *storage.Organization) {
+	// Get monthly usage
+	monthly, err := a.store.Redis().GetMonthlyUsage(nil, org.ID)
+	if err != nil {
+		log.Printf("[alerter] checkOrgUsageQuota: failed to get monthly usage for org %s: %v", org.ID, err)
+		return
+	}
+
+	// Get plan quota
+	planLimit := int64(100000) // default
+	if org.Plan != "" {
+		plan, err := a.store.GetPlanByName(org.Plan)
+		if err == nil && plan != nil {
+			planLimit = plan.RequestLimit
+		}
+	}
+
+	if planLimit <= 0 {
+		return
+	}
+
+	ratio := float64(monthly) / float64(planLimit)
+	if ratio < 0.8 {
+		return // below threshold
+	}
+
+	// Fire alert for this org
+	b := make([]byte, 16)
+	rand.Read(b)
+	traceID := hex.EncodeToString(b)
+
+	percent := ratio * 100
+	if percent > 100 {
+		percent = 100
+	}
+	triggeredAt := time.Now().UTC().Format(time.RFC3339)
+
+	log.Printf("[alerter] usage_quota triggered for org %s (%s): %.2f%% (used: %d / quota: %d) [trace=%s]",
+		org.ID, org.Name, percent, monthly, planLimit, traceID)
+
+	// Broadcast SSE event
+	storage.Hub.BroadcastAll("alert_triggered", map[string]interface{}{
+		"rule_id":        0,
+		"rule_name":      fmt.Sprintf("Usage Quota Alert: %s", org.Name),
+		"metric_type":    "usage_quota",
+		"operator":       ">=",
+		"threshold":      80.0,
+		"current_value":  percent,
+		"service_name":   org.Name,
+		"org_id":         org.ID,
+		"triggered_at":   triggeredAt,
+	})
+
+	// Trigger webhook via webhook_delivery engine
+	TriggerWebhook(a.store, org.ID, "alert.triggered", map[string]interface{}{
+		"rule_id":       0,
+		"rule_name":     fmt.Sprintf("Usage Quota Alert: %s", org.Name),
+		"metric_type":   "usage_quota",
+		"operator":      ">=",
+		"threshold":     80.0,
+		"current_value": percent,
+		"service_name":  org.Name,
+		"org_id":        org.ID,
+		"triggered_at":  triggeredAt,
+		"trace_id":      traceID,
+	})
+
+	// Persist alert history record with type=usage_quota
+	history := &storage.AlertHistory{
+		RuleID:      0,
+		RuleName:    fmt.Sprintf("Usage Quota Alert: %s", org.Name),
+		OrgID:       &org.ID,
+		MetricType:  "usage_quota",
+		Operator:    ">=",
+		Threshold:   80.0,
+		ActualValue: percent,
+		Message:     fmt.Sprintf("Usage quota alert for org '%s': %.2f%% used (%d / %d)", org.Name, percent, monthly, planLimit),
+		TraceID:     traceID,
+	}
+	if err := a.store.CreateAlertHistory(history); err != nil {
+		log.Printf("[alerter] checkOrgUsageQuota: failed to create alert history for org %s: %v", org.ID, err)
+	}
 }
 
 func (a *Alerter) evaluateRule(rule *storage.AlertRule) {
