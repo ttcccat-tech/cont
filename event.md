@@ -430,12 +430,18 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont Webhook Delivery Engine（Async Delivery + Retry Queue）**
-  - WebhookSubscriptions CRUD 已存在（tables/routes/storage），但 delivery 尚未實作
-  - 需要：`engine/webhook_delivery.go` — background worker，每5s掃描 pending/failed deliveries，異步 POST webhook，使用 exponential backoff 重試（max 5次），dead-letter 寫入 alert_history
-  - `storage/webhook.go`: 新增 DeliverWebhook/delivery methods
-  - `webhook_deliveries` table 已存在，structure 完整
-  - 觸發時機：AlertRule triggered、API Key 審批状态變更、Config Snapshot created
+（無）
+
+## ✅ 已完成
+
+- [x] **Cont Webhook Delivery Engine（Async Delivery + Retry Queue）** — commit `a66dfe1d`
+  - `engine/webhook_delivery.go`: WebhookDeliveryEngine struct（每5s批次處理, exponential backoff max 5次）
+  - `internal/worker/webhook.go`: WebhookWorker pool（10 concurrent workers）已在 main.go 啟動
+  - `alerter.fireAlert()` 整合 `engine.TriggerWebhook()` → `alert.triggered` 事件寫入 webhook_deliveries
+  - `ApproveAPIKey` 觸發 `api_key.approved` webhook 事件
+  - `RejectAPIKey` 觸發 `api_key.rejected` webhook 事件
+  - `storage/webhook.go`: FireWebhooks/GetPendingWebhookDeliveries/UpdateWebhookDelivery CRUD 完整
+  - worker.lua 每10s同步 plugin registry → proxy plugins 可用
 
 ---
 
