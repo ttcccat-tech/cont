@@ -430,7 +430,7 @@
 
 ## 🟡 預計優化
 
-- [✅] **Cont 自有用量追蹤整合 Analytics 儀表板** — ✅ Redis storage key 解析 bug 已修：`GetTopRoutesByUsage`/`GetTopConsumersByUsage` 改用 `parts[3]` 正確提取 route_id/consumer_id（commit `9c7db0eb`）
+- [x] **Cont 自有用量追蹤整合 Analytics 儀表板** — ✅ Redis storage key 解析 bug 已修：`GetTopRoutesByUsage`/`GetTopConsumersByUsage` 改用 `parts[3]` 正確提取 route_id/consumer_id（commit `9c7db0eb`）
   - Backend: `GET /usage/analytics` endpoint（monthly total、plan quota、top routes、top consumers）
   - Frontend: Analytics.tsx 新增 Cont 用量 panel（usage vs quota progress、hourly trend、top entities）
   - kong.ts: 新增 `getAnalyticsUsage()` API call
@@ -445,8 +445,8 @@
   - Frontend: AlertRules.tsx 表單包含 quota_metric_type + percentage_threshold 欄位 ✅
   - Frontend: AlertRules.tsx 列表顯示 usage_quota 規則時顯示 % suffix ✅
   - QA: POST /alerts/rules (usage_quota) → 201 ✅, GET /alerts/rules → 200 ✅
-  - 🔴 **BUG (已修)**: alerter 評估 usage_quota 規則時 panic — `storage/redis.go:131` GetMonthlyUsage 收到 nil context → 已改用 context.Background()
-  - 🔴 **BUG (已修)**: cont-frontend 依賴 admin-api host，admin-api 崩潰後 frontend 無法啟動 → 已重啟 frontend（另為部署問題，不阻擋本功能）
+  - **BUG (已修)**: alerter 評估 usage_quota 規則時 panic — `storage/redis.go:131` GetMonthlyUsage 收到 nil context → 已改用 context.Background()
+  - **BUG (已修)**: cont-frontend 依賴 admin-api host，admin-api 崩潰後 frontend 無法啟動 → 已重啟 frontend（另為部署問題，不阻擋本功能）
 
 
 ## ✅ 已完成
