@@ -8,13 +8,12 @@ package main
 
 import (
 	"database/sql"
-	"flag"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 
-	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"github.com/ttcccat-tech/cont/admin-api/migrator"
 )
 
@@ -87,9 +86,4 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
 		os.Exit(1)
 	}
-}
-
-func init() {
-	// Silence pq header warning
-	pq.Driver{}
 }

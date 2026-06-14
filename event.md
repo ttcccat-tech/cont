@@ -430,7 +430,12 @@
 
 ## 🟡 預計優化
 
-（空）
+- [ ] **Cont Webhook Delivery Engine（Async Delivery + Retry Queue）**
+  - WebhookSubscriptions CRUD 已存在（tables/routes/storage），但 delivery 尚未實作
+  - 需要：`engine/webhook_delivery.go` — background worker，每5s掃描 pending/failed deliveries，異步 POST webhook，使用 exponential backoff 重試（max 5次），dead-letter 寫入 alert_history
+  - `storage/webhook.go`: 新增 DeliverWebhook/delivery methods
+  - `webhook_deliveries` table 已存在，structure 完整
+  - 觸發時機：AlertRule triggered、API Key 審批状态變更、Config Snapshot created
 
 ---
 

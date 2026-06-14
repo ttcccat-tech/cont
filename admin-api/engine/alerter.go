@@ -395,6 +395,20 @@ func (a *Alerter) fireAlert(rule *storage.AlertRule, currentValue float64) {
 		"triggered_at":   triggeredAt,
 	})
 
+	// Trigger webhook subscriptions for alert.triggered events
+	// Use default org since alert_rules table has no org_id column (global alerts)
+	TriggerWebhook(a.store, "00000000-0000-0000-0000-000000000000", "alert.triggered", map[string]interface{}{
+		"rule_id":       rule.ID,
+		"rule_name":     rule.Name,
+		"metric_type":   rule.MetricType,
+		"operator":      rule.Operator,
+		"threshold":     rule.ThresholdValue,
+		"current_value": currentValue,
+		"service_name":  rule.ServiceName,
+		"triggered_at":  triggeredAt,
+		"trace_id":      traceID,
+	})
+
 	// Persist last triggered timestamp and value to DB
 	if err := a.store.UpdateAlertRuleTriggered(rule.ID, triggeredAt, currentValue); err != nil {
 		log.Printf("[alerter] failed to update triggered state for rule %d: %v", rule.ID, err)

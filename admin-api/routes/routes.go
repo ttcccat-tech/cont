@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/ttcccat-tech/cont/admin-api/engine"
 	"github.com/ttcccat-tech/cont/admin-api/storage"
 	"github.com/ttcccat-tech/cont/admin-api/tracing"
 	"go.opentelemetry.io/otel/semconv/v1.18.0"
@@ -3376,6 +3377,16 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 			Type:    "api_key_approved",
 			Payload: string(payloadJSON),
 		})
+		// Trigger webhook for api_key.approved event
+		orgID := "00000000-0000-0000-0000-000000000000"
+		go engine.TriggerWebhook(store, orgID, "api_key.approved", map[string]interface{}{
+			"request_id":    id,
+			"key_name":      existing.KeyName,
+			"consumer":      consumerName,
+			"status":        "approved",
+			"reviewed_by":   reviewerStr,
+			"generated_key": generatedKey,
+		})
 		c.JSON(200, updated)
 	}
 }
@@ -3429,6 +3440,16 @@ func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
 			UserID:  existing.ApplicantUserID,
 			Type:    "api_key_rejected",
 			Payload: string(payloadJSON),
+		})
+		// Trigger webhook for api_key.rejected event
+		orgID := "00000000-0000-0000-0000-000000000000"
+		go engine.TriggerWebhook(store, orgID, "api_key.rejected", map[string]interface{}{
+			"request_id": id,
+			"key_name":   existing.KeyName,
+			"consumer":   existing.ConsumerName,
+			"status":     "rejected",
+			"reviewed_by": reviewerStr,
+			"reason":     existing.Reason,
 		})
 		c.JSON(200, updated)
 	}
