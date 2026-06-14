@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -242,7 +243,7 @@ func (a *Alerter) computeUsageQuotaMetric(orgID string) (float64, error) {
 	}
 
 	// Get monthly usage from Redis
-	monthly, err := a.store.Redis().GetMonthlyUsage(nil, orgID)
+	monthly, err := a.store.Redis().GetMonthlyUsage(context.Background(), orgID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get monthly usage: %w", err)
 	}
@@ -286,7 +287,7 @@ func (a *Alerter) computeConsumerUsageQuotaMetric(consumerID string) (float64, e
 	}
 
 	// Get monthly usage for this consumer from Redis
-	monthly, err := a.store.Redis().GetConsumerMonthlyUsage(nil, consumerID)
+	monthly, err := a.store.Redis().GetConsumerMonthlyUsage(context.Background(), consumerID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get consumer monthly usage: %w", err)
 	}
