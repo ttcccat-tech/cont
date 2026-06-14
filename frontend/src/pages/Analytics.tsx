@@ -367,6 +367,37 @@ export default function Analytics() {
             </Col>
           </Row>
           <Row gutter={[16,16]} style={{ marginBottom: 16 }}>
+            <Col xs={24}>
+              <Card style={{ background:'var(--secondary)', border:'none' }} title={<span style={{color:'var(--text)'}}>24小時用量趨勢</span>}>
+                <ReactECharts option={{
+                  backgroundColor: 'transparent',
+                  tooltip: { trigger: 'axis' },
+                  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                  xAxis: {
+                    type: 'category' as const,
+                    data: contUsage.hourly_trend.map(h => h.hour),
+                    axisLine: { lineStyle: { color: '#333' } },
+                    axisLabel: { color: '#8892a0', fontSize: 10, rotate: 45 }
+                  },
+                  yAxis: {
+                    type: 'value' as const,
+                    name: '請求次數',
+                    axisLine: { lineStyle: { color: '#333' } },
+                    axisLabel: { color: '#8892a0' },
+                    splitLine: { lineStyle: { color: '#222' } }
+                  },
+                  series: [{
+                    type: 'bar' as const,
+                    data: contUsage.hourly_trend.map(h => h.count),
+                    itemStyle: { color: '#4ade80' },
+                    barRadius: [4, 4, 0, 0],
+                    label: { show: false }
+                  }]
+                }} style={{ height: 200 }} />
+              </Card>
+            </Col>
+          </Row>
+          <Row gutter={[16,16]} style={{ marginBottom: 16 }}>
             <Col xs={24} lg={12}>
               <Card style={{ background:'var(--secondary)', border:'none' }} title={<span style={{color:'var(--text)'}}>Top Routes</span>}>
                 {contUsage.top_routes.length > 0 ? (
