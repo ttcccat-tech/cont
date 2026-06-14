@@ -194,6 +194,28 @@ func (r *Redis) GetConsumerUsageByHour(ctx context.Context, consumerID, startHou
 	return r.UsageByTimeRange(ctx, pattern, startHour, endHour)
 }
 
+// GetConsumerMonthlyUsage returns the total API request count for the current calendar month for a consumer.
+// Sums all hourly buckets from the 1st of the month to the current hour.
+func (r *Redis) GetConsumerMonthlyUsage(ctx context.Context, consumerID string) (int64, error) {
+	now := time.Now()
+	// Start of current month
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	end := now
+
+	var total int64
+	current := start
+	for current.Before(end) {
+		hour := current.Format("2006010215")
+		key := fmt.Sprintf("cont:usage:consumer:%s:%s", consumerID, hour)
+		val, err := r.client.Get(ctx, key).Int64()
+		if err == nil {
+			total += val
+		}
+		current = current.Add(time.Hour)
+	}
+	return total, nil
+}
+
 // GetTopOrgsByUsage returns top N orgs by total usage in a time range
 func (r *Redis) GetTopOrgsByUsage(ctx context.Context, startHour, endHour string, limit int) ([]struct {
 	OrgID  string `json:"org_id"`
