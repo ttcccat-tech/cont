@@ -339,14 +339,16 @@ export interface AnalyticsUsageResponse {
   top_consumers: { consumer_id: string; count: number }[]
 }
 
-export const getAnalyticsUsage = (orgId: string) =>
-  analyticsClient.get<{ monthly_total: number; plan_quota: number; usage_percentage: number; top_routes: { route_id: string; count: number }[]; top_consumers: { consumer_id: string; count: number }[] }>(`/usage/analytics?org_id=${orgId}`).then(r => ({
+export const getAnalyticsUsage = (orgId?: string) => {
+  const url = orgId ? `/usage/analytics?org_id=${orgId}` : '/usage/analytics'
+  return analyticsClient.get<{ monthly_total: number; plan_quota: number; usage_percentage: number; top_routes: { route_id: string; count: number }[]; top_consumers: { consumer_id: string; count: number }[]; hourly_trend: { hour: string; count: number }[] }>(url).then(r => ({
     monthly_total: r.data.monthly_total,
     quota_limit: r.data.plan_quota,
     usage_percent: r.data.usage_percentage,
     top_routes: r.data.top_routes,
     top_consumers: r.data.top_consumers,
   }))
+}
 export const createCheckoutSession = (planName: string, billingCycle: string) =>
   analyticsClient.post<{ url: string }>('/billing/checkout', { plan_name: planName, billing_cycle: billingCycle }).then(r => r.data)
 export const createPortalSession = () =>
