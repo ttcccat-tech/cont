@@ -430,7 +430,15 @@
 
 ## 🟡 預計優化
 
-（無）
+- [ ] **Cont 自有用量追蹤整合 Analytics 儀表板** — Analytics.tsx 目前只顯示 Kong Nginx metrics，需整合 Cont 自有的 Redis 用量數據（per-org/per-consumer/per-route hourly buckets）變成有意義的儀表板視圖
+  - Backend: `GET /usage/analytics` endpoint（彙整 monthly total、plan quota、top routes、top consumers）
+  - Frontend: 新增 Cont 用量 panel（usage vs quota progress、hourly trend、top entities）
+  - kong.ts: 新增 `getAnalyticsUsage()` API call
+  - QA: 確認 `/usage/analytics` 返回正確數據，前端 chart 正確渲染
+
+- [ ] **Cont 使用量預警自動化（Usage Alerting）** — 當 org 或 consumer 接近配額時自動觸發 webhook/SSE 通知
+  - Backend: alerter.go 評估時一併檢查用量，接近 80%/90%/100% 門檻時 fire alert
+  - Frontend: AlertRules.tsx 新增 `usage_quota` alert type（threshold_type: percentage absolute）
 
 ## ✅ 已完成
 
