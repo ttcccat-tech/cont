@@ -37,8 +37,8 @@
 
 ## Tasks
 
-- [ ] TASK-1: Fix Users.tsx `d.map is not a function` — 檢查 kong.ts API 回傳資料型別，確認是否有 Array.isArray normalize
-- [ ] TASK-2: Fix AlertRules.tsx blank page — 檢查 component 是否正常 export，fetch 是否正常
+- [✅] TASK-1: Fix Users.tsx `d.map is not a function` — 檢查 kong.ts API 回傳資料型別，確認是否有 Array.isArray normalize (commit `e85ceb37`)
+- [✅] TASK-2: Fix AlertRules.tsx blank page — 檢查 component 是否正常 export，fetch 是否正常 (commit `f55927a2`)
 - [ ] TASK-3: Fix Billing.tsx route — 檢查 BillingPortal component 是否存在、route 是否有設定
 - [ ] TASK-4: Fix /config-snapshots route — 確認 ConfigVersioning 是否應為 /config-snapshots，或需要新增 component
 - [ ] TASK-5: Fix ApiDocs.tsx load failure — 檢查 /docs 和 /docs.json endpoint，確認 Swagger UI 是否正常

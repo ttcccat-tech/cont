@@ -118,6 +118,7 @@ export default function App() {
                   <Route path="/billing" element={<Settings />} />
                   <Route path="/audit" element={<AuditLog />} />
                   <Route path="/config-versioning" element={<ConfigVersioning />} />
+                  <Route path="/config-snapshots" element={<ConfigVersioning />} />
                   <Route path="/health-portal" element={<HealthPortal />} />
                   <Route path="/alerts/rules" element={<AlertRules />} />
                   <Route path="/alert-history" element={<AlertHistory />} />
