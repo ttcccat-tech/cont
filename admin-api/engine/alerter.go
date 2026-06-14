@@ -81,109 +81,7 @@ func (a *Alerter) evaluate() {
 		}
 		a.evaluateRule(&rule)
 	}
-
-	// Check usage quota for all orgs (≥80% trigger)
-	a.evaluateUsageQuota()
 }
-
-// evaluateUsageQuota checks all orgs' monthly usage vs quota and fires alerts at ≥80%.
-func (a *Alerter) evaluateUsageQuota() {
-	orgs, err := a.store.ListOrganizations()
-	if err != nil {
-		log.Printf("[alerter] evaluateUsageQuota: failed to list orgs: %v", err)
-		return
-	}
-
-	for _, org := range orgs {
-		a.checkOrgUsageQuota(&org)
-	}
-}
-
-// checkOrgUsageQuota checks a single org's usage vs quota and fires alert if ≥80%.
-func (a *Alerter) checkOrgUsageQuota(org *storage.Organization) {
-	// Get monthly usage
-	monthly, err := a.store.Redis().GetMonthlyUsage(context.Background(), org.ID)
-	if err != nil {
-		log.Printf("[alerter] checkOrgUsageQuota: failed to get monthly usage for org %s: %v", org.ID, err)
-		return
-	}
-
-	// Get plan quota
-	planLimit := int64(100000) // default
-	if org.Plan != "" {
-		plan, err := a.store.GetPlanByName(org.Plan)
-		if err == nil && plan != nil {
-			planLimit = plan.RequestLimit
-		}
-	}
-
-	if planLimit <= 0 {
-		return
-	}
-
-	ratio := float64(monthly) / float64(planLimit)
-	if ratio < 0.8 {
-		return // below threshold
-	}
-
-	// Fire alert for this org
-	b := make([]byte, 16)
-	rand.Read(b)
-	traceID := hex.EncodeToString(b)
-
-	percent := ratio * 100
-	if percent > 100 {
-		percent = 100
-	}
-	triggeredAt := time.Now().UTC().Format(time.RFC3339)
-
-	log.Printf("[alerter] usage_quota triggered for org %s (%s): %.2f%% (used: %d / quota: %d) [trace=%s]",
-		org.ID, org.Name, percent, monthly, planLimit, traceID)
-
-	// Broadcast SSE event
-	storage.Hub.BroadcastAll("alert_triggered", map[string]interface{}{
-		"rule_id":        0,
-		"rule_name":      fmt.Sprintf("Usage Quota Alert: %s", org.Name),
-		"metric_type":    "usage_quota",
-		"operator":       ">=",
-		"threshold":      80.0,
-		"current_value":  percent,
-		"service_name":   org.Name,
-		"org_id":         org.ID,
-		"triggered_at":   triggeredAt,
-	})
-
-	// Trigger webhook via webhook_delivery engine
-	TriggerWebhook(a.store, org.ID, "alert.triggered", map[string]interface{}{
-		"rule_id":       0,
-		"rule_name":     fmt.Sprintf("Usage Quota Alert: %s", org.Name),
-		"metric_type":   "usage_quota",
-		"operator":      ">=",
-		"threshold":     80.0,
-		"current_value": percent,
-		"service_name":  org.Name,
-		"org_id":        org.ID,
-		"triggered_at":  triggeredAt,
-		"trace_id":      traceID,
-	})
-
-	// Persist alert history record with type=usage_quota
-	history := &storage.AlertHistory{
-		RuleID:      0,
-		RuleName:    fmt.Sprintf("Usage Quota Alert: %s", org.Name),
-		OrgID:       &org.ID,
-		MetricType:  "usage_quota",
-		Operator:    ">=",
-		Threshold:   80.0,
-		ActualValue: percent,
-		Message:     fmt.Sprintf("Usage quota alert for org '%s': %.2f%% used (%d / %d)", org.Name, percent, monthly, planLimit),
-		TraceID:     traceID,
-	}
-	if err := a.store.CreateAlertHistory(history); err != nil {
-		log.Printf("[alerter] checkOrgUsageQuota: failed to create alert history for org %s: %v", org.ID, err)
-	}
-}
-
 func (a *Alerter) evaluateRule(rule *storage.AlertRule) {
 	// Check suppression window
 	a.mu.RLock()
@@ -213,7 +111,15 @@ func (a *Alerter) evaluateRule(rule *storage.AlertRule) {
 			log.Printf("[alerter] rule %d (%s): failed to fetch metric: %v", rule.ID, rule.Name, err)
 			return
 		}
-		triggered = a.checkCondition(value, rule.ThresholdValue, rule.Operator)
+		// For usage_quota, use PercentageThreshold (default 80) instead of ThresholdValue
+		threshold := rule.ThresholdValue
+		if rule.MetricType == "usage_quota" {
+			threshold = rule.PercentageThreshold
+			if threshold == 0 {
+				threshold = 80.0 // default
+			}
+		}
+		triggered = a.checkCondition(value, threshold, rule.Operator)
 		triggeredValue = value
 	}
 
@@ -240,7 +146,15 @@ func (a *Alerter) evaluateConditions(rule *storage.AlertRule) bool {
 		log.Printf("[alerter] rule %d (%s): failed to fetch metric for condition: %v", rule.ID, rule.Name, err)
 		return false
 	}
-	result := a.checkCondition(firstValue, cond.ThresholdValue, cond.Operator)
+	// For usage_quota, use PercentageThreshold (default 80)
+	threshold := cond.ThresholdValue
+	if cond.MetricType == "usage_quota" {
+		threshold = rule.PercentageThreshold
+		if threshold == 0 {
+			threshold = 80.0
+		}
+	}
+	result := a.checkCondition(firstValue, threshold, cond.Operator)
 
 	// Evaluate remaining conditions with AND/OR logic
 	for i := 1; i < len(rule.Conditions); i++ {
@@ -250,7 +164,15 @@ func (a *Alerter) evaluateConditions(rule *storage.AlertRule) bool {
 			log.Printf("[alerter] rule %d (%s): failed to fetch metric for condition %d: %v", rule.ID, rule.Name, i, err)
 			return false
 		}
-		condResult := a.checkCondition(value, cond.ThresholdValue, cond.Operator)
+		// For usage_quota, use PercentageThreshold (default 80)
+		threshold = cond.ThresholdValue
+		if cond.MetricType == "usage_quota" {
+			threshold = rule.PercentageThreshold
+			if threshold == 0 {
+				threshold = 80.0
+			}
+		}
+		condResult := a.checkCondition(value, threshold, cond.Operator)
 
 		// Determine logic from previous condition
 		prevLogic := "AND"
@@ -305,6 +227,9 @@ func (a *Alerter) computeConditionMetric(cond storage.Condition) (float64, error
 		return parseMetricFromPrometheusWithCond(buf.Bytes(), cond)
 	}
 	if cond.MetricType == "usage_quota" {
+		if cond.QuotaMetricType == "consumer" {
+			return a.computeConsumerUsageQuotaMetric(cond.ServiceName)
+		}
 		return a.computeUsageQuotaMetric(cond.ServiceName)
 	}
 	return 0.0, fmt.Errorf("unknown metric type: %s", cond.MetricType)
@@ -318,7 +243,7 @@ func (a *Alerter) computeUsageQuotaMetric(orgID string) (float64, error) {
 	}
 
 	// Get monthly usage from Redis
-	monthly, err := a.store.Redis().GetMonthlyUsage(nil, orgID)
+	monthly, err := a.store.Redis().GetMonthlyUsage(context.Background(), orgID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get monthly usage: %w", err)
 	}
@@ -332,6 +257,48 @@ func (a *Alerter) computeUsageQuotaMetric(orgID string) (float64, error) {
 			if err == nil && plan != nil {
 				planLimit = int64(plan.RequestLimit)
 			}
+		}
+	}
+
+	if planLimit <= 0 {
+		return 0, nil
+	}
+	percent := float64(monthly) / float64(planLimit) * 100
+	if percent > 100 {
+		percent = 100
+	}
+	return percent, nil
+}
+
+// computeConsumerUsageQuotaMetric computes the usage percentage (0-100) for a consumer's quota.
+// ServiceName is used as the consumer_id; looks up org_id from the consumer record.
+func (a *Alerter) computeConsumerUsageQuotaMetric(consumerID string) (float64, error) {
+	if consumerID == "" {
+		return 0, fmt.Errorf("consumer ID is required")
+	}
+
+	// Look up consumer to get org_id
+	consumer, err := a.store.GetConsumer(consumerID, "")
+	if err != nil {
+		return 0, fmt.Errorf("failed to get consumer %s: %w", consumerID, err)
+	}
+	if consumer == nil {
+		return 0, fmt.Errorf("consumer %s not found", consumerID)
+	}
+
+	// Get monthly usage for this consumer from Redis
+	monthly, err := a.store.Redis().GetConsumerMonthlyUsage(context.Background(), consumerID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get consumer monthly usage: %w", err)
+	}
+
+	// Get plan limit (consumer-specific or org-level)
+	planLimit := int64(100000) // default
+	org, err := a.store.GetOrganization(consumer.OrgID)
+	if err == nil && org != nil {
+		plan, err := a.store.GetPlanByName(org.Plan)
+		if err == nil && plan != nil {
+			planLimit = int64(plan.RequestLimit)
 		}
 	}
 

@@ -430,16 +430,33 @@
 
 ## 🟡 預計優化
 
+<<<<<<< HEAD
 - [x] **Cont 自有用量追蹤整合 Analytics 儀表板** — commit `d66ec448`
   - Backend: `GET /usage/analytics` endpoint（monthly total、plan quota、top routes、top consumers）— route 在 main.go 已存在
   - Frontend: Analytics.tsx Cont 用量 panel（usage bar + hourly trend + top entities）— UI 已存在
   - kong.ts: 新增 `getAnalyticsUsage()` API + `AnalyticsUsageResponse` interface
   - **Bug fix `d66ec448`**: getAnalyticsUsage orgId parameter 改為 optional（Analytics.tsx 無參數呼叫）
   - QA: GET /usage/analytics → 200 ✅（需 auth），monthly_total/plan_quota/usage_percentage/hourly_trend/top_routes/top_consumers 全部正確 ✅，frontend build ✅
+=======
+- [✅] **Cont 自有用量追蹤整合 Analytics 儀表板** — ✅ Redis storage key 解析 bug 已修：`GetTopRoutesByUsage`/`GetTopConsumersByUsage` 改用 `parts[3]` 正確提取 route_id/consumer_id
+  - Backend: `GET /usage/analytics` endpoint（彙整 monthly total、plan quota、top routes、top consumers）
+  - Frontend: Analytics.tsx 新增 Cont 用量 panel（usage vs quota progress、hourly trend、top entities）
+  - kong.ts: 新增 `getAnalyticsUsage()` API call
+  - QA: 確認 `/usage/analytics` 返回正確數據，前端 chart 正確渲染
+>>>>>>> develop
 
-- [ ] **Cont 使用量預警自動化（Usage Alerting）** — 當 org 或 consumer 接近配額時自動觸發 webhook/SSE 通知
+- [x] **Cont 使用量預警自動化（Usage Alerting）** — 當 org 或 consumer 接近配額時自動觸發 webhook/SSE 通知
   - Backend: alerter.go 評估時一併檢查用量，接近 80%/90%/100% 門檻時 fire alert
   - Frontend: AlertRules.tsx 新增 `usage_quota` alert type（threshold_type: percentage absolute）
+  - Backend: `quota_metric_type` 欄位（org/consumer）已實作，migration v024 已套用
+  - Backend: `percentage_threshold` 欄位已實作，migration v023 已套用
+  - Backend: AlertRules CRUD API 支援 usage_quota metric_type ✅
+  - Frontend: AlertRules.tsx 表單包含 quota_metric_type + percentage_threshold 欄位 ✅
+  - Frontend: AlertRules.tsx 列表顯示 usage_quota 規則時顯示 % suffix ✅
+  - QA: POST /alerts/rules (usage_quota) → 201 ✅, GET /alerts/rules → 200 ✅
+  - 🔴 **BUG (已修)**: alerter 評估 usage_quota 規則時 panic — `storage/redis.go:131` GetMonthlyUsage 收到 nil context → 已改用 context.Background()
+  - 🔴 **BUG (已修)**: cont-frontend 依賴 admin-api host，admin-api 崩潰後 frontend 無法啟動 → 已重啟 frontend（另為部署問題，不阻擋本功能）
+
 
 ## ✅ 已完成
 
