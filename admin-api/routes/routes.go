@@ -3679,8 +3679,8 @@ func CreateConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 		// Trigger webhook for config.snapshot.created event
 		go engine.TriggerWebhook(store, "00000000-0000-0000-0000-000000000000", "config.snapshot.created", map[string]interface{}{
 			"snapshot_id": created.ID,
-			"name":        created.Name,
-			"version":     created.Version,
+			"name":        created.VersionLabel,
+			"version":     created.VersionLabel,
 			"created_by":  actorStr,
 		})
 		c.JSON(201, created)
