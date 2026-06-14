@@ -296,7 +296,7 @@ func (r *Redis) GetTopRoutesByUsage(ctx context.Context, startHour, endHour stri
 		if len(parts) >= 4 {
 			hourPart := parts[len(parts)-1]
 			if hourPart >= startHour && hourPart <= endHour {
-				routeID := parts[2]
+				routeID := parts[3]
 				val, _ := r.client.Get(ctx, key).Int64()
 				routeCounts[routeID] += val
 			}
@@ -354,7 +354,7 @@ func (r *Redis) GetTopConsumersByUsage(ctx context.Context, startHour, endHour s
 		if len(parts) >= 4 {
 			hourPart := parts[len(parts)-1]
 			if hourPart >= startHour && hourPart <= endHour {
-				consumerID := parts[2]
+				consumerID := parts[3]
 				val, _ := r.client.Get(ctx, key).Int64()
 				consumerCounts[consumerID] += val
 			}
