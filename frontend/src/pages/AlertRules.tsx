@@ -40,6 +40,17 @@ const metricOptions = [
   { value: 'usage_quota', label: '用量配額 (%)' },
 ]
 
+const quotaThresholdOptions = [
+  { value: 80, label: '80%' },
+  { value: 90, label: '90%' },
+  { value: 100, label: '100%' },
+]
+
+const quotaMetricTypeOptions = [
+  { value: 'org', label: '組織 (Org)' },
+  { value: 'consumer', label: '消費者 (Consumer)' },
+]
+
 const operatorOptions = [
   { value: '>', label: '>' },
   { value: '<', label: '<' },
@@ -375,11 +386,42 @@ export default function AlertRulesPage() {
                         </Form.Item>
                       </Col>
                       <Col span={5}>
-                        <Form.Item {...rest} name={[name, 'threshold_value']} label="閾值" rules={[{ required: true }]} style={{ marginBottom: 0 }}>
-                          <InputNumber style={{ width: '100%' }} min={0} placeholder="5" />
+                        <Form.Item noStyle shouldUpdate={(prev, curr) => prev?.[name]?.metric_type !== curr?.[name]?.metric_type}>
+                          {({ getFieldValue }) => {
+                            const mType = getFieldValue([name, 'metric_type'])
+                            if (mType === 'usage_quota') {
+                              return (
+                                <Form.Item {...rest} name={[name, 'threshold_value']} label="閾值" rules={[{ required: true }]} initialValue={80} style={{ marginBottom: 0 }}>
+                                  <Select options={quotaThresholdOptions} />
+                                </Form.Item>
+                              )
+                            }
+                            return (
+                              <Form.Item {...rest} name={[name, 'threshold_value']} label="閾值" rules={[{ required: true }]} style={{ marginBottom: 0 }}>
+                                <InputNumber style={{ width: '100%' }} min={0} placeholder="5" />
+                              </Form.Item>
+                            )
+                          }}
                         </Form.Item>
                       </Col>
                     </Row>
+                    <Form.Item noStyle shouldUpdate={(prev, curr) => prev?.[name]?.metric_type !== curr?.[name]?.metric_type}>
+                      {({ getFieldValue }) => {
+                        const mType = getFieldValue([name, 'metric_type'])
+                        if (mType === 'usage_quota') {
+                          return (
+                            <Row gutter={8} style={{ marginTop: 8 }}>
+                              <Col span={7} offset={7}>
+                                <Form.Item {...rest} name={[name, 'quota_metric_type']} label="配額類型" rules={[{ required: true }]} initialValue="org" style={{ marginBottom: 0 }}>
+                                  <Select options={quotaMetricTypeOptions} />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                          )
+                        }
+                        return null
+                      }}
+                    </Form.Item>
                   </Card>
                 ))}
                 <Button type="dashed" onClick={() => add({
