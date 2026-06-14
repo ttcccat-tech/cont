@@ -185,3 +185,111 @@ func calcPercent(used, limit int64) float64 {
 	}
 	return math.Round(float64(used)/float64(limit)*10000) / 100
 }
+
+// ── GET /usage/analytics ───────────────────────────────────────────────────────
+// Returns aggregated analytics for the current org's usage dashboard:
+// monthly total, plan quota, usage percentage, hourly trend,
+// top routes, and top consumers.
+type AnalyticsResponse struct {
+	OrgID           string              `json:"org_id"`
+	Plan            string              `json:"plan"`
+	MonthlyTotal    int64               `json:"monthly_total"`
+	QuotaLimit      int64               `json:"quota_limit"`
+	UsagePercent    float64             `json:"usage_percent"`
+	HourlyTrend     []HourlyUsageItem   `json:"hourly_trend"`
+	TopRoutes       []RouteUsageItem    `json:"top_routes"`
+	TopConsumers    []ConsumerUsageItem `json:"top_consumers"`
+}
+
+type RouteUsageItem struct {
+	RouteID string `json:"route_id"`
+	Count   int64  `json:"count"`
+}
+
+type ConsumerUsageItem struct {
+	ConsumerID string `json:"consumer_id"`
+	Count      int64  `json:"count"`
+}
+
+// getAnalyticsOrgID resolves the org_id for analytics, handling admin role specially.
+// Admin users have org_id="00000000..." in JWT which getOrgID bypasses.
+// We directly check c.Get("org_id") which stores the JWT claim value.
+func getAnalyticsOrgID(c *gin.Context) string {
+	if orgID, ok := c.Get("org_id"); ok {
+		if s, ok := orgID.(string); ok && s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func GetAnalyticsUsage(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID := getAnalyticsOrgID(c)
+		if orgID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"code": "BAD_REQUEST", "message": "org_id required"})
+			return
+		}
+
+		// Look up org only if not the zero UUID (admin default org has no DB record)
+		var orgPlan string
+		if orgID != "00000000-0000-0000-0000-000000000000" {
+			org, err := store.GetOrganization(orgID)
+			if err != nil || org == nil {
+				c.JSON(http.StatusNotFound, gin.H{"code": "NOT_FOUND", "message": "organization not found"})
+				return
+			}
+			orgPlan = org.Plan
+		} else {
+			// Admin default org — use default plan
+			orgPlan = "default"
+		}
+
+		plan, err := store.GetPlanByName(orgPlan)
+		if err != nil || plan == nil {
+			plan = &storage.Plan{RequestLimit: 100000, WorkspaceLimit: 3, UserLimit: 5}
+		}
+
+		// Monthly total: sum all hourly buckets from 1st of month to now
+		monthlyTotal, err := store.Redis().GetMonthlyUsage(c.Request.Context(), orgID)
+		if err != nil {
+			monthlyTotal = 0
+		}
+
+		// Hourly trend: last 7 days (168 hours)
+		startHour := time.Now().Add(-7 * 24 * time.Hour).Format("2006010215")
+		endHour := time.Now().Format("2006010215")
+		hourlyData, _ := store.Redis().GetOrgUsageByHour(c.Request.Context(), orgID, startHour, endHour)
+		hourlyTrend := make([]HourlyUsageItem, len(hourlyData))
+		for i, h := range hourlyData {
+			hourlyTrend[i] = HourlyUsageItem{Hour: h.Hour, Count: h.Count}
+		}
+
+		// Top routes
+		topRoutesRaw, _ := store.Redis().GetTopRoutesByUsage(c.Request.Context(), startHour, endHour, 5)
+		topRoutes := make([]RouteUsageItem, len(topRoutesRaw))
+		for i, r := range topRoutesRaw {
+			topRoutes[i] = RouteUsageItem{RouteID: r.RouteID, Count: r.Count}
+		}
+
+		// Top consumers
+		topConsumersRaw, _ := store.Redis().GetTopConsumersByUsage(c.Request.Context(), startHour, endHour, 5)
+		topConsumers := make([]ConsumerUsageItem, len(topConsumersRaw))
+		for i, c := range topConsumersRaw {
+			topConsumers[i] = ConsumerUsageItem{ConsumerID: c.ConsumerID, Count: c.Count}
+		}
+
+		usagePercent := calcPercent(monthlyTotal, plan.RequestLimit)
+
+		c.JSON(http.StatusOK, AnalyticsResponse{
+			OrgID:         orgID,
+			Plan:          orgPlan,
+			MonthlyTotal:  monthlyTotal,
+			QuotaLimit:    plan.RequestLimit,
+			UsagePercent:  usagePercent,
+			HourlyTrend:   hourlyTrend,
+			TopRoutes:     topRoutes,
+			TopConsumers:  topConsumers,
+		})
+	}
+}
