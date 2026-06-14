@@ -450,6 +450,7 @@
   - Dead Letter Queue — 顯示所有 `status=failed` 的 deliveries，支援「重新觸發」按鈕
   - `GET /webhooks/:id/deliveries` → 前端列表顯示 delivery 記錄
   - 候選方向：Config Snapshot webhook 觸發時機（尚未實作 `config.snapshot.created`）
+  - **DONE** commit `b1d5a70d` — App.tsx 路由 + kong.ts APIs + WebhookDeliveries.tsx 完整實作 + Upstreams.tsx JSX bug 修復
 
 ---
 
