@@ -443,6 +443,14 @@
   - `storage/webhook.go`: FireWebhooks/GetPendingWebhookDeliveries/UpdateWebhookDelivery CRUD 完整
   - worker.lua 每10s同步 plugin registry → proxy plugins 可用
 
+## 🟡 預計優化
+
+- [ ] **Cont Webhook Delivery Dashboard + Dead Letter Queue UI**
+  - 前端 `WebhookDeliveries.tsx` — 查看 delivery 歷史（成功/失敗/retrying），狀態/時間/錯誤訊息
+  - Dead Letter Queue — 顯示所有 `status=failed` 的 deliveries，支援「重新觸發」按鈕
+  - `GET /webhooks/:id/deliveries` → 前端列表顯示 delivery 記錄
+  - 候選方向：Config Snapshot webhook 觸發時機（尚未實作 `config.snapshot.created`）
+
 ---
 
 ## 完整開發流程（開發守護遵循）
