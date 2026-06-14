@@ -2041,11 +2041,11 @@ func (s *Store) CreateAlertRule(r *AlertRule) (*AlertRule, error) {
 	}
 	err := s.db.QueryRow(
 		`INSERT INTO alert_rules (name, description, org_id, conditions, metric_type, service_name, threshold_value, operator,
-		 threshold_type, percentage_threshold, duration_seconds, enabled, notification_channels, slack_webhook_url, email_webhook_url,
-		 discord_webhook_url, alert_suppress_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-		 RETURNING id, created_at, updated_at`,
+	 threshold_type, percentage_threshold, quota_metric_type, duration_seconds, enabled, notification_channels, slack_webhook_url, email_webhook_url,
+	 discord_webhook_url, alert_suppress_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+	 RETURNING id, created_at, updated_at`,
 		r.Name, nullString(r.Description), r.OrgID, conditionsJSON, r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
-		r.Operator, nullString(r.ThresholdType), r.PercentageThreshold,
+		r.Operator, nullString(r.ThresholdType), r.PercentageThreshold, nullString(r.QuotaMetricType),
 		r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
 		nullString(r.SlackWebhookURL), nullString(r.EmailWebhookURL), nullString(r.DiscordWebhookURL),
 		r.AlertSuppressSeconds,
@@ -2059,16 +2059,16 @@ func (s *Store) CreateAlertRule(r *AlertRule) (*AlertRule, error) {
 
 func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
 	var r AlertRule
-	var desc, svcName, notifCh, slackURL, emailURL, discordURL, thresholdType sql.NullString
+	var desc, svcName, notifCh, slackURL, emailURL, discordURL, thresholdType, quotaMetricType sql.NullString
 	var createdAt, updatedAt sql.NullString
 	var conditionsJSON []byte
 	err := s.db.QueryRow(
 		`SELECT id, name, description, COALESCE(org_id,''), conditions, metric_type, service_name, threshold_value, operator,
-		        threshold_type, percentage_threshold, duration_seconds, enabled, notification_channels, slack_webhook_url,
+		        threshold_type, percentage_threshold, quota_metric_type, duration_seconds, enabled, notification_channels, slack_webhook_url,
 		        email_webhook_url, discord_webhook_url, alert_suppress_seconds, created_at, updated_at
 		 FROM alert_rules WHERE id=$1`, id,
 	).Scan(&r.ID, &r.Name, &desc, &r.OrgID, &conditionsJSON, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
-		&thresholdType, &r.PercentageThreshold,
+		&thresholdType, &r.PercentageThreshold, &quotaMetricType,
 		&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
 		&r.AlertSuppressSeconds, &createdAt, &updatedAt)
 	if err != nil {
@@ -2098,6 +2098,9 @@ func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
 	if thresholdType.Valid {
 		r.ThresholdType = thresholdType.String
 	}
+	if quotaMetricType.Valid {
+		r.QuotaMetricType = quotaMetricType.String
+	}
 	if createdAt.Valid {
 		r.CreatedAt = createdAt.String
 	}
@@ -2111,11 +2114,11 @@ func (s *Store) UpdateAlertRule(id string, r *AlertRule) (*AlertRule, error) {
 	conditionsJSON, _ := json.Marshal(r.Conditions)
 	err := s.db.QueryRow(
 		`UPDATE alert_rules SET name=$2, description=$3, org_id=$4, conditions=$5, metric_type=$6, service_name=$7, threshold_value=$8,
-		 operator=$9, threshold_type=$10, percentage_threshold=$11, duration_seconds=$12, enabled=$13, notification_channels=$14,
-		 slack_webhook_url=$15, email_webhook_url=$16, discord_webhook_url=$17, alert_suppress_seconds=$18, updated_at=NOW()
+		 operator=$9, threshold_type=$10, percentage_threshold=$11, quota_metric_type=$12, duration_seconds=$13, enabled=$14, notification_channels=$15,
+		 slack_webhook_url=$16, email_webhook_url=$17, discord_webhook_url=$18, alert_suppress_seconds=$19, updated_at=NOW()
 		 WHERE id=$1 RETURNING updated_at`,
 		id, r.Name, nullString(r.Description), r.OrgID, conditionsJSON, r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
-		r.Operator, nullString(r.ThresholdType), r.PercentageThreshold,
+		r.Operator, nullString(r.ThresholdType), r.PercentageThreshold, nullString(r.QuotaMetricType),
 		r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
 		nullString(r.SlackWebhookURL), nullString(r.EmailWebhookURL), nullString(r.DiscordWebhookURL),
 		r.AlertSuppressSeconds,
