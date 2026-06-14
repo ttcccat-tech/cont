@@ -2,8 +2,8 @@
 # One-command startup: cp .env.example .env && docker compose up -d
 
 services:
-  # ── Databases ──────────────────────────────────────────────────────────────
-  postgres:
+  # ── Cont Postgres ────────────────────────────────────────────────────────────
+  cont-postgres:
     image: postgres:16-alpine
     container_name: cont-postgres
     restart: always
@@ -12,7 +12,7 @@ services:
       POSTGRES_USER: kong
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kongpass}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - cont-postgres_data:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
@@ -23,23 +23,24 @@ services:
     networks:
       - cont_net
 
-  redis:
+  # ── Cont Redis ───────────────────────────────────────────────────────────────
+  cont-redis:
     image: redis:7-alpine
     container_name: cont-redis
     restart: always
-    command: redis-server --appendonly yes --appendfsync everysec --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server --appendonly yes --appendfsync everysec${REDIS_PASSWORD:+ --requirepass ${REDIS_PASSWORD}}
     ports:
       - "${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-}", "ping"]
+      test: ["CMD", "redis-cli${REDIS_PASSWORD:+ -a ${REDIS_PASSWORD}}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - cont_net
 
-  # ── Cont Admin API (Go Gin) ────────────────────────────────────────────────
-  admin-api:
+  # ── Cont Admin API (Go Gin) ─────────────────────────────────────────────────
+  cont-admin-api:
     build:
       context: ${APP_DIR:-../admin-api}
       dockerfile: Dockerfile
@@ -70,9 +71,9 @@ services:
     ports:
       - "${ADMIN_API_PORT:-18081}:8001"
     depends_on:
-      postgres:
+      cont-postgres:
         condition: service_healthy
-      redis:
+      cont-redis:
         condition: service_healthy
     networks:
       - cont_net
@@ -84,7 +85,7 @@ services:
           memory: 128M
 
   # ── Cont Proxy Engine (OpenResty) ───────────────────────────────────────────
-  proxy:
+  cont-proxy:
     build:
       context: ${APP_DIR:-../proxy}
       dockerfile: Dockerfile
@@ -92,7 +93,7 @@ services:
     container_name: cont-proxy
     restart: always
     volumes:
-      - proxy_logs:/usr/local/openresty/nginx/logs
+      - cont-proxy_logs:/usr/local/openresty/nginx/logs
     ports:
       - "${PROXY_PORT:-18000}:8000"
     environment:
@@ -103,7 +104,7 @@ services:
       - CONT_JSON_PRETTY=${CONT_JSON_PRETTY:-false}
       - CONT_WRAP_ERRORS=${CONT_WRAP_ERRORS:-true}
     depends_on:
-      admin-api:
+      cont-admin-api:
         condition: service_healthy
     networks:
       - cont_net
@@ -114,8 +115,8 @@ services:
         reservations:
           memory: 64M
 
-  # ── Cont Frontend (React + Nginx) ──────────────────────────────────────────
-  frontend:
+  # ── Cont Frontend (React + Nginx) ───────────────────────────────────────────
+  cont-frontend:
     build:
       context: ${APP_DIR:-../frontend}
       dockerfile: Dockerfile
@@ -128,7 +129,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-18082}:80"
     depends_on:
-      - admin-api
+      - cont-admin-api
     networks:
       - cont_net
 
@@ -140,5 +141,5 @@ networks:
         - subnet: 172.28.0.0/16
 
 volumes:
-  postgres_data:
-  proxy_logs:
+  cont-postgres_data:
+  cont-proxy_logs:

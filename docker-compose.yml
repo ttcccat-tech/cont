@@ -1,9 +1,11 @@
 services:
   # ── Databases ────────────────────────────────────────────────
-  postgres:
+  cont-postgres:
     image: postgres:16-alpine
     container_name: cont-postgres
     restart: unless-stopped
+    networks:
+      - cont_default
     environment:
       POSTGRES_DB: cont
       POSTGRES_USER: kong
@@ -18,10 +20,12 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
+  cont-redis:
     image: redis:7-alpine
     container_name: cont-redis
     restart: unless-stopped
+    networks:
+      - cont_default
     ports:
       - "6379:6379"
     healthcheck:
@@ -31,7 +35,7 @@ services:
       retries: 5
 
   # ── cont Admin API (Go Gin) ───────────────────────────────────
-  admin-api:
+  cont-admin-api:
     build:
       context: ./admin-api
       dockerfile: Dockerfile
@@ -64,28 +68,30 @@ services:
     ports:
       - "18081:8001"
     depends_on:
-      postgres:
+      cont-postgres:
         condition: service_healthy
-      redis:
+      cont-redis:
         condition: service_healthy
 
   # ── cont Proxy Engine (OpenResty) ────────────────────────────
-  proxy:
+  cont-proxy:
     build:
       context: ./proxy
       dockerfile: Dockerfile
     container_name: cont-proxy
     restart: unless-stopped
+    networks:
+      - cont_default
     ports:
       - "18000:8000"
     environment:
       - LUA_PACKAGE_PATH=/usr/local/openresty/lualib/?.lua;/usr/local/openresty/lualib/?/init.lua;./?.lua;./?/init.lua
     depends_on:
-      admin-api:
+      cont-admin-api:
         condition: service_healthy
 
   # ── cont Frontend (React + Nginx) ─────────────────────────────
-  frontend:
+  cont-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -99,7 +105,7 @@ services:
     ports:
       - "18082:80"
     depends_on:
-      - admin-api
+      - cont-admin-api
 
 networks:
   cont_default:
