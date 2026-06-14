@@ -115,6 +115,7 @@ export default function App() {
                   <Route path="/grpc-services" element={<GrpcServices />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/billing" element={<Settings />} />
                   <Route path="/audit" element={<AuditLog />} />
                   <Route path="/config-versioning" element={<ConfigVersioning />} />
                   <Route path="/health-portal" element={<HealthPortal />} />
