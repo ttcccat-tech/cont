@@ -482,3 +482,14 @@
 5. **push** → 確認所有改動入庫
 
 > 一輪：開發 → QA → Bug 寫入 event.md → commit → push = 完整回合
+
+---
+
+## 🔍 TASK-PLUGIN-* 任務驗證結果（2026-06-14）
+
+| 任務 | 結果 | 說明 |
+|------|------|------|
+| TASK-PLUGIN-1 | ✅ PASS | `proxy/lua/cont/access.lua:207` 包含 `pcall(handler.access, handler, plugin)` |
+| TASK-PLUGIN-2 | ✅ PASS | `docker exec cont-proxy-test nginx -t` → syntax ok, test successful |
+| TASK-PLUGIN-3 | 🟡 FAIL | `busted` 不存在於 OpenResty Alpine 镜像中，测试无法执行（环境限制，非代码缺陷） |
+| TASK-PLUGIN-4 | ✅ PASS | `docker compose build --pull --no-cache proxy` → build 成功 |
