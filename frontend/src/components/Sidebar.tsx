@@ -42,7 +42,7 @@ export default function Sidebar() {
     { key: '/audit', icon: <AuditOutlined />, label: 'audit 審計日誌' },
     { key: '/config-versioning', icon: <HistoryOutlined />, label: 'versions 設定版本' },
     { key: '/health-portal', icon: <HeartOutlined />, label: 'health 服務健康度' },
-    { key: '/alerts', icon: <BellOutlined />, label: 'alerts 告警規則' },
+    { key: '/alerts/rules', icon: <BellOutlined />, label: 'alerts 告警規則' },
     { key: '/api-key-requests', icon: <FileTextOutlined />, label: 'api keys API Key 申請' },
     { key: '/api-docs', icon: <BookOutlined />, label: 'api docs API 文件' },
     { key: '/settings', icon: <SettingOutlined />, label: 'settings 系統設置' },
