@@ -25,11 +25,20 @@
 - 不修改 frontend
 - 不做新的功能
 
+## Tasks
+- [ ] TASK-ROUTE-1: Commit all 4 files (nginx.conf, store.go, access.lua, config_sync.lua)
+- [ ] TASK-ROUTE-2: Docker build proxy --no-cache
+- [ ] TASK-ROUTE-3: Docker build admin-api --no-cache
+- [ ] TASK-ROUTE-4: Restart all containers
+- [ ] TASK-ROUTE-5: Verify nginx -t passes
+- [ ] TASK-ROUTE-6: Verify GET /services returns upstream_id in response
+- [ ] TASK-ROUTE-7: Verify containers healthy (proxy/admin-api/frontend/postgres/redis)
+
 ## 驗收標準
 1. `docker compose build --pull --no-cache proxy` 成功
 2. `docker compose build --pull --no-cache cont-admin-api` 成功
 3. `docker exec cont-proxy nginx -t` 通過
 4. 所有 containers 正常啟動（proxy/admin-api/frontend/postgres/redis）
 5. `GET /services` → 200（upstream_id 正確出現在 response）
-6. `GET /` 或 proxy 路由 → 200/404（取決於是否有 matched route）
+6. Basic proxy routing via nginx location / works
 7. `docker compose ps` 顯示所有 containers healthy
