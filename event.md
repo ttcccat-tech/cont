@@ -430,9 +430,9 @@
 
 ## 🟡 預計優化
 
-- [ ] **Cont 自有用量追蹤整合 Analytics 儀表板** — Analytics.tsx 目前只顯示 Kong Nginx metrics，需整合 Cont 自有的 Redis 用量數據（per-org/per-consumer/per-route hourly buckets）變成有意義的儀表板視圖
+- [🔴] **Cont 自有用量追蹤整合 Analytics 儀表板** — 🔴 Redis storage key 解析 bug：`GetTopRoutesByUsage`/`GetTopConsumersByUsage` 提取 `parts[2]` 拿到 literal "route"/"consumer" 而非實際 ID
   - Backend: `GET /usage/analytics` endpoint（彙整 monthly total、plan quota、top routes、top consumers）
-  - Frontend: 新增 Cont 用量 panel（usage vs quota progress、hourly trend、top entities）
+  - Frontend: Analytics.tsx 新增 Cont 用量 panel（usage vs quota progress、hourly trend、top entities）
   - kong.ts: 新增 `getAnalyticsUsage()` API call
   - QA: 確認 `/usage/analytics` 返回正確數據，前端 chart 正確渲染
 
