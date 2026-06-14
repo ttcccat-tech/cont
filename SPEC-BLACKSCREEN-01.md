@@ -34,3 +34,12 @@
 5. 打開 `/config-snapshots` → 正常渲染 Config Snapshots 頁面
 6. 打開 `/api-docs` → 正常渲染 API 文件
 7. Sidebar 點擊「工作區」→ 正確導航到 `/workspaces`
+
+## Tasks
+
+- [ ] TASK-1: Fix Users.tsx `d.map is not a function` — 檢查 kong.ts API 回傳資料型別，確認是否有 Array.isArray normalize
+- [ ] TASK-2: Fix AlertRules.tsx blank page — 檢查 component 是否正常 export，fetch 是否正常
+- [ ] TASK-3: Fix Billing.tsx route — 檢查 BillingPortal component 是否存在、route 是否有設定
+- [ ] TASK-4: Fix /config-snapshots route — 確認 ConfigVersioning 是否應為 /config-snapshots，或需要新增 component
+- [ ] TASK-5: Fix ApiDocs.tsx load failure — 檢查 /docs 和 /docs.json endpoint，確認 Swagger UI 是否正常
+- [ ] TASK-6: Fix sidebar "工作區" navigation — 檢查 App.tsx sidebar 連結是否對應正確路徑
