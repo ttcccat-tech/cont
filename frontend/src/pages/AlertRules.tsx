@@ -6,7 +6,7 @@ import type { ColumnsType } from 'antd/es/table'
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 interface Condition {
-  metric_type: 'error_rate' | 'latency'
+  metric_type: 'error_rate' | 'latency' | 'usage_quota'
   service_name: string
   threshold_value: number
   operator: '>' | '<' | '>=' | '<=' | '=='
@@ -18,7 +18,7 @@ interface AlertRule {
   name: string
   description: string
   conditions: Condition[]
-  metric_type: 'error_rate' | 'latency'
+  metric_type: 'error_rate' | 'latency' | 'usage_quota'
   service_name: string
   threshold_value: number
   operator: '>' | '<' | '>=' | '<=' | '=='
@@ -37,6 +37,7 @@ interface AlertRule {
 const metricOptions = [
   { value: 'error_rate', label: '錯誤率 (%)' },
   { value: 'latency', label: '延遲 (ms)' },
+  { value: 'usage_quota', label: '用量配額 (%)' },
 ]
 
 const operatorOptions = [
@@ -214,7 +215,7 @@ export default function AlertRulesPage() {
           })
           return <Tooltip title={r.conditions.map(c => `${c.metric_type} ${c.operator} ${c.threshold_value} (${c.service_name})`).join(', ')}><span>{r.conditions.length} 條件</span></Tooltip>
         }
-        return <span>{r.threshold_value}{r.metric_type === 'error_rate' ? '%' : 'ms'} {r.operator}</span>
+        return <span>{r.threshold_value}{r.metric_type === 'error_rate' ? '%' : r.metric_type === 'usage_quota' ? '%' : 'ms'} {r.operator}</span>
       },
     },
     {

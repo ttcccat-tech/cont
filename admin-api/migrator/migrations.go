@@ -659,8 +659,23 @@ DROP TABLE IF EXISTS grpc_services;
 	m.Register(Migration{
 		Version:     22,
 		Description: "OAuth providers updated_at column",
-		Up: `DO $$ BEGIN ALTER TABLE oauth_providers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ; EXCEPTION WHEN OTHERS THEN NULL; END $$;`,
+		Up:   `DO $$ BEGIN ALTER TABLE oauth_providers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ; EXCEPTION WHEN OTHERS THEN NULL; END $$;`,
 		Down: `ALTER TABLE oauth_providers DROP COLUMN IF EXISTS updated_at;`,
+	})
+
+	// v023: Alert rules org_id + threshold_type/percentage_threshold for multi-tenant usage quota alerting
+	m.Register(Migration{
+		Version:     23,
+		Description: "Add org_id, threshold_type, percentage_threshold to alert_rules for multi-tenant usage quota alerting",
+		Up: `
+DO $$ BEGIN
+  ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS org_id TEXT DEFAULT '00000000-0000-0000-0000-000000000000';
+  ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS threshold_type TEXT DEFAULT 'absolute';
+  ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS percentage_threshold REAL DEFAULT 0;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+`,
+		Down: `ALTER TABLE alert_rules DROP COLUMN IF EXISTS percentage_threshold; ALTER TABLE alert_rules DROP COLUMN IF EXISTS threshold_type; ALTER TABLE alert_rules DROP COLUMN IF EXISTS org_id;`,
 	})
 }
 

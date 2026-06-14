@@ -189,8 +189,8 @@ func (a *Alerter) fetchConditionMetric(cond storage.Condition) (float64, error) 
 
 // computeConditionMetric computes metric value for a condition from proxy metrics.
 func (a *Alerter) computeConditionMetric(cond storage.Condition) (float64, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
 	if cond.MetricType == "error_rate" || cond.MetricType == "latency" {
+		client := &http.Client{Timeout: 5 * time.Second}
 		resp, err := client.Get("http://localhost:18000/metrics")
 		if err != nil {
 			return 0, fmt.Errorf("proxy metrics request failed: %w", err)
@@ -202,10 +202,52 @@ func (a *Alerter) computeConditionMetric(cond storage.Condition) (float64, error
 		}
 		return parseMetricFromPrometheusWithCond(buf.Bytes(), cond)
 	}
+	if cond.MetricType == "usage_quota" {
+		return a.computeUsageQuotaMetric(cond.ServiceName)
+	}
 	return 0.0, fmt.Errorf("unknown metric type: %s", cond.MetricType)
 }
 
+// computeUsageQuotaMetric computes the usage percentage (0-100) for an org's quota.
+// ServiceName is used as the org_id; if empty, defaults to zero-UUID admin org.
+func (a *Alerter) computeUsageQuotaMetric(orgID string) (float64, error) {
+	if orgID == "" {
+		orgID = "00000000-0000-0000-0000-000000000000"
+	}
+
+	// Get monthly usage from Redis
+	monthly, err := a.store.Redis().GetMonthlyUsage(nil, orgID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get monthly usage: %w", err)
+	}
+
+	// Get plan quota
+	var planLimit int64 = 100000
+	if orgID != "00000000-0000-0000-0000-000000000000" {
+		org, err := a.store.GetOrganization(orgID)
+		if err == nil && org != nil {
+			plan, err := a.store.GetPlanByName(org.Plan)
+			if err == nil && plan != nil {
+				planLimit = int64(plan.RequestLimit)
+			}
+		}
+	}
+
+	if planLimit <= 0 {
+		return 0, nil
+	}
+	percent := float64(monthly) / float64(planLimit) * 100
+	if percent > 100 {
+		percent = 100
+	}
+	return percent, nil
+}
+
 func (a *Alerter) fetchMetric(rule *storage.AlertRule) (float64, error) {
+	// usage_quota is always computed from Redis, never from Prometheus
+	if rule.MetricType == "usage_quota" {
+		return a.computeUsageQuotaMetric(rule.OrgID)
+	}
 	if a.metricsURL == "" {
 		// Fallback: compute from proxy metrics endpoint
 		return a.computeFromProxyMetrics(rule)
@@ -227,6 +269,10 @@ func (a *Alerter) fetchMetric(rule *storage.AlertRule) (float64, error) {
 }
 
 func (a *Alerter) computeFromProxyMetrics(rule *storage.AlertRule) (float64, error) {
+	// usage_quota is always computed from Redis
+	if rule.MetricType == "usage_quota" {
+		return a.computeUsageQuotaMetric(rule.OrgID)
+	}
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	// Try upstream health metrics

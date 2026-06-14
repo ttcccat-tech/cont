@@ -68,11 +68,14 @@ type AlertRule struct {
 	ID                   int64       `json:"id"`
 	Name                 string      `json:"name" binding:"required,max=255"`
 	Description          string      `json:"description,omitempty"`
+	OrgID                string      `json:"org_id,omitempty"`
 	Conditions           []Condition `json:"conditions,omitempty"` // Multi-condition support; if empty, falls back to single-condition fields below
-	MetricType           string      `json:"metric_type" binding:"omitempty,oneof=error_rate latency"`
+	MetricType           string      `json:"metric_type" binding:"omitempty,oneof=error_rate latency usage_quota"`
 	ServiceName          string      `json:"service_name"`
 	ThresholdValue       float64     `json:"threshold_value"`
 	Operator             string      `json:"operator" binding:"omitempty,oneof=> < >= <="`
+	ThresholdType        string      `json:"threshold_type" binding:"omitempty,oneof=absolute percentage"`
+	PercentageThreshold  float64     `json:"percentage_threshold"` // e.g. 80.0 for 80%
 	DurationSeconds      int         `json:"duration_seconds" binding:"min=1"`
 	Enabled              bool        `json:"enabled"`
 	NotificationChannels string      `json:"notification_channels,omitempty"`

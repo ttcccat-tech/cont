@@ -1966,8 +1966,8 @@ func (s *Store) CreateAuditLog(l *AuditLog) error {
 
 func (s *Store) ListAlertRules() ([]AlertRule, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, description, conditions, metric_type, service_name, threshold_value, operator,
-		        duration_seconds, enabled, notification_channels, slack_webhook_url,
+		`SELECT id, name, description, COALESCE(org_id,''), conditions, metric_type, service_name, threshold_value, operator,
+		        threshold_type, percentage_threshold, duration_seconds, enabled, notification_channels, slack_webhook_url,
 		        email_webhook_url, discord_webhook_url, alert_suppress_seconds,
 		        last_triggered_at, last_triggered_value, created_at, updated_at
 		 FROM alert_rules ORDER BY created_at DESC`)
@@ -1978,12 +1978,13 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 	var rules []AlertRule
 	for rows.Next() {
 		var r AlertRule
-		var desc, svcName, notifCh, slackURL, emailURL, discordURL sql.NullString
+		var desc, svcName, notifCh, slackURL, emailURL, discordURL, thresholdType sql.NullString
 		var createdAt, updatedAt sql.NullString
 		var lastTriggeredAt sql.NullString
 		var lastTriggeredValue sql.NullFloat64
 		var conditionsJSON []byte
-		if err := rows.Scan(&r.ID, &r.Name, &desc, &conditionsJSON, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
+		if err := rows.Scan(&r.ID, &r.Name, &desc, &r.OrgID, &conditionsJSON, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
+			&thresholdType, &r.PercentageThreshold,
 			&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
 			&r.AlertSuppressSeconds, &lastTriggeredAt, &lastTriggeredValue, &createdAt, &updatedAt); err != nil {
 			return nil, err
@@ -2009,6 +2010,9 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 		if discordURL.Valid {
 			r.DiscordWebhookURL = discordURL.String
 		}
+		if thresholdType.Valid {
+			r.ThresholdType = thresholdType.String
+		}
 		if lastTriggeredAt.Valid {
 			r.LastTriggeredAt = &lastTriggeredAt.String
 		}
@@ -2029,13 +2033,17 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 func (s *Store) CreateAlertRule(r *AlertRule) (*AlertRule, error) {
 	var outID int64
 	conditionsJSON, _ := json.Marshal(r.Conditions)
+	if r.OrgID == "" {
+		r.OrgID = "00000000-0000-0000-0000-000000000000"
+	}
 	err := s.db.QueryRow(
-		`INSERT INTO alert_rules (name, description, conditions, metric_type, service_name, threshold_value, operator,
-		 duration_seconds, enabled, notification_channels, slack_webhook_url, email_webhook_url,
-		 discord_webhook_url, alert_suppress_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+		`INSERT INTO alert_rules (name, description, org_id, conditions, metric_type, service_name, threshold_value, operator,
+		 threshold_type, percentage_threshold, duration_seconds, enabled, notification_channels, slack_webhook_url, email_webhook_url,
+		 discord_webhook_url, alert_suppress_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		 RETURNING id, created_at, updated_at`,
-		r.Name, nullString(r.Description), conditionsJSON, r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
-		r.Operator, r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
+		r.Name, nullString(r.Description), r.OrgID, conditionsJSON, r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
+		r.Operator, nullString(r.ThresholdType), r.PercentageThreshold,
+		r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
 		nullString(r.SlackWebhookURL), nullString(r.EmailWebhookURL), nullString(r.DiscordWebhookURL),
 		r.AlertSuppressSeconds,
 	).Scan(&outID, &r.CreatedAt, &r.UpdatedAt)
@@ -2048,15 +2056,16 @@ func (s *Store) CreateAlertRule(r *AlertRule) (*AlertRule, error) {
 
 func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
 	var r AlertRule
-	var desc, svcName, notifCh, slackURL, emailURL, discordURL sql.NullString
+	var desc, svcName, notifCh, slackURL, emailURL, discordURL, thresholdType sql.NullString
 	var createdAt, updatedAt sql.NullString
 	var conditionsJSON []byte
 	err := s.db.QueryRow(
-		`SELECT id, name, description, conditions, metric_type, service_name, threshold_value, operator,
-		        duration_seconds, enabled, notification_channels, slack_webhook_url,
+		`SELECT id, name, description, COALESCE(org_id,''), conditions, metric_type, service_name, threshold_value, operator,
+		        threshold_type, percentage_threshold, duration_seconds, enabled, notification_channels, slack_webhook_url,
 		        email_webhook_url, discord_webhook_url, alert_suppress_seconds, created_at, updated_at
 		 FROM alert_rules WHERE id=$1`, id,
-	).Scan(&r.ID, &r.Name, &desc, &conditionsJSON, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
+	).Scan(&r.ID, &r.Name, &desc, &r.OrgID, &conditionsJSON, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
+		&thresholdType, &r.PercentageThreshold,
 		&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
 		&r.AlertSuppressSeconds, &createdAt, &updatedAt)
 	if err != nil {
@@ -2083,6 +2092,9 @@ func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
 	if discordURL.Valid {
 		r.DiscordWebhookURL = discordURL.String
 	}
+	if thresholdType.Valid {
+		r.ThresholdType = thresholdType.String
+	}
 	if createdAt.Valid {
 		r.CreatedAt = createdAt.String
 	}
@@ -2095,12 +2107,13 @@ func (s *Store) GetAlertRule(id string) (*AlertRule, error) {
 func (s *Store) UpdateAlertRule(id string, r *AlertRule) (*AlertRule, error) {
 	conditionsJSON, _ := json.Marshal(r.Conditions)
 	err := s.db.QueryRow(
-		`UPDATE alert_rules SET name=$2, description=$3, conditions=$4, metric_type=$5, service_name=$6, threshold_value=$7,
-		 operator=$8, duration_seconds=$9, enabled=$10, notification_channels=$11, slack_webhook_url=$12,
-		 email_webhook_url=$13, discord_webhook_url=$14, alert_suppress_seconds=$15, updated_at=NOW()
+		`UPDATE alert_rules SET name=$2, description=$3, org_id=$4, conditions=$5, metric_type=$6, service_name=$7, threshold_value=$8,
+		 operator=$9, threshold_type=$10, percentage_threshold=$11, duration_seconds=$12, enabled=$13, notification_channels=$14,
+		 slack_webhook_url=$15, email_webhook_url=$16, discord_webhook_url=$17, alert_suppress_seconds=$18, updated_at=NOW()
 		 WHERE id=$1 RETURNING updated_at`,
-		id, r.Name, nullString(r.Description), conditionsJSON, r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
-		r.Operator, r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
+		id, r.Name, nullString(r.Description), r.OrgID, conditionsJSON, r.MetricType, nullString(r.ServiceName), r.ThresholdValue,
+		r.Operator, nullString(r.ThresholdType), r.PercentageThreshold,
+		r.DurationSeconds, r.Enabled, nullString(r.NotificationChannels),
 		nullString(r.SlackWebhookURL), nullString(r.EmailWebhookURL), nullString(r.DiscordWebhookURL),
 		r.AlertSuppressSeconds,
 	).Scan(&r.UpdatedAt)
