@@ -204,7 +204,7 @@ local function run_plugin_access(plugin)
 
     local handler = mod.new()
     if handler.access then
-        local ok2, err = pcall(handler.access, handler)
+        local ok2, err = pcall(handler.access, handler, plugin)
         if not ok2 then
             ngx.log(ngx.ERR, "cont: plugin ", plugin_name, " access() error: ", err)
         end
