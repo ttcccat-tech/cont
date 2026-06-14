@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Form, Input, Button, Alert, Divider, message, Spin } from 'antd'
-import { UserOutlined, LockOutlined, GoogleOutlined, SafetyCertificateOutlined, MailOutlined } from '@ant-design/icons'
+import { UserOutlined, LockOutlined, GoogleOutlined, SafetyCertificateOutlined, MailOutlined, GithubOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 
@@ -768,11 +768,13 @@ export default function Login() {
             <div style={{ textAlign: 'center', padding: '8px 0' }}>
               <Spin size="small" />
             </div>
-          ) : oauthProviders.map(p => (
+          ) : oauthProviders.map(p => {
+              const Icon = p.provider === 'google' ? <GoogleOutlined /> : p.provider === 'github' ? <GithubOutlined /> : <SafetyCertificateOutlined />
+              return (
             <Button
               key={p.provider}
               size="large"
-              icon={<GoogleOutlined />}
+              icon={Icon}
               loading={ssoLoading}
               onClick={() => handleSSOLogin('oauth2', p.provider)}
               block
@@ -785,7 +787,8 @@ export default function Login() {
             >
               {p.provider.charAt(0).toUpperCase() + p.provider.slice(1)} 登入
             </Button>
-          ))}
+              )
+          })}
         </div>
 
         <div style={{ marginTop: 24, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
