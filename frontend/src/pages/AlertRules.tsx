@@ -11,6 +11,8 @@ interface Condition {
   threshold_value: number
   operator: '>' | '<' | '>=' | '<=' | '=='
   logic: 'AND' | 'OR'
+  quota_metric_type?: 'org' | 'consumer'
+  percentage_threshold?: number
 }
 
 interface AlertRule {
@@ -124,6 +126,8 @@ export default function AlertRulesPage() {
           threshold_value: r.threshold_value || 0,
           operator: r.operator || '>',
           logic: 'AND',
+          quota_metric_type: 'org',
+          percentage_threshold: r.threshold_value || 0,
         }]
     form.setFieldsValue({
       ...r,
@@ -149,6 +153,8 @@ export default function AlertRulesPage() {
           threshold_value: c.threshold_value ?? 0,
           operator: c.operator || '>',
           logic: idx === 0 ? 'AND' : (c.logic || 'AND'),
+          quota_metric_type: c.quota_metric_type || 'org',
+          percentage_threshold: c.threshold_value ?? 0,
         }))
       } else {
         // Fallback: single condition from flat fields
@@ -158,6 +164,8 @@ export default function AlertRulesPage() {
           threshold_value: values.threshold_value ?? 0,
           operator: values.operator || '>',
           logic: 'AND',
+          quota_metric_type: 'org',
+          percentage_threshold: values.threshold_value ?? 0,
         }]
       }
       if (editingRule) {
@@ -222,7 +230,10 @@ export default function AlertRulesPage() {
         if (r.conditions && r.conditions.length > 0) {
           const parts = r.conditions.map((c, i) => {
             const logic = i === 0 ? '' : ` ${c.logic} `
-            return `${logic}${c.metric_type === 'error_rate' ? '錯誤率' : '延遲'} ${c.operator} ${c.threshold_value}`
+            if (c.metric_type === 'usage_quota') {
+              return `${logic}用量配額 ${c.operator} ${c.threshold_value}% (${(c as any).quota_metric_type || 'org'})`
+            }
+            return `${logic}${c.metric_type === 'error_rate' ? '錯誤率' : '延遲'} ${c.operator} ${c.threshold_value}${c.metric_type === 'error_rate' ? '%' : 'ms'}`
           })
           return <Tooltip title={r.conditions.map(c => `${c.metric_type} ${c.operator} ${c.threshold_value} (${c.service_name})`).join(', ')}><span>{r.conditions.length} 條件</span></Tooltip>
         }
@@ -430,6 +441,8 @@ export default function AlertRulesPage() {
                   threshold_value: 0,
                   operator: '>',
                   logic: 'AND',
+                  quota_metric_type: 'org',
+                  percentage_threshold: 0,
                 })} block style={{ marginBottom: 16 }}>
                   + 新增條件
                 </Button>
