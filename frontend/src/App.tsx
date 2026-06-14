@@ -115,10 +115,12 @@ export default function App() {
                   <Route path="/grpc-services" element={<GrpcServices />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/billing" element={<Settings />} />
                   <Route path="/audit" element={<AuditLog />} />
                   <Route path="/config-versioning" element={<ConfigVersioning />} />
+                  <Route path="/config-snapshots" element={<ConfigVersioning />} />
                   <Route path="/health-portal" element={<HealthPortal />} />
-                  <Route path="/alerts" element={<AlertRules />} />
+                  <Route path="/alerts/rules" element={<AlertRules />} />
                   <Route path="/alert-history" element={<AlertHistory />} />
                   <Route path="/webhook-deliveries" element={<WebhookDeliveries />} />
                   <Route path="/api-key-requests" element={<ApiKeyRequests />} />

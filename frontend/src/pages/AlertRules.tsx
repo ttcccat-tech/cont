@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Card, Table, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Switch, message, Popconfirm, Tooltip, Row, Col, Divider } from 'antd'
 import { ReloadOutlined, PlusOutlined, EditOutlined, DeleteOutlined, BellOutlined, HistoryOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -99,8 +99,8 @@ export default function AlertRulesPage() {
   }
 
   // Stable ref for fetchRules to avoid stale closure in SSE handler
-  const fetchRulesRef = React.useRef(fetchRules)
-  React.useEffect(() => { fetchRulesRef.current = fetchRules }, [fetchRules])
+  const fetchRulesRef = useRef(fetchRules)
+  useEffect(() => { fetchRulesRef.current = fetchRules }, [fetchRules])
 
   useEffect(() => {
     fetchRulesRef.current()

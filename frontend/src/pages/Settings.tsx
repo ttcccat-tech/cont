@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Card, Form, Input, Switch, Select, Button, Space, Tag, message, Divider, Row, Col, InputNumber, Alert, Tabs, Table, Modal, Popconfirm } from 'antd'
 import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import BillingPortal from '../components/BillingPortal'
@@ -39,6 +40,10 @@ export default function SettingsPage() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
+  const location = useLocation()
+
+  // Auto-open billing tab when URL is /billing
+  const defaultActiveKey = location.pathname === '/billing' ? 'billing' : 'system'
 
   useEffect(() => {
     form.setFieldsValue({
@@ -85,7 +90,7 @@ export default function SettingsPage() {
         </Space>
       </div>
 
-      <Tabs defaultActiveKey="system" items={[
+      <Tabs defaultActiveKey={defaultActiveKey} items={[
         {
           key: 'system',
           label: '系統設定',

@@ -278,7 +278,13 @@ export const createAlertRule = (payload: Record<string, unknown>) => analyticsCl
 export const updateAlertRule = (id: string, payload: Record<string, unknown>) => analyticsClient.patch(`/alerts/rules/${id}`, payload).then(r => r.data)
 export const deleteAlertRule = (id: string) => analyticsClient.delete(`/alerts/rules/${id}`)
 
-export const getUsers = () => analyticsClient.get('/users').then(r => r.data)
+export const getUsers = () => analyticsClient.get('/users').then(r => {
+  // Backend returns {data: [...], total: N} — normalize to array
+  const d = r.data
+  if (Array.isArray(d)) return d
+  if (Array.isArray(d?.data)) return d.data
+  return []
+})
 export const createUser = (payload: Record<string, unknown>) => analyticsClient.post('/users', payload).then(r => r.data)
 export const inviteUser = (email: string, groupId: string) =>
   analyticsClient.post('/users/invite', { email, group_id: groupId }).then(r => r.data)
