@@ -155,8 +155,9 @@ type Service struct {
 	ConnectTimeout  int    `json:"connect_timeout,omitempty" binding:"omitempty,min=0,max=600000"`
 	ReadTimeout     int    `json:"read_timeout,omitempty" binding:"omitempty,min=0,max=600000"`
 	WriteTimeout    int    `json:"write_timeout,omitempty" binding:"omitempty,min=0,max=600000"`
-	Enabled         bool   `json:"enabled"`
-	OrgID           string `json:"org_id,omitempty"`
+	UpstreamID     string `json:"upstream_id,omitempty"`
+	Enabled        bool   `json:"enabled"`
+	OrgID          string `json:"org_id,omitempty"`
 	CreatedAt       string `json:"created_at,omitempty"`
 	UpdatedAt       string `json:"updated_at,omitempty"`
 }

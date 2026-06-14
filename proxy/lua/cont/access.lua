@@ -20,33 +20,13 @@ local function generate_trace_id()
     return table.concat(id)
 end
 
--- ── Internal Admin API call via ngx.location.capture ──────────────────────────
-local function admin_api_call(path)
-    local trace_id = ngx.var.http_x_cont_trace_id or ""
-    local headers = {}
-    if trace_id ~= "" then
-        headers["X-Cont-Trace-ID"] = trace_id
+-- Load jwt_validation module (uses cosocket, safe at access_by_lua context)
+local jwt_validation
+local function get_jwt_validation()
+    if not jwt_validation then
+        jwt_validation = require("cont.jwt_validation")
     end
-    local res = ngx.location.capture("/__cont_api_internal__" .. path, {
-        headers = headers,
-    })
-    return res.status, res.body
-end
-
--- ── JWT Validation (via Admin API /internal/validate-jwt) ─────────────────────
-local function validate_jwt(token)
-    if not token or token == "" then
-        return nil
-    end
-    local status, body = admin_api_call("/internal/validate-jwt/" .. ngx.escape_uri(token))
-    if status ~= 200 then
-        return nil
-    end
-    local ok, data = pcall(cjson.decode, body)
-    if not ok or not data then
-        return nil
-    end
-    return data.consumer_id, data.user_id
+    return jwt_validation
 end
 
 -- ── Consumer Auth Validation ─────────────────────────────────────────────────
@@ -105,19 +85,16 @@ local function validate_consumer_auth(credential_type)
         secret = payload:sub(colon1 + 1, colon2 - 1)
     end
 
-    -- Call Admin API to validate credential
-    local status, body = admin_api_call("/internal/validate-cred/" .. credential_type .. "/" .. ngx.escape_uri(key))
-    if status ~= 200 then
+    -- Call Admin API to validate credential via cosocket
+    local jv = get_jwt_validation()
+    local consumer_id, user_id = jv.validate_consumer_auth(credential_type, key)
+    if not consumer_id then
         ngx.status = 401
         ngx.say('{"message":"Invalid credentials","error":"Unauthorized","statusCode":401}')
         return false
     end
-
-    local ok, res = pcall(cjson.decode, body)
-    if ok and res and res.consumer_id then
-        ngx.ctx.authenticated_consumer_id = res.consumer_id
-        ngx.ctx.credential_identifier = key
-    end
+    ngx.ctx.authenticated_consumer_id = consumer_id
+    ngx.ctx.credential_identifier = key
     return true
 end
 
@@ -295,25 +272,7 @@ local trace_id = ngx.var.http_x_cont_trace_id
 if not trace_id or trace_id == "" then
     trace_id = generate_trace_id()
 end
-ngx.var.cont_trace_id = trace_id
 ngx.header["X-Cont-Trace-ID"] = trace_id
-
-if not cont.routes or #cont.routes == 0 then
-    -- Load config from Admin API if not yet loaded
-    local status, body = admin_api_call("/internal/config/snapshot")
-    if status == 200 then
-        local ok, data = pcall(cjson.decode, body)
-        if ok and data then
-            _G.cont.routes = data.routes or {}
-            _G.cont.services = data.services or {}
-            _G.cont.upstreams = data.upstreams or {}
-            _G.cont.plugins = data.plugins or {}
-            _G.cont.targets = data.targets or {}
-            _G.cont.config_loaded = true
-            cont = _G.cont
-        end
-    end
-end
 
 local route = match_route()
 
@@ -356,7 +315,8 @@ if route and service_id then
             token = ngx.var.http_x_auth_token
         end
         if token then
-            local consumer_id, user_id = validate_jwt(token)
+            local jv = get_jwt_validation()
+            local consumer_id, user_id = jv.validate_jwt(token)
             if consumer_id then
                 ngx.ctx.authenticated_consumer_id = consumer_id
                 ngx.ctx.authenticated_user_id = user_id
