@@ -163,6 +163,9 @@ func QuotaEnforcer(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+// GET /usage/analytics returns analytics usage data (monthly total, hourly trend, top routes, top consumers).
+// Registered in main.go: admin.GET("/usage/analytics", routes.GetAnalyticsUsage(store))
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 func paginate(c *gin.Context) (int, int) {
