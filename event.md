@@ -434,6 +434,17 @@
 
 ## ✅ 已完成
 
+- [x] **Cont Webhook Delivery Dashboard + Dead Letter Queue UI** — commit `b1d5a70d`
+  - App.tsx: add `/webhook-deliveries` route + WebhookDeliveries component import
+  - kong.ts: add `listWebhooks/getWebhook/createWebhook/updateWebhook/deleteWebhook` + `listWebhookDeliveries/retryWebhookDelivery` APIs
+  - WebhookDeliveries.tsx: full dashboard with subscription list, delivery table, status stats (success/failed/retrying/pending), detail drawer with payload/response body
+  - Bonus fix: Upstreams.tsx circuit-breaker tab JSX syntax error (`</>},` → `}`)
+
+- [x] **Cont Config Snapshot webhook 觸發時機實作** — commit `15c23a14`
+  - `CreateConfigSnapshot` handler fires `config.snapshot.created` webhook event via `engine.TriggerWebhook`
+  - `RollbackConfigSnapshot` handler fires `config.snapshot.rolled_back` webhook event
+  - Both use goroutine for non-blocking async delivery
+
 - [x] **Cont Webhook Delivery Engine（Async Delivery + Retry Queue）** — commit `a66dfe1d`
   - `engine/webhook_delivery.go`: WebhookDeliveryEngine struct（每5s批次處理, exponential backoff max 5次）
   - `internal/worker/webhook.go`: WebhookWorker pool（10 concurrent workers）已在 main.go 啟動
@@ -442,15 +453,6 @@
   - `RejectAPIKey` 觸發 `api_key.rejected` webhook 事件
   - `storage/webhook.go`: FireWebhooks/GetPendingWebhookDeliveries/UpdateWebhookDelivery CRUD 完整
   - worker.lua 每10s同步 plugin registry → proxy plugins 可用
-
-## 🟡 預計優化
-
-- [ ] **Cont Webhook Delivery Dashboard + Dead Letter Queue UI**
-  - 前端 `WebhookDeliveries.tsx` — 查看 delivery 歷史（成功/失敗/retrying），狀態/時間/錯誤訊息
-  - Dead Letter Queue — 顯示所有 `status=failed` 的 deliveries，支援「重新觸發」按鈕
-  - `GET /webhooks/:id/deliveries` → 前端列表顯示 delivery 記錄
-  - 候選方向：Config Snapshot webhook 觸發時機（尚未實作 `config.snapshot.created`）
-  - **DONE** commit `b1d5a70d` — App.tsx 路由 + kong.ts APIs + WebhookDeliveries.tsx 完整實作 + Upstreams.tsx JSX bug 修復
 
 ---
 
