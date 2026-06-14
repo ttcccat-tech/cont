@@ -118,6 +118,10 @@
 
 （發現問題後填入）
 
+## ✅ 本輪完成
+
+- [✅] SPEC-INLINE-ROUTE — inline route matching + upstream_id fix，7 tasks 全部完成，merge to main
+
 ---
 
 ## 🟡 預計優化
