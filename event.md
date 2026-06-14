@@ -487,9 +487,40 @@
 
 ## 🔍 TASK-PLUGIN-* 任務驗證結果（2026-06-14）
 
-| 任務 | 結果 | 說明 |
-|------|------|------|
-| TASK-PLUGIN-1 | ✅ PASS | `proxy/lua/cont/access.lua:207` 包含 `pcall(handler.access, handler, plugin)` |
-| TASK-PLUGIN-2 | ✅ PASS | `docker exec cont-proxy-test nginx -t` → syntax ok, test successful |
-| TASK-PLUGIN-3 | 🟡 FAIL | `busted` 不存在於 OpenResty Alpine 镜像中，测试无法执行（环境限制，非代码缺陷） |
-| TASK-PLUGIN-4 | ✅ PASS | `docker compose build --pull --no-cache proxy` → build 成功 |
+|| 任務 | 結果 | 說明 |
+||------|------|------|
+|| TASK-PLUGIN-1 | ✅ PASS | `proxy/lua/cont/access.lua:207` 包含 `pcall(handler.access, handler, plugin)` |
+|| TASK-PLUGIN-2 | ✅ PASS | `docker exec cont-proxy-test nginx -t` → syntax ok, test successful |
+|| TASK-PLUGIN-3 | 🟡 FAIL | `busted` 不存在於 OpenResty Alpine 镜像中，测试无法执行（环境限制，非代码缺陷） |
+|| TASK-PLUGIN-4 | ✅ PASS | `docker compose build --pull --no-cache proxy` → build 成功 |
+
+---
+
+## 🔍 SPEC-PENDING-01 驗證結果（2026-06-14 晚間）
+
+|| 驗收標準 | 結果 | 說明 |
+||------|------|------|
+|| v025 migration 存在 | ✅ PASS | `services` 表的 `upstream_id` 欄位在 v1 migration (line 59) 就已建立，無需額外 migration |
+|| Go build 成功 | ✅ PASS | `docker compose build --pull --no-cache cont-admin-api` → build 成功 |
+|| nginx -t 通過 | ✅ PASS | `docker exec cont-proxy nginx -t` → syntax ok, test successful |
+|| docker compose build proxy 成功 | ✅ PASS | proxy build 成功，container 正常啟動 |
+|| docker compose build admin-api 成功 | ✅ PASS | admin-api build 成功，container healthy |
+|| /internal/config/snapshot 正常 | ✅ PASS | API 正確回傳完整 snapshot |
+|| 所有 containers 正常 | ✅ PASS | proxy/admin-api/frontend/postgres/redis 全部 Up |
+
+**備註**：SPEC-PENDING-01 描述的「缺少 v025 migration」問題經查證後確認不成立 — `services.upstream_id` 欄位從專案一開始就在 v1 migration 中建立，store.go 也已實作完整 CRUD。cosocket 實作（jwt_validation.lua、config_sync.lua）已正確加入 codebase並通過 nginx -t。
+
+---
+
+## ✅ 已完成（2026-06-14 晚間）
+
+- [x] **SPEC-PENDING-01 Phase 1 驗證完成** — 所有 9 個 tasks 已驗證通過，SPEC-PENDING-01 結案
+  - TASK-MIGRATION-1: ✅ upstream_id migration 已存在（v1）
+  - TASK-MIGRATION-2: ✅ Go build 成功
+  - TASK-BUILD-1: ✅ docker compose build proxy 成功
+  - TASK-BUILD-2: ✅ docker compose build admin-api 成功
+  - TASK-BUILD-3: ✅ nginx -t 通過
+  - TASK-BUILD-4: ✅ Lua modules 已就緒
+  - TASK-INT-1: ✅ 所有 containers 正常運行
+  - TASK-INT-2: ✅ /internal/config/snapshot 正常
+  - TASK-INT-3: ✅ event.md 已更新
