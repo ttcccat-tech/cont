@@ -124,6 +124,13 @@
 
 ---
 
+## ✅ 本輪完成
+
+- [✅] SPEC-INLINE-ROUTE — inline route matching + upstream_id fix，7 tasks 全部完成，merge to main
+- [✅] SPEC-BLACKSCREEN-01 — 6 tasks 全部驗證通過（billing/config-snapshots/api-docs/workspaces 均正常渲染）
+
+---
+
 ## 🟡 預計優化
 
 （過程中發現的改進點）
