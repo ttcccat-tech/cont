@@ -16,9 +16,13 @@ export default function ApiDocsPage() {
     fetch('/api/docs.json')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
+        return res.text()
       })
-      .then(() => setLoading(false))
+      .then(text => {
+        // SwaggerUI handles both JSON and YAML — pass spec directly
+        setSpecUrl('data:text/plain;charset=utf-8,' + encodeURIComponent(text))
+        setLoading(false)
+      })
       .catch(err => {
         setError(`無法載入 OpenAPI 規格：${err.message}`)
         setLoading(false)
