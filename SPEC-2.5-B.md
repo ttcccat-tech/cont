@@ -25,3 +25,7 @@
 3. AlertRules.tsx 新增 alert type 選擇：`usage_quota`
 4. `usage_quota` alert 的 threshold 為百分比（80/90/100%）
 5. 用量 alert 觸發 webhook（`alert.triggered` event）並送至 webhook_delivery engine
+
+## Tasks
+- [ ] TASK-2.5-B1: Backend — alerter.go usage quota check (evaluate org usage vs quota, fire alert at 80/90/100%)
+- [ ] TASK-2.5-B2: Frontend — AlertRules.tsx add `usage_quota` alert type with percentage threshold UI

@@ -25,3 +25,8 @@ Analytics.tsx 目前只顯示 Kong Nginx metrics（nginx_requests_total 之類�
 3. Analytics.tsx 渲染 hourly trend（24小時折線圖）
 4. Analytics.tsx 渲染 top routes / top consumers table
 5. `GET /usage/analytics` without org_id → 400（org_id required）
+
+## Tasks
+- [ ] TASK-2.5-A1: Backend — Add `/usage/analytics` endpoint (routes/usage.go handler + storage/usage.go analytics query)
+- [ ] TASK-2.5-A2: Frontend — Add `getAnalyticsUsage()` to kong.ts
+- [ ] TASK-2.5-A3: Frontend — Add Cont usage panel to Analytics.tsx (progress bar, hourly trend, top entities)
