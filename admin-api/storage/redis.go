@@ -257,6 +257,122 @@ func (r *Redis) GetTopOrgsByUsage(ctx context.Context, startHour, endHour string
 	return result, nil
 }
 
+// GetTopRoutesByUsage returns top N routes by total usage in a time range
+func (r *Redis) GetTopRoutesByUsage(ctx context.Context, startHour, endHour string, limit int) ([]struct {
+	RouteID string `json:"route_id"`
+	Count   int64  `json:"count"`
+}, error) {
+	pattern := "cont:usage:route:*"
+	keys, _, err := r.client.Scan(ctx, 0, pattern, 1000).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	routeCounts := make(map[string]int64)
+	for _, key := range keys {
+		parts := strings.Split(key, ":")
+		if len(parts) >= 4 {
+			hourPart := parts[len(parts)-1]
+			if hourPart >= startHour && hourPart <= endHour {
+				routeID := parts[2]
+				val, _ := r.client.Get(ctx, key).Int64()
+				routeCounts[routeID] += val
+			}
+		}
+	}
+
+	type routeUsage struct {
+		RouteID string
+		Count   int64
+	}
+	sorted := make([]routeUsage, 0, len(routeCounts))
+	for routeID, count := range routeCounts {
+		sorted = append(sorted, routeUsage{RouteID: routeID, Count: count})
+	}
+
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].Count > sorted[i].Count {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	if len(sorted) > limit {
+		sorted = sorted[:limit]
+	}
+
+	result := make([]struct {
+		RouteID string `json:"route_id"`
+		Count   int64  `json:"count"`
+	}, len(sorted))
+	for i, s := range sorted {
+		result[i] = struct {
+			RouteID string `json:"route_id"`
+			Count   int64  `json:"count"`
+		}{RouteID: s.RouteID, Count: s.Count}
+	}
+	return result, nil
+}
+
+// GetTopConsumersByUsage returns top N consumers by total usage in a time range
+func (r *Redis) GetTopConsumersByUsage(ctx context.Context, startHour, endHour string, limit int) ([]struct {
+	ConsumerID string `json:"consumer_id"`
+	Count      int64  `json:"count"`
+}, error) {
+	pattern := "cont:usage:consumer:*"
+	keys, _, err := r.client.Scan(ctx, 0, pattern, 1000).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	consumerCounts := make(map[string]int64)
+	for _, key := range keys {
+		parts := strings.Split(key, ":")
+		if len(parts) >= 4 {
+			hourPart := parts[len(parts)-1]
+			if hourPart >= startHour && hourPart <= endHour {
+				consumerID := parts[2]
+				val, _ := r.client.Get(ctx, key).Int64()
+				consumerCounts[consumerID] += val
+			}
+		}
+	}
+
+	type consumerUsage struct {
+		ConsumerID string
+		Count      int64
+	}
+	sorted := make([]consumerUsage, 0, len(consumerCounts))
+	for consumerID, count := range consumerCounts {
+		sorted = append(sorted, consumerUsage{ConsumerID: consumerID, Count: count})
+	}
+
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].Count > sorted[i].Count {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	if len(sorted) > limit {
+		sorted = sorted[:limit]
+	}
+
+	result := make([]struct {
+		ConsumerID string `json:"consumer_id"`
+		Count      int64  `json:"count"`
+	}, len(sorted))
+	for i, s := range sorted {
+		result[i] = struct {
+			ConsumerID string `json:"consumer_id"`
+			Count      int64  `json:"count"`
+		}{ConsumerID: s.ConsumerID, Count: s.Count}
+	}
+	return result, nil
+}
+
 
 
 // Upstream target health
