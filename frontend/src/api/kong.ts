@@ -424,6 +424,47 @@ export const api = {
 
   // Plugin registry (available plugin types)
   getPluginRegistry: () => analyticsClient.get<{ plugins: PluginSchema[] }>('/internal/plugin-registry').then(r => r.data?.plugins ?? []),
+
+  // Webhook subscriptions
+  listWebhooks: () => analyticsClient.get<WebhookSubscription[]>('/webhooks').then(r => r.data?.data ?? []),
+  getWebhook: (id: string) => analyticsClient.get<WebhookSubscription>(`/webhooks/${id}`).then(r => r.data),
+  createWebhook: (data: { url: string; event_types: string[]; secret?: string }) =>
+    analyticsClient.post<WebhookSubscription>('/webhooks', data).then(r => r.data),
+  updateWebhook: (id: string, data: { url?: string; event_types?: string[]; active?: boolean }) =>
+    analyticsClient.put<WebhookSubscription>(`/webhooks/${id}`, data).then(r => r.data),
+  deleteWebhook: (id: string) => analyticsClient.delete(`/webhooks/${id}`),
+
+  // Webhook deliveries
+  listWebhookDeliveries: (webhookId: string, limit = 50, offset = 0) =>
+    analyticsClient.get<{ data: WebhookDelivery[] }>(`/webhooks/${webhookId}/deliveries?limit=${limit}&offset=${offset}`)
+      .then(r => r.data?.data ?? []),
+  retryWebhookDelivery: (webhookId: string, deliveryId: string) =>
+    analyticsClient.post(`/webhooks/${webhookId}/retry/${deliveryId}`).then(r => r.data),
+}
+
+export interface WebhookSubscription {
+  id: string
+  org_id: string
+  url: string
+  event_types: string[]
+  active: boolean
+  created_at: string
+}
+
+export interface WebhookDelivery {
+  id: string
+  org_id: string
+  webhook_id: string
+  event_type: string
+  payload: string
+  status: 'pending' | 'success' | 'failed' | 'retrying'
+  attempts: number
+  last_attempt?: string
+  next_retry?: string
+  last_error?: string
+  response_status?: number
+  response_body?: string
+  created_at: string
 }
 
 export default api

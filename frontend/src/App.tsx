@@ -22,6 +22,7 @@ import Upstreams from './pages/Upstreams'
 import GrpcServices from './pages/GrpcServices'
 import WorkspaceDetail from './pages/WorkspaceDetail'
 import Workspaces from './pages/Workspaces'
+import WebhookDeliveries from './pages/WebhookDeliveries'
 import { getToken, clearAuth } from './api/kong'
 import { WorkspaceProvider } from './context/WorkspaceContext'
 import { AuthProvider } from './context/AuthContext'
@@ -119,6 +120,7 @@ export default function App() {
                   <Route path="/health-portal" element={<HealthPortal />} />
                   <Route path="/alerts" element={<AlertRules />} />
                   <Route path="/alert-history" element={<AlertHistory />} />
+                  <Route path="/webhook-deliveries" element={<WebhookDeliveries />} />
                   <Route path="/api-key-requests" element={<ApiKeyRequests />} />
                   <Route path="/api-docs" element={<ApiDocs />} />
                   <Route path="/users" element={<Users />} />

@@ -297,7 +297,7 @@ export default function UpstreamsPage() {
                 </Button>
               )}
             </Form>
-          </>},
+          },
         ]} />
 
         {/* Add target modal */}
