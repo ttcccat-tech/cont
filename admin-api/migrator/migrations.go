@@ -677,6 +677,14 @@ END $$;
 `,
 		Down: `ALTER TABLE alert_rules DROP COLUMN IF EXISTS percentage_threshold; ALTER TABLE alert_rules DROP COLUMN IF EXISTS threshold_type; ALTER TABLE alert_rules DROP COLUMN IF EXISTS org_id;`,
 	})
+
+	// v024: Alert rules quota_metric_type for usage quota per-org vs per-consumer
+	m.Register(Migration{
+		Version:     24,
+		Description: "Add quota_metric_type to alert_rules for per-org vs per-consumer usage quota",
+		Up:          `ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS quota_metric_type TEXT DEFAULT 'org';`,
+		Down:        `ALTER TABLE alert_rules DROP COLUMN IF EXISTS quota_metric_type;`,
+	})
 }
 
 // Migrate runs all pending migrations

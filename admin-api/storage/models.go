@@ -77,6 +77,7 @@ type AlertRule struct {
 	Operator             string      `json:"operator" binding:"omitempty,oneof=> < >= <="`
 	ThresholdType        string      `json:"threshold_type" binding:"omitempty,oneof=absolute percentage"`
 	PercentageThreshold  float64     `json:"percentage_threshold"` // e.g. 80.0 for 80%
+	QuotaMetricType     string      `json:"quota_metric_type" binding:"omitempty,oneof=org consumer"` // "org" or "consumer" for usage_quota metric
 	DurationSeconds      int         `json:"duration_seconds" binding:"min=1"`
 	Enabled              bool        `json:"enabled"`
 	NotificationChannels string      `json:"notification_channels,omitempty"`

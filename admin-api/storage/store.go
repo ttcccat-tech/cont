@@ -1967,7 +1967,7 @@ func (s *Store) CreateAuditLog(l *AuditLog) error {
 func (s *Store) ListAlertRules() ([]AlertRule, error) {
 	rows, err := s.db.Query(
 		`SELECT id, name, description, COALESCE(org_id,''), conditions, metric_type, service_name, threshold_value, operator,
-		        threshold_type, percentage_threshold, duration_seconds, enabled, notification_channels, slack_webhook_url,
+		        threshold_type, percentage_threshold, quota_metric_type, duration_seconds, enabled, notification_channels, slack_webhook_url,
 		        email_webhook_url, discord_webhook_url, alert_suppress_seconds,
 		        last_triggered_at, last_triggered_value, created_at, updated_at
 		 FROM alert_rules ORDER BY created_at DESC`)
@@ -1978,13 +1978,13 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 	var rules []AlertRule
 	for rows.Next() {
 		var r AlertRule
-		var desc, svcName, notifCh, slackURL, emailURL, discordURL, thresholdType sql.NullString
+		var desc, svcName, notifCh, slackURL, emailURL, discordURL, thresholdType, quotaMetricType sql.NullString
 		var createdAt, updatedAt sql.NullString
 		var lastTriggeredAt sql.NullString
 		var lastTriggeredValue sql.NullFloat64
 		var conditionsJSON []byte
 		if err := rows.Scan(&r.ID, &r.Name, &desc, &r.OrgID, &conditionsJSON, &r.MetricType, &svcName, &r.ThresholdValue, &r.Operator,
-			&thresholdType, &r.PercentageThreshold,
+			&thresholdType, &r.PercentageThreshold, &quotaMetricType,
 			&r.DurationSeconds, &r.Enabled, &notifCh, &slackURL, &emailURL, &discordURL,
 			&r.AlertSuppressSeconds, &lastTriggeredAt, &lastTriggeredValue, &createdAt, &updatedAt); err != nil {
 			return nil, err
@@ -2012,6 +2012,9 @@ func (s *Store) ListAlertRules() ([]AlertRule, error) {
 		}
 		if thresholdType.Valid {
 			r.ThresholdType = thresholdType.String
+		}
+		if quotaMetricType.Valid {
+			r.QuotaMetricType = quotaMetricType.String
 		}
 		if lastTriggeredAt.Valid {
 			r.LastTriggeredAt = &lastTriggeredAt.String
