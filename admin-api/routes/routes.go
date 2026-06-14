@@ -309,7 +309,7 @@ func CreateService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var s storage.Service
 		if err := c.ShouldBindJSON(&s); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -349,7 +349,7 @@ func UpdateService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var s storage.Service
 		if err := c.ShouldBindJSON(&s); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -529,7 +529,7 @@ func CreateRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var r storage.Route
 		if err := c.ShouldBindJSON(&r); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -576,7 +576,7 @@ func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var r storage.Route
 		if err := c.ShouldBindJSON(&r); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -623,7 +623,7 @@ func CreateUpstream(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var u storage.Upstream
 		if err := c.ShouldBindJSON(&u); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -659,7 +659,7 @@ func UpdateUpstream(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var u storage.Upstream
 		if err := c.ShouldBindJSON(&u); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -711,13 +711,13 @@ func GetUpstreamHealth(store *storage.Store) gin.HandlerFunc {
 		healthStatuses, _ := store.Redis().GetTargetHealthStatuses(ctx, upstreamID)
 
 		type TargetHealth struct {
-			ID       string `json:"id"`
-			Target   string `json:"target"`
-			Weight   int    `json:"weight"`
-			Enabled  bool   `json:"enabled"`
-			Healthy  bool   `json:"healthy"`
-			Port     int    `json:"port"`
-			Host     string `json:"host"`
+			ID      string `json:"id"`
+			Target  string `json:"target"`
+			Weight  int    `json:"weight"`
+			Enabled bool   `json:"enabled"`
+			Healthy bool   `json:"healthy"`
+			Port    int    `json:"port"`
+			Host    string `json:"host"`
 		}
 
 		targetHealths := make([]TargetHealth, 0, len(targets))
@@ -755,11 +755,11 @@ func GetUpstreamHealth(store *storage.Store) gin.HandlerFunc {
 // ── Circuit Breaker Config ──────────────────────────────────────────────────
 
 type CircuitBreakerConfigInput struct {
-	Enabled            *bool `json:"enabled"`
-	TripThreshold      *int  `json:"trip_threshold"`
-	RecoveryTimeout    *int  `json:"recovery_timeout"`
-	HalfOpenMaxRequests *int `json:"half_open_max_requests"`
-	HalfOpenSuccessRate *int `json:"half_open_success_rate"`
+	Enabled             *bool `json:"enabled"`
+	TripThreshold       *int  `json:"trip_threshold"`
+	RecoveryTimeout     *int  `json:"recovery_timeout"`
+	HalfOpenMaxRequests *int  `json:"half_open_max_requests"`
+	HalfOpenSuccessRate *int  `json:"half_open_success_rate"`
 }
 
 func GetCircuitBreakerConfig(store *storage.Store) gin.HandlerFunc {
@@ -896,7 +896,7 @@ func CreateTarget(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var t storage.Target
 		if err := c.ShouldBindJSON(&t); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		t.UpstreamID = c.Param("id")
@@ -918,7 +918,7 @@ func UpdateTarget(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var t storage.Target
 		if err := c.ShouldBindJSON(&t); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -961,7 +961,7 @@ func CreateConsumer(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var con storage.Consumer
 		if err := c.ShouldBindJSON(&con); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -997,7 +997,7 @@ func UpdateConsumer(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var con storage.Consumer
 		if err := c.ShouldBindJSON(&con); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -1233,13 +1233,13 @@ func ListInternalPlugins(store *storage.Store) gin.HandlerFunc {
 		}
 		// Filter to enabled only and strip bulky fields for proxy
 		type ProxyPlugin struct {
-			ID        string                 `json:"id"`
-			Name      string                 `json:"name"`
-			RouteID   string                 `json:"route_id,omitempty"`
-			ServiceID string                 `json:"service_id,omitempty"`
-			ConsumerID string                `json:"consumer_id,omitempty"`
-			Config    map[string]interface{} `json:"config,omitempty"`
-			Enabled   bool                   `json:"enabled"`
+			ID         string                 `json:"id"`
+			Name       string                 `json:"name"`
+			RouteID    string                 `json:"route_id,omitempty"`
+			ServiceID  string                 `json:"service_id,omitempty"`
+			ConsumerID string                 `json:"consumer_id,omitempty"`
+			Config     map[string]interface{} `json:"config,omitempty"`
+			Enabled    bool                   `json:"enabled"`
 		}
 		var out []ProxyPlugin
 		for _, p := range plugins {
@@ -1304,7 +1304,10 @@ func GetProxyRuntimeConfig(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
-		type ProxyTarget struct{ Target string `json:"target"`; Weight int `json:"weight"` }
+		type ProxyTarget struct {
+			Target string `json:"target"`
+			Weight int    `json:"weight"`
+		}
 		targetsMap := make(map[string][]ProxyTarget)
 		for _, u := range upstreams {
 			tgts, err := store.ListTargetsByUpstream(u.ID)
@@ -1375,7 +1378,7 @@ func CreatePlugin(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var p storage.Plugin
 		if err := c.ShouldBindJSON(&p); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -1429,7 +1432,7 @@ func UpdatePlugin(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var p storage.Plugin
 		if err := c.ShouldBindJSON(&p); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		orgID := getOrgID(c)
@@ -1511,7 +1514,7 @@ func CreateWorkspace(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var w storage.Workspace
 		if err := c.ShouldBindJSON(&w); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		userID, _ := c.Get("user_id")
@@ -1609,7 +1612,7 @@ func UpdateWorkspace(store *storage.Store) gin.HandlerFunc {
 			badRequest(c, err)
 			return
 		}
-		result, err := store.UpdateWorkspace(c.Param("id"),&w, orgID)
+		result, err := store.UpdateWorkspace(c.Param("id"), &w, orgID)
 		if err == sql.ErrNoRows {
 			notFound(c, "workspace not found")
 			return
@@ -1787,7 +1790,7 @@ func RequireWorkspacePermission(store *storage.Store, entity string, write bool)
 
 		// For write operations, require editor or admin workspace role
 		if write && wsLevel < 2 {
-			forbidden(c, "write permission denied for " + entity)
+			forbidden(c, "write permission denied for "+entity)
 			return
 		}
 
@@ -1852,9 +1855,9 @@ var demoUsers = map[string]struct {
 
 // Login rate limit constants
 const (
-	LoginMaxAttempts     = 5       // max failed attempts before lockout
-	LoginWindowSeconds   = 60      // time window for max attempts (seconds)
-	LoginLockoutSeconds  = 300     // lockout duration after max failed attempts (5 minutes)
+	LoginMaxAttempts    = 5   // max failed attempts before lockout
+	LoginWindowSeconds  = 60  // time window for max attempts (seconds)
+	LoginLockoutSeconds = 300 // lockout duration after max failed attempts (5 minutes)
 )
 
 func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
@@ -1898,12 +1901,12 @@ func Login(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 
 		// Generate JWT
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"sub":     user.ID,
+			"sub":      user.ID,
 			"username": user.Username,
-			"role":    user.Role,
-			"org_id":  user.OrgID,
-			"exp":     time.Now().Add(24 * time.Hour).Unix(),
-			"iat":     time.Now().Unix(),
+			"role":     user.Role,
+			"org_id":   user.OrgID,
+			"exp":      time.Now().Add(24 * time.Hour).Unix(),
+			"iat":      time.Now().Unix(),
 		})
 		tokenStr, err := token.SignedString([]byte(jwtSecret))
 		if err != nil {
@@ -1933,7 +1936,7 @@ func SendOTP(store *storage.Store) gin.HandlerFunc {
 			Purpose string `json:"purpose" binding:"required,oneof=register reset-password"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			badRequestMsg(c, "invalid request: " + err.Error())
+			badRequestMsg(c, "invalid request: "+err.Error())
 			return
 		}
 
@@ -1959,8 +1962,8 @@ func SendOTP(store *storage.Store) gin.HandlerFunc {
 		log.Printf("[OTP] To %s (purpose=%s): %s", req.Email, req.Purpose, code)
 
 		c.JSON(200, gin.H{
-			"message":   "verification code sent",
-			"otp_id":    otp.ID,
+			"message":    "verification code sent",
+			"otp_id":     otp.ID,
 			"expires_in": 600, // seconds
 			// NOTE: In dev mode only — remove in production
 			"code": code,
@@ -1975,12 +1978,12 @@ func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 			Email       string `json:"email" binding:"required,email"`
 			Code        string `json:"code" binding:"required,len=6"`
 			Purpose     string `json:"purpose" binding:"required,oneof=register reset-password"`
-			Password    string `json:"password,omitempty"`  // required for register
-			Username    string `json:"username,omitempty"`  // required for register
+			Password    string `json:"password,omitempty"` // required for register
+			Username    string `json:"username,omitempty"` // required for register
 			DisplayName string `json:"display_name,omitempty"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			badRequestMsg(c, "invalid request: " + err.Error())
+			badRequestMsg(c, "invalid request: "+err.Error())
 			return
 		}
 
@@ -2031,13 +2034,13 @@ func VerifyOTP(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 				displayName = req.Username
 			}
 			user := &storage.User{
-				Username:    req.Username,
+				Username:     req.Username,
 				PasswordHash: string(hash),
-				DisplayName: displayName,
-				Email:       req.Email,
-				Role:        "admin", // First user is admin of their org
-				OrgID:       org.ID,
-				Enabled:     true,
+				DisplayName:  displayName,
+				Email:        req.Email,
+				Role:         "admin", // First user is admin of their org
+				OrgID:        org.ID,
+				Enabled:      true,
 			}
 			user, err = store.CreateUser(user)
 			if err != nil {
@@ -2113,10 +2116,10 @@ func GetMe(jwtSecret string) gin.HandlerFunc {
 		role, _ := c.Get("role")
 		roleStr := role.(string)
 		c.JSON(200, gin.H{
-			"id":           userID,
-			"username":     username,
-			"role":         role,
-			"permissions":  buildPermissions(roleStr),
+			"id":          userID,
+			"username":    username,
+			"role":        role,
+			"permissions": buildPermissions(roleStr),
 		})
 	}
 }
@@ -2268,12 +2271,12 @@ func RequirePermission(store *storage.Store, entity string, write bool) gin.Hand
 		// Fall back to role-based permission check
 		if write {
 			if !storage.CanWrite(roleStr, entity) {
-				forbidden(c, "write permission denied for " + entity)
+				forbidden(c, "write permission denied for "+entity)
 				return
 			}
 		} else {
 			if !storage.CanRead(roleStr, entity) {
-				forbidden(c, "read permission denied for " + entity)
+				forbidden(c, "read permission denied for "+entity)
 				return
 			}
 		}
@@ -2379,7 +2382,7 @@ func CreateUser(store *storage.Store) gin.HandlerFunc {
 			Role        string `json:"role" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-badRequest(c, err)
+			badRequest(c, err)
 			return
 		}
 		password := req.Password
@@ -2392,12 +2395,12 @@ badRequest(c, err)
 			return
 		}
 		user, err := store.CreateUser(&storage.User{
-			Username:    req.Username,
+			Username:     req.Username,
 			PasswordHash: string(hash),
-			DisplayName: req.DisplayName,
-			Email:       req.Email,
-			Role:        req.Role,
-			Enabled:     true,
+			DisplayName:  req.DisplayName,
+			Email:        req.Email,
+			Role:         req.Role,
+			Enabled:      true,
 		})
 		if err != nil {
 			badRequestMsg(c, err.Error())
@@ -2580,9 +2583,9 @@ func SetUserResourcePermissions(store *storage.Store) gin.HandlerFunc {
 // ── Auth Groups ─────────────────────────────────────────────────────────────
 
 type UpdateAuthGroupRequest struct {
-	Name        string            `json:"name" binding:"omitempty,max=255"`
-	Label       string            `json:"label" binding:"omitempty"`
-	Description string            `json:"description,omitempty"`
+	Name        string                    `json:"name" binding:"omitempty,max=255"`
+	Label       string                    `json:"label" binding:"omitempty"`
+	Description string                    `json:"description,omitempty"`
 	Permissions []storage.PermissionEntry `json:"permissions,omitempty"`
 }
 
@@ -3270,11 +3273,11 @@ func ListAlertHistory(store *storage.Store) gin.HandlerFunc {
 // ── API Key Requests ────────────────────────────────────────────────────────
 
 type UpdateAPIKeyReq struct {
-	KeyName       string `json:"key_name" binding:"omitempty,max=255"`
-	ConsumerName  string `json:"consumer_name"`
-	Description   string `json:"description,omitempty"`
-	Status        string `json:"status" binding:"omitempty,oneof=pending approved rejected"`
-	ReviewedBy    string `json:"reviewed_by,omitempty"`
+	KeyName      string `json:"key_name" binding:"omitempty,max=255"`
+	ConsumerName string `json:"consumer_name"`
+	Description  string `json:"description,omitempty"`
+	Status       string `json:"status" binding:"omitempty,oneof=pending approved rejected"`
+	ReviewedBy   string `json:"reviewed_by,omitempty"`
 }
 
 // ApproveAPIKey approves an API key request and returns the generated key
@@ -3366,10 +3369,10 @@ func ApproveAPIKey(store *storage.Store) gin.HandlerFunc {
 		go SendAPIKeyApprovalNotification(store, existing, reviewerStr, "approved")
 		// Store notification in DB and broadcast via SSE
 		payloadJSON, _ := json.Marshal(map[string]interface{}{
-			"key_name":     existing.KeyName,
-			"consumer":     consumerName,
-			"status":       "approved",
-			"reviewed_by":  reviewerStr,
+			"key_name":      existing.KeyName,
+			"consumer":      consumerName,
+			"status":        "approved",
+			"reviewed_by":   reviewerStr,
 			"generated_key": generatedKey,
 		})
 		go store.CreateNotification(&storage.Notification{
@@ -3419,12 +3422,12 @@ func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
 		}
 		// Write audit log
 		store.CreateAuditLog(&storage.AuditLog{
-			AuditType:    "update",
-			TargetType:   "APIKeyRequest",
-			TargetID:     id,
-			ActorUserID:  reviewerIDStr,
+			AuditType:     "update",
+			TargetType:    "APIKeyRequest",
+			TargetID:      id,
+			ActorUserID:   reviewerIDStr,
 			ActorUsername: reviewerStr,
-			Description:  "Rejected API key request: " + existing.KeyName,
+			Description:   "Rejected API key request: " + existing.KeyName,
 		})
 		// Send notification (non-blocking)
 		go SendAPIKeyApprovalNotification(store, existing, reviewerStr, "rejected")
@@ -3444,12 +3447,12 @@ func RejectAPIKey(store *storage.Store) gin.HandlerFunc {
 		// Trigger webhook for api_key.rejected event
 		orgID := "00000000-0000-0000-0000-000000000000"
 		go engine.TriggerWebhook(store, orgID, "api_key.rejected", map[string]interface{}{
-			"request_id": id,
-			"key_name":   existing.KeyName,
-			"consumer":   existing.ConsumerName,
-			"status":     "rejected",
+			"request_id":  id,
+			"key_name":    existing.KeyName,
+			"consumer":    existing.ConsumerName,
+			"status":      "rejected",
 			"reviewed_by": reviewerStr,
-			"reason":     existing.Reason,
+			"reason":      existing.Reason,
 		})
 		c.JSON(200, updated)
 	}
@@ -3673,6 +3676,13 @@ func CreateConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 			ActorUsername: actorStr,
 			Description:   "Created config snapshot",
 		})
+		// Trigger webhook for config.snapshot.created event
+		go engine.TriggerWebhook(store, "00000000-0000-0000-0000-000000000000", "config.snapshot.created", map[string]interface{}{
+			"snapshot_id": created.ID,
+			"name":        created.Name,
+			"version":     created.Version,
+			"created_by":  actorStr,
+		})
 		c.JSON(201, created)
 	}
 }
@@ -3753,6 +3763,11 @@ func RollbackConfigSnapshot(store *storage.Store) gin.HandlerFunc {
 			ActorUserID:   userIDStr,
 			ActorUsername: actorStr,
 			Description:   "Rolled back config snapshot",
+		})
+		// Trigger webhook for config.snapshot.rolled_back event
+		go engine.TriggerWebhook(store, "00000000-0000-0000-0000-000000000000", "config.snapshot.rolled_back", map[string]interface{}{
+			"snapshot_id":    id,
+			"rolled_back_by": actorStr,
 		})
 		if len(errors) > 0 {
 			c.JSON(200, gin.H{"success": true, "errors": errors})
@@ -4125,7 +4140,7 @@ func CreateWebhook(store *storage.Store) gin.HandlerFunc {
 		c.JSON(201, gin.H{
 			"id": result.ID, "org_id": result.OrgID,
 			"url": result.URL, "event_types": result.EventTypes,
-			"active": result.Active,
+			"active":     result.Active,
 			"created_at": result.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
@@ -4150,7 +4165,7 @@ func GetWebhook(store *storage.Store) gin.HandlerFunc {
 		c.JSON(200, gin.H{
 			"id": sub.ID, "org_id": sub.OrgID,
 			"url": sub.URL, "event_types": sub.EventTypes,
-			"active": sub.Active,
+			"active":     sub.Active,
 			"created_at": sub.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
@@ -4267,7 +4282,7 @@ func ListWebhookDeliveries(store *storage.Store) gin.HandlerFunc {
 				Status: d.Status, Attempts: d.Attempts,
 				LastError: d.LastError, ResponseStatus: d.ResponseStatus,
 				ResponseBody: d.ResponseBody,
-				CreatedAt: d.CreatedAt.Format("2006-01-02T15:04:05Z"),
+				CreatedAt:    d.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			}
 			if d.LastAttempt != nil {
 				s := d.LastAttempt.UTC().Format("2006-01-02T15:04:05Z")
@@ -4309,4 +4324,3 @@ func RetryWebhookDelivery(store *storage.Store) gin.HandlerFunc {
 		c.JSON(200, gin.H{"message": "delivery queued for retry", "id": delivery.ID})
 	}
 }
-
