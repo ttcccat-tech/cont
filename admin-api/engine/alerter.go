@@ -111,7 +111,15 @@ func (a *Alerter) evaluateRule(rule *storage.AlertRule) {
 			log.Printf("[alerter] rule %d (%s): failed to fetch metric: %v", rule.ID, rule.Name, err)
 			return
 		}
-		triggered = a.checkCondition(value, rule.ThresholdValue, rule.Operator)
+		// For usage_quota, use PercentageThreshold (default 80) instead of ThresholdValue
+		threshold := rule.ThresholdValue
+		if rule.MetricType == "usage_quota" {
+			threshold = rule.PercentageThreshold
+			if threshold == 0 {
+				threshold = 80.0 // default
+			}
+		}
+		triggered = a.checkCondition(value, threshold, rule.Operator)
 		triggeredValue = value
 	}
 
@@ -138,7 +146,15 @@ func (a *Alerter) evaluateConditions(rule *storage.AlertRule) bool {
 		log.Printf("[alerter] rule %d (%s): failed to fetch metric for condition: %v", rule.ID, rule.Name, err)
 		return false
 	}
-	result := a.checkCondition(firstValue, cond.ThresholdValue, cond.Operator)
+	// For usage_quota, use PercentageThreshold (default 80)
+	threshold := cond.ThresholdValue
+	if cond.MetricType == "usage_quota" {
+		threshold = rule.PercentageThreshold
+		if threshold == 0 {
+			threshold = 80.0
+		}
+	}
+	result := a.checkCondition(firstValue, threshold, cond.Operator)
 
 	// Evaluate remaining conditions with AND/OR logic
 	for i := 1; i < len(rule.Conditions); i++ {
@@ -148,7 +164,15 @@ func (a *Alerter) evaluateConditions(rule *storage.AlertRule) bool {
 			log.Printf("[alerter] rule %d (%s): failed to fetch metric for condition %d: %v", rule.ID, rule.Name, i, err)
 			return false
 		}
-		condResult := a.checkCondition(value, cond.ThresholdValue, cond.Operator)
+		// For usage_quota, use PercentageThreshold (default 80)
+		threshold = cond.ThresholdValue
+		if cond.MetricType == "usage_quota" {
+			threshold = rule.PercentageThreshold
+			if threshold == 0 {
+				threshold = 80.0
+			}
+		}
+		condResult := a.checkCondition(value, threshold, cond.Operator)
 
 		// Determine logic from previous condition
 		prevLogic := "AND"
