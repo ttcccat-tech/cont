@@ -50,7 +50,12 @@ export default function Users() {
   const fetchUsers = () => {
     setLoading(true)
     getUsers()
-      .then(r => setUsers(Array.isArray(r) ? r : []))
+      .then(r => {
+        const users = Array.isArray(r) ? r : []
+        // Normalize: ensure every user has a groups array
+        // API may return users without the groups field → AntD Table crashes on .map(undefined)
+        setUsers(users.map(u => ({ ...u, groups: Array.isArray(u.groups) ? u.groups : [] })))
+      })
       .catch(() => message.error('無法連接 API'))
       .finally(() => setLoading(false))
   }
@@ -324,8 +329,45 @@ export default function Users() {
     },
   ]
 
+  // Catch ALL errors (sync, async, promise) and show on screen
+  useEffect(() => {
+    const handler = (msg: string, src: string, lineno: number, colno: number, error: Error) => {
+      const div = document.createElement('div')
+      div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#ff0;padding:16px;font-size:14px;font-family:monospace'
+      div.textContent = `JS ERROR: ${msg} at ${src}:${lineno}:${colno} -- ${error?.stack}`
+      document.body.appendChild(div)
+    }
+    const origFetch = window.fetch
+    window.fetch = async (...args) => {
+      try {
+        const r = await origFetch(...args)
+        constclone = r.clone()
+        try {
+          const body = await r.text()
+          if (args[0]?.toString().includes('/users') || args[0]?.toString().includes('/groups')) {
+            const div = document.createElement('div')
+            div.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0ff;padding:8px;font-size:12px;font-family:monospace'
+            div.textContent = `API ${args[0]}: ${r.status} ${body.slice(0,200)}`
+            document.body.appendChild(div)
+          }
+          return new Response(body, {status: clone.status, statusText: clone.statusText, headers: clone.headers})
+        } catch {}
+        return r
+      } catch(e) { return origFetch(...args) }
+    }
+    const rejHandler = (e: PromiseRejectionEvent) => {
+      const div = document.createElement('div')
+      div.style.cssText = 'position:fixed;top:60px;left:0;right:0;z-index:9999;background:#f0f;padding:16px;font-size:14px;font-family:monospace'
+      div.textContent = `UNHANDLED REJECTION: ${e.reason?.message || String(e.reason)} -- ${e.reason?.stack || ''}`
+      document.body.appendChild(div)
+    }
+    window.addEventListener('error', handler as any)
+    window.addEventListener('unhandledrejection', rejHandler)
+    return () => { window.removeEventListener('error', handler as any); window.removeEventListener('unhandledrejection', rejHandler) }
+  }, [])
+
   return (
-    <div>
+    <div style={{ background: '#1a1a2e', minHeight: '100vh', padding: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h1 style={{ margin: 0 }}>使用者管理</h1>
         <Space>

@@ -343,6 +343,7 @@ export interface AnalyticsUsageResponse {
   usage_percent: number     // mapped from backend usage_percentage
   top_routes: { route_id: string; count: number }[]
   top_consumers: { consumer_id: string; count: number }[]
+  hourly_trend: { hour: string; count: number }[]
 }
 
 export const getAnalyticsUsage = (orgId?: string) => {
@@ -353,6 +354,7 @@ export const getAnalyticsUsage = (orgId?: string) => {
     usage_percent: r.data.usage_percentage,
     top_routes: r.data.top_routes,
     top_consumers: r.data.top_consumers,
+    hourly_trend: r.data.hourly_trend,
   }))
 }
 export const createCheckoutSession = (planName: string, billingCycle: string) =>
