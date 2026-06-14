@@ -430,7 +430,7 @@
 
 ## 🟡 預計優化
 
-- [🔴] **Cont 自有用量追蹤整合 Analytics 儀表板** — 🔴 Redis storage key 解析 bug：`GetTopRoutesByUsage`/`GetTopConsumersByUsage` 提取 `parts[2]` 拿到 literal "route"/"consumer" 而非實際 ID
+- [✅] **Cont 自有用量追蹤整合 Analytics 儀表板** — ✅ Redis storage key 解析 bug 已修：`GetTopRoutesByUsage`/`GetTopConsumersByUsage` 改用 `parts[3]` 正確提取 route_id/consumer_id
   - Backend: `GET /usage/analytics` endpoint（彙整 monthly total、plan quota、top routes、top consumers）
   - Frontend: Analytics.tsx 新增 Cont 用量 panel（usage vs quota progress、hourly trend、top entities）
   - kong.ts: 新增 `getAnalyticsUsage()` API call
