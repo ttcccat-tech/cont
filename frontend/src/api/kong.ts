@@ -227,18 +227,38 @@ export const createOAuthProvider = (data: Partial<OAuth2Provider>) => analyticsC
 export const updateOAuthProvider = (provider: string, data: Partial<OAuth2Provider>) => analyticsClient.put<OAuth2Provider>(`/auth/oauth/providers/${provider}`, data).then(r => r.data)
 export const deleteOAuthProvider = (provider: string) => analyticsClient.delete(`/auth/oauth/providers/${provider}`)
 
-export const getGroups = () => analyticsClient.get<AuthGroup[]>('/groups').then(r => r.data)
+// Normalize helper: backend may return {data:[...], total:N} or direct array
+const norm = <T>(d: unknown): T[] => {
+  if (Array.isArray(d)) return d as T[]
+  if (Array.isArray((d as any)?.data)) return (d as any).data as T[]
+  return []
+}
+
+export const getGroups = () => analyticsClient.get<AuthGroup[]>('/groups').then(r => norm<AuthGroup>(r.data))
 export const createGroup = (data: Partial<AuthGroup>) => analyticsClient.post<AuthGroup>('/groups', data).then(r => r.data)
 export const updateGroup = (id: string, data: Partial<AuthGroup>) => analyticsClient.patch<AuthGroup>(`/groups/${id}`, data).then(r => r.data)
 export const deleteGroup = (id: string) => analyticsClient.delete(`/groups/${id}`)
-export const getGroupMembers = (id: string) => analyticsClient.get<{members: {id:string;username:string;display_name:string;email:string;role:string}[]}>(`/groups/${id}/members`).then(r => r.data)
+export const getGroupMembers = (id: string) => analyticsClient.get<{members: {id:string;username:string;display_name:string;email:string;role:string}[]}>(`/groups/${id}/members`).then(r => {
+  const d = r.data
+  if (Array.isArray(d)) return d
+  if (Array.isArray((d as any)?.members)) return (d as any).members
+  return []
+})
 export const setGroupMembers = (id: string, userIds: string[]) => analyticsClient.put(`/groups/${id}/members`, {user_ids: userIds}).then(r => r.data)
-export const getGroupResourcePermissions = (id: string) => analyticsClient.get<{permissions: ResourcePermission[]}>(`/groups/${id}/resource-permissions`).then(r => r.data?.permissions ?? [])
+export const getGroupResourcePermissions = (id: string) => analyticsClient.get<{permissions: ResourcePermission[]}>(`/groups/${id}/resource-permissions`).then(r => {
+  const d = r.data
+  if (Array.isArray(d)) return d
+  return (d as any)?.permissions ?? []
+})
 export const setGroupResourcePermissions = (id: string, permissions: ResourcePermission[]) => analyticsClient.put(`/groups/${id}/resource-permissions`, permissions).then(r => r.data)
-export const getUserResourcePermissions = (id: string) => analyticsClient.get<{permissions: ResourcePermission[]}>(`/users/${id}/resource-permissions`).then(r => r.data?.permissions ?? [])
+export const getUserResourcePermissions = (id: string) => analyticsClient.get<{permissions: ResourcePermission[]}>(`/users/${id}/resource-permissions`).then(r => {
+  const d = r.data
+  if (Array.isArray(d)) return d
+  return (d as any)?.permissions ?? []
+})
 export const setUserResourcePermissions = (id: string, permissions: ResourcePermission[]) => analyticsClient.put(`/users/${id}/resource-permissions`, permissions).then(r => r.data)
 
-export const listWorkspaces = () => analyticsClient.get<Workspace[]>('/workspaces').then(r => r.data)
+export const listWorkspaces = () => analyticsClient.get<Workspace[]>('/workspaces').then(r => norm<Workspace>(r.data))
 export const listMyWorkspaces = () => analyticsClient.get<Workspace[]>('/workspaces/mine').then(r => r.data)
 export const createWorkspace = (data: { name: string; label: string; description?: string }) =>
   analyticsClient.post<Workspace>('/workspaces', data).then(r => r.data)
