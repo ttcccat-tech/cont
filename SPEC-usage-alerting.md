@@ -40,3 +40,12 @@
 5. **UI 正確送出**：AlertRules.tsx POST/PUT 時攜帶 `quota_metric_type` 和 `percentage_threshold`
 6. **規則評估正確**：`usage_quota` 規則在 alerter evaluate loop 中被正確評估（≥threshold 觸發）
 7. **SSE + Webhook**：規則觸發時正確廣播 SSE + 寫入 AlertHistory + 觸發 webhook
+
+## Tasks
+
+- [ ] TASK-UA-1: Backend alerter.go — 廢除 evaluateUsageQuota() hardcoded掃描，改為在 evaluateRule() 中處理 usage_quota（讀取 PercentageThreshold）
+- [ ] TASK-UA-2: Backend alerter.go — 新增 computeConsumerUsageQuotaMetric()，支援 quota_metric_type=consumer 時計算該 consumer 用量百分比
+- [ ] TASK-UA-3: Backend store.go — 確認 AlertRule CRUD 正確讀寫 PercentageThreshold 和 quota_metric_type（新增欄位 migration 如需要）
+- [ ] TASK-UA-4: Frontend AlertRules.tsx — 表單 POST/PUT 時正確攜帶 quota_metric_type 和 percentage_threshold 欄位
+- [ ] TASK-UA-5: Frontend AlertRules.tsx — 列表條件顯示 usage_quota 規則時正確顯示門檻百分比
+- [ ] TASK-UA-6: QA 驗證 — usage_quota 規則建立→觸發→SSE+broadcast+AlertHistory 完整流程
