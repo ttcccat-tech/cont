@@ -191,14 +191,14 @@ func calcPercent(used, limit int64) float64 {
 // monthly total, plan quota, usage percentage, hourly trend,
 // top routes, and top consumers.
 type AnalyticsResponse struct {
-	OrgID           string              `json:"org_id"`
-	Plan            string              `json:"plan"`
-	MonthlyTotal    int64               `json:"monthly_total"`
-	QuotaLimit      int64               `json:"quota_limit"`
-	UsagePercent    float64             `json:"usage_percent"`
-	HourlyTrend     []HourlyUsageItem   `json:"hourly_trend"`
-	TopRoutes       []RouteUsageItem    `json:"top_routes"`
-	TopConsumers    []ConsumerUsageItem `json:"top_consumers"`
+	OrgID            string              `json:"org_id"`
+	Plan             string              `json:"plan"`
+	MonthlyTotal     int64               `json:"monthly_total"`
+	PlanQuota        int64               `json:"plan_quota"`
+	UsagePercentage  float64             `json:"usage_percentage"`
+	HourlyTrend      []HourlyUsageItem   `json:"hourly_trend"`
+	TopRoutes        []RouteUsageItem    `json:"top_routes"`
+	TopConsumers     []ConsumerUsageItem `json:"top_consumers"`
 }
 
 type RouteUsageItem struct {
@@ -211,10 +211,13 @@ type ConsumerUsageItem struct {
 	Count      int64  `json:"count"`
 }
 
-// getAnalyticsOrgID resolves the org_id for analytics, handling admin role specially.
-// Admin users have org_id="00000000..." in JWT which getOrgID bypasses.
-// We directly check c.Get("org_id") which stores the JWT claim value.
+// getAnalyticsOrgID resolves the org_id for analytics from query param or JWT claim.
+// Query param takes precedence (supports GET /usage/analytics?org_id=X).
 func getAnalyticsOrgID(c *gin.Context) string {
+	// Query param takes precedence per acceptance criteria
+	if orgID := c.Query("org_id"); orgID != "" {
+		return orgID
+	}
 	if orgID, ok := c.Get("org_id"); ok {
 		if s, ok := orgID.(string); ok && s != "" {
 			return s
@@ -282,14 +285,14 @@ func GetAnalyticsUsage(store *storage.Store) gin.HandlerFunc {
 		usagePercent := calcPercent(monthlyTotal, plan.RequestLimit)
 
 		c.JSON(http.StatusOK, AnalyticsResponse{
-			OrgID:         orgID,
-			Plan:          orgPlan,
-			MonthlyTotal:  monthlyTotal,
-			QuotaLimit:    plan.RequestLimit,
-			UsagePercent:  usagePercent,
-			HourlyTrend:   hourlyTrend,
-			TopRoutes:     topRoutes,
-			TopConsumers:  topConsumers,
+			OrgID:           orgID,
+			Plan:            orgPlan,
+			MonthlyTotal:    monthlyTotal,
+			PlanQuota:       plan.RequestLimit,
+			UsagePercentage: usagePercent,
+			HourlyTrend:     hourlyTrend,
+			TopRoutes:       topRoutes,
+			TopConsumers:    topConsumers,
 		})
 	}
 }
