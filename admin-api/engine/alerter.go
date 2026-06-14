@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -101,7 +102,7 @@ func (a *Alerter) evaluateUsageQuota() {
 // checkOrgUsageQuota checks a single org's usage vs quota and fires alert if ≥80%.
 func (a *Alerter) checkOrgUsageQuota(org *storage.Organization) {
 	// Get monthly usage
-	monthly, err := a.store.Redis().GetMonthlyUsage(nil, org.ID)
+	monthly, err := a.store.Redis().GetMonthlyUsage(context.Background(), org.ID)
 	if err != nil {
 		log.Printf("[alerter] checkOrgUsageQuota: failed to get monthly usage for org %s: %v", org.ID, err)
 		return
