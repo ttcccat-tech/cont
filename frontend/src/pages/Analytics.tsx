@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
-import { Card, Row, Col, Statistic, Spin, Tag, Select, DatePicker } from 'antd'
+import { Card, Row, Col, Statistic, Spin, Tag, Select, DatePicker, Progress } from 'antd'
 import ReactECharts from 'echarts-for-react'
-import { getStatus, getMetrics } from '../api/kong'
+import { getStatus, getMetrics, getAnalyticsUsage, AnalyticsUsageResponse } from '../api/kong'
 
 const { RangePicker } = DatePicker
 const { Option } = Select
@@ -42,6 +42,9 @@ export default function Analytics() {
   const [metrics, setMetrics] = useState<Record<string, number>>({})
   const [status, setStatus] = useState<any>(null)
 
+  // Cont usage analytics
+  const [contUsage, setContUsage] = useState<AnalyticsUsageResponse | null>(null)
+
   // Historical data — loaded once at init, kept in sync via saveHistory on each poll
   const historyRef = useRef<MetricsPoint[]>(loadHistory())
   const [history, setHistory] = useState<MetricsPoint[]>(historyRef.current)
@@ -58,9 +61,10 @@ export default function Analytics() {
       }
       lastFetchRef.current = now
 
-      const [st, mi] = await Promise.all([getStatus(), getMetrics()])
+      const [st, mi, cu] = await Promise.all([getStatus(), getMetrics(), getAnalyticsUsage()])
       setStatus(st)
       setMetrics(mi)
+      setContUsage(cu)
       setError(false)
 
       const timeStr = Date.now()
@@ -316,6 +320,80 @@ export default function Analytics() {
           </Card>
         </Col>
       </Row>
+
+      {/* Cont Usage Analytics Panel */}
+      {contUsage && (
+        <>
+          <Row gutter={[16,16]} style={{ marginBottom: 16 }}>
+            <Col xs={12} sm={6}>
+              <Card style={{ background:'var(--secondary)', border:'none' }}>
+                <Statistic title={<span style={{color:'var(--muted)'}}>本月用量</span>}
+                  value={contUsage.monthly_total.toLocaleString()}
+                  valueStyle={{color:'#4ade80', fontSize:20}} />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card style={{ background:'var(--secondary)', border:'none' }}>
+                <Statistic title={<span style={{color:'var(--muted)'}}>配額上限</span>}
+                  value={contUsage.quota_limit.toLocaleString()}
+                  valueStyle={{color:'#60a5fa', fontSize:20}} />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card style={{ background:'var(--secondary)', border:'none' }}>
+                <Statistic title={<span style={{color:'var(--muted)'}}>用量百分比</span>}
+                  value={`${contUsage.usage_percent.toFixed(1)}%`}
+                  valueStyle={{color: contUsage.usage_percent > 90 ? '#f87171' : contUsage.usage_percent > 70 ? '#facc15' : '#4ade80', fontSize:20}} />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card style={{ background:'var(--secondary)', border:'none' }}>
+                <Statistic title={<span style={{color:'var(--muted)'}}>方案</span>}
+                  value={contUsage.plan}
+                  valueStyle={{color:'#e879f9', fontSize:20}} />
+              </Card>
+            </Col>
+          </Row>
+          <Row gutter={[16,16]} style={{ marginBottom: 16 }}>
+            <Col xs={24}>
+              <Card style={{ background:'var(--secondary)', border:'none' }}>
+                <Progress
+                  percent={Math.min(contUsage.usage_percent, 100)}
+                  strokeColor={contUsage.usage_percent > 90 ? '#f87171' : contUsage.usage_percent > 70 ? '#facc15' : '#4ade80'}
+                  trailColor="rgba(255,255,255,0.1)"
+                  format={(p) => `${contUsage.monthly_total.toLocaleString()} / ${contUsage.quota_limit.toLocaleString()}`}
+                />
+              </Card>
+            </Col>
+          </Row>
+          <Row gutter={[16,16]} style={{ marginBottom: 16 }}>
+            <Col xs={24} lg={12}>
+              <Card style={{ background:'var(--secondary)', border:'none' }} title={<span style={{color:'var(--text)'}}>Top Routes</span>}>
+                {contUsage.top_routes.length > 0 ? (
+                  contUsage.top_routes.map((r, i) => (
+                    <div key={r.route_id} style={{ display:'flex', justifyContent:'space-between', color:'var(--text)', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{color:'var(--muted)'}}>#{i+1} {r.route_id}</span>
+                      <span style={{color:'#4ade80'}}>{r.count.toLocaleString()}</span>
+                    </div>
+                  ))
+                ) : <span style={{color:'var(--muted)'}}>暫無資料</span>}
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card style={{ background:'var(--secondary)', border:'none' }} title={<span style={{color:'var(--text)'}}>Top Consumers</span>}>
+                {contUsage.top_consumers.length > 0 ? (
+                  contUsage.top_consumers.map((c, i) => (
+                    <div key={c.consumer_id} style={{ display:'flex', justifyContent:'space-between', color:'var(--text)', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{color:'var(--muted)'}}>#{i+1} {c.consumer_id}</span>
+                      <span style={{color:'#60a5fa'}}>{c.count.toLocaleString()}</span>
+                    </div>
+                  ))
+                ) : <span style={{color:'var(--muted)'}}>暫無資料</span>}
+              </Card>
+            </Col>
+          </Row>
+        </>
+      )}
 
       {/* Charts Row 1 */}
       <Row gutter={[16,16]}>
