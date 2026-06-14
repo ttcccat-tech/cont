@@ -1,7 +1,6 @@
 -- cont.access
 -- Route matching + plugin access() chain
 -- Implements: JWT validation, API Key/BasicAuth/HMACAuth, rate-limit, OPTIONS preflight
--- NOTE: Uses ngx.location.capture (no resty.http in OpenResty Alpine)
 
 local cjson = require("cjson")
 
@@ -21,13 +20,7 @@ local function generate_trace_id()
 end
 
 -- Load jwt_validation module (uses cosocket, safe at access_by_lua context)
-local jwt_validation
-local function get_jwt_validation()
-    if not jwt_validation then
-        jwt_validation = require("cont.jwt_validation")
-    end
-    return jwt_validation
-end
+local jwt_validation = require("cont.jwt_validation")
 
 -- ── Consumer Auth Validation ─────────────────────────────────────────────────
 local function validate_consumer_auth(credential_type)
@@ -86,7 +79,7 @@ local function validate_consumer_auth(credential_type)
     end
 
     -- Call Admin API to validate credential via cosocket
-    local jv = get_jwt_validation()
+    local jv = jwt_validation
     local consumer_id, user_id = jv.validate_consumer_auth(credential_type, key)
     if not consumer_id then
         ngx.status = 401
@@ -315,7 +308,7 @@ if route and service_id then
             token = ngx.var.http_x_auth_token
         end
         if token then
-            local jv = get_jwt_validation()
+            local jv = jwt_validation
             local consumer_id, user_id = jv.validate_jwt(token)
             if consumer_id then
                 ngx.ctx.authenticated_consumer_id = consumer_id

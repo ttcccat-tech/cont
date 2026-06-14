@@ -24,11 +24,11 @@ func NewStore(db *sql.DB, rdb *Redis) *Store {
 func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error) {
 	query := `
 		SELECT id, name, protocol, host, port, path, url, retries,
-		       connect_timeout, read_timeout, write_timeout, enabled,
+		       connect_timeout, read_timeout, write_timeout, upstream_id, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM services
 		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
-		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+		ORDER BY created_at DESC LIMIT COALESCE(NULLIF($2, 0), 1000) OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -37,12 +37,12 @@ func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error)
 	var out []Service
 	for rows.Next() {
 		var r Service
-		var name, protocol, host, path, url sql.NullString
+		var name, protocol, host, path, url, upstreamID sql.NullString
 		var port, retries, connect, read, write sql.NullInt64
 		var enabled sql.NullBool
 		var created, updated sql.NullString
 		if err := rows.Scan(&r.ID, &name, &protocol, &host, &port, &path, &url,
-			&retries, &connect, &read, &write, &enabled, &r.OrgID, &created, &updated); err != nil {
+			&retries, &connect, &read, &write, &upstreamID, &enabled, &r.OrgID, &created, &updated); err != nil {
 			return nil, err
 		}
 		r.Name = name.String
@@ -55,6 +55,7 @@ func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error)
 		if connect.Valid { r.ConnectTimeout = int(connect.Int64) }
 		if read.Valid { r.ReadTimeout = int(read.Int64) }
 		if write.Valid { r.WriteTimeout = int(write.Int64) }
+		if upstreamID.Valid { r.UpstreamID = upstreamID.String }
 		if enabled.Valid { r.Enabled = enabled.Bool }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
@@ -184,7 +185,7 @@ func (s *Store) getOneService(row *sql.Row) (*Service, error) {
 func (s *Store) GetServiceByName(name, orgID string) (*Service, error) {
 	row := s.db.QueryRow(`
 		SELECT id, name, protocol, host, port, path, url, retries,
-		       connect_timeout, read_timeout, write_timeout, enabled,
+		       connect_timeout, read_timeout, write_timeout, upstream_id, enabled,
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM services WHERE name=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`, name, orgID)
 	return s.getOneService(row)
@@ -198,7 +199,7 @@ func (s *Store) ListGrpcServices(orgID string, limit, offset int) ([]GrpcService
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM grpc_services
 		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
-		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+		ORDER BY created_at DESC LIMIT COALESCE(NULLIF($2, 0), 1000) OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -374,7 +375,7 @@ func (s *Store) ListRoutes(orgID string, limit, offset int) ([]Route, error) {
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM routes
 		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
-		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+		ORDER BY created_at DESC LIMIT COALESCE(NULLIF($2, 0), 1000) OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -516,7 +517,7 @@ func (s *Store) ListUpstreams(orgID string, limit, offset int) ([]Upstream, erro
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM upstreams
 		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
-		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+		ORDER BY created_at DESC LIMIT COALESCE(NULLIF($2, 0), 1000) OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -695,7 +696,7 @@ func (s *Store) ListConsumers(orgID string, limit, offset int) ([]Consumer, erro
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, created_at, updated_at
 		FROM consumers
 		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
-		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+		ORDER BY created_at DESC LIMIT COALESCE(NULLIF($2, 0), 1000) OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -948,7 +949,7 @@ func (s *Store) ListPlugins(orgID string, limit, offset int) ([]Plugin, error) {
 		       COALESCE(org_id, '00000000-0000-0000-0000-000000000000') as org_id, scope, created_at, updated_at
 		FROM plugins
 		WHERE (($1 = '' AND COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = '00000000-0000-0000-0000-000000000000') OR ($1 != '' AND org_id::text = $1))
-		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+		ORDER BY created_at DESC LIMIT COALESCE(NULLIF($2, 0), 1000) OFFSET $3`
 	rows, err := s.db.Query(query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -3340,7 +3341,7 @@ func (s *Store) CreateNotification(n *Notification) (*Notification, error) {
 
 // ListNotifications returns notifications for a user (unread first)
 func (s *Store) ListNotifications(userID string, limit, offset int) ([]Notification, error) {
-	rows, err := s.db.Query(`SELECT id, user_id, type, payload, read, created_at FROM notifications WHERE user_id = $1 ORDER BY read ASC, created_at DESC LIMIT $2 OFFSET $3`, userID, limit, offset)
+	rows, err := s.db.Query(`SELECT id, user_id, type, payload, read, created_at FROM notifications WHERE user_id = $1 ORDER BY read ASC, created_at DESC LIMIT COALESCE(NULLIF($2, 0), 1000) OFFSET $3`, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
