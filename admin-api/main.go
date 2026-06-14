@@ -338,6 +338,7 @@ func main() {
 		admin.GET("/usage/org/:org_id", routes.GetOrgUsage(store))
 		admin.GET("/usage/consumer/:consumer_id", routes.GetConsumerUsage(store))
 		admin.GET("/usage/summary", routes.GetUsageSummary(store))
+		admin.GET("/usage/analytics", routes.GetAnalyticsUsage(store))
 
 		// Webhooks (Reliable)
 		admin.GET("/webhooks", routes.ListWebhooks(store))
