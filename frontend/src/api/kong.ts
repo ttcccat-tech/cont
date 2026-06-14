@@ -333,14 +333,20 @@ export const getUsage = () => analyticsClient.get<{org_id: string; plan: string;
 
 export interface AnalyticsUsageResponse {
   monthly_total: number
-  plan_quota: number
-  usage_percentage: number
+  quota_limit: number       // mapped from backend plan_quota
+  usage_percent: number     // mapped from backend usage_percentage
   top_routes: { route_id: string; count: number }[]
   top_consumers: { consumer_id: string; count: number }[]
 }
 
 export const getAnalyticsUsage = (orgId: string) =>
-  analyticsClient.get<AnalyticsUsageResponse>(`/usage/analytics?org_id=${orgId}`).then(r => r.data)
+  analyticsClient.get<{ monthly_total: number; plan_quota: number; usage_percentage: number; top_routes: { route_id: string; count: number }[]; top_consumers: { consumer_id: string; count: number }[] }>(`/usage/analytics?org_id=${orgId}`).then(r => ({
+    monthly_total: r.data.monthly_total,
+    quota_limit: r.data.plan_quota,
+    usage_percent: r.data.usage_percentage,
+    top_routes: r.data.top_routes,
+    top_consumers: r.data.top_consumers,
+  }))
 export const createCheckoutSession = (planName: string, billingCycle: string) =>
   analyticsClient.post<{ url: string }>('/billing/checkout', { plan_name: planName, billing_cycle: billingCycle }).then(r => r.data)
 export const createPortalSession = () =>
