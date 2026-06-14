@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Layout, Button } from 'antd'
+import { Layout, Button, Result } from 'antd'
+import { useState } from 'react'
+import React from 'react'
 import Login from './pages/Login'
 import Users from './pages/Users'
 import Groups from './pages/Groups'
@@ -32,6 +34,25 @@ const { Header, Content } = Layout
 
 interface ProtectedRouteProps {
   children: React.ReactNode
+}
+
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean; error: any}> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error: any, info: any) {
+    console.error('RENDER ERROR:', error?.message, error?.stack, 'COMPONENT STACK:', info?.componentStack)
+  }
+  render() {
+    if (this.state.hasError) {
+      return <Result status="error" title="Render Error" subTitle={this.state.error?.message} />
+    }
+    return this.props.children
+  }
 }
 
 function ProtectedRoute({ children }: ProtectedRouteProps) {
@@ -100,6 +121,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/*" element={
           <ProtectedRoute>
+            <ErrorBoundary>
             <WorkspaceProvider>
               <AuthProvider>
                 <AppLayout>
@@ -133,6 +155,7 @@ export default function App() {
               </AppLayout>
             </AuthProvider>
           </WorkspaceProvider>
+          </ErrorBoundary>
         </ProtectedRoute>
         } />
       </Routes>

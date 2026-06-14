@@ -16,7 +16,7 @@ type Redis struct {
 
 func NewRedis(url string) *Redis {
 	if url == "" {
-		url = "localhost:6379"
+		url = "cont-redis:6379"
 	}
 	client := redis.NewClient(&redis.Options{
 		Addr: url,

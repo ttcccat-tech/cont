@@ -26,7 +26,7 @@ func (s *Store) Redis() *Redis {
 
 func NewPostgres(url string) (*sql.DB, error) {
 	if url == "" {
-		url = "postgres://kong:kongpass@localhost:5432/cont?sslmode=disable"
+		url = "postgres://kong:kongpass@cont-postgres:5432/cont?sslmode=disable"
 	}
 	db, err := sql.Open("postgres", url)
 	if err != nil {

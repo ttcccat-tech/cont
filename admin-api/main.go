@@ -325,7 +325,7 @@ func main() {
 		// Billing / Stripe
 		frontendBaseURL := os.Getenv("FRONTEND_BASE_URL")
 		if frontendBaseURL == "" {
-			frontendBaseURL = "http://localhost:5173"
+			frontendBaseURL = "http://cont-frontend:5173"
 		}
 		admin.GET("/billing/plans", routes.ListPlans(store))
 		admin.GET("/billing/subscription", routes.GetSubscription(store))

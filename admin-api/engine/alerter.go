@@ -215,7 +215,7 @@ func (a *Alerter) fetchConditionMetric(cond storage.Condition) (float64, error) 
 func (a *Alerter) computeConditionMetric(cond storage.Condition) (float64, error) {
 	if cond.MetricType == "error_rate" || cond.MetricType == "latency" {
 		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Get("http://localhost:18000/metrics")
+		resp, err := client.Get(a.metricsURL)
 		if err != nil {
 			return 0, fmt.Errorf("proxy metrics request failed: %w", err)
 		}
@@ -346,7 +346,7 @@ func (a *Alerter) computeFromProxyMetrics(rule *storage.AlertRule) (float64, err
 
 	// Try upstream health metrics
 	if rule.MetricType == "error_rate" || rule.MetricType == "latency" {
-		resp, err := client.Get("http://localhost:18000/metrics")
+		resp, err := client.Get(a.metricsURL)
 		if err != nil {
 			return 0, fmt.Errorf("proxy metrics request failed: %w", err)
 		}

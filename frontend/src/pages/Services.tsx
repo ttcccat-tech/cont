@@ -5,7 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import api, { KongService } from '../api/kong'
 import { useAuth } from '../context/AuthContext'
 
-const API = import.meta.env.VITE_API_BASE || 'http://localhost:8001'
+const API = import.meta.env.VITE_API_BASE || '/api'
 
 export default function Services() {
   const [services, setServices] = useState<KongService[]>([])

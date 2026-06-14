@@ -9,7 +9,7 @@ info:
   contact:
     name: Cont Project
     url: https://github.com/ttcccat-tech/cont
-host: "localhost:8001"
+host: "cont-admin-api:8001"
 basePath: "/"
 schemes:
   - http

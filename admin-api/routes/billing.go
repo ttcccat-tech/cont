@@ -129,7 +129,7 @@ func CreateCheckoutSession(store *storage.Store, frontendBaseURL string) gin.Han
 
 		baseURL := frontendBaseURL
 		if baseURL == "" {
-			baseURL = "http://localhost:5173"
+			baseURL = "http://cont-frontend:5173"
 		}
 
 		// Get or create Stripe customer
@@ -228,7 +228,7 @@ func CreatePortalSession(store *storage.Store, frontendBaseURL string) gin.Handl
 
 		baseURL := frontendBaseURL
 		if baseURL == "" {
-			baseURL = "http://localhost:5173"
+			baseURL = "http://cont-frontend:5173"
 		}
 
 		params := &stripe.BillingPortalSessionParams{
