@@ -6,14 +6,14 @@ import { ReloadOutlined } from '@ant-design/icons'
 // swagger-ui-dist CSS loaded via CDN in index.html
 
 export default function ApiDocsPage() {
-  const [specUrl, setSpecUrl] = useState('/api/openapi.json')
+  const [specUrl, setSpecUrl] = useState('/api/docs.json')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const checkSpec = () => {
     setLoading(true)
     setError(null)
-    fetch('/api/openapi.json')
+    fetch('/api/docs.json')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
