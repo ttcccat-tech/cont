@@ -81,6 +81,9 @@ func (a *Alerter) evaluate() {
 		}
 		a.evaluateRule(&rule)
 	}
+
+	// Also evaluate usage quotas for all orgs and consumers (automatic, no rule needed)
+	a.evaluateUsageQuotas()
 }
 func (a *Alerter) evaluateRule(rule *storage.AlertRule) {
 	// Check suppression window
