@@ -495,48 +495,46 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	paths := orSlice(r.Paths, []string{})
 	methods := orSlice(r.Methods, []string{})
 
-	// Build setClauses and args with correct placeholder indices.
-	// Default: id($1), name($2), protocols($3), hosts($4), paths($5), methods($6),
-	//          strip_path($7), preserve_host($8), regex_priority($9), https_redirect_status_code($10),
-	//          connection_timeout($11), enabled($12), orgID($13)
+	svcID := r.GetServiceID()
+
+	// Build args FIRST, then setClauses with correct placeholder indices based on actual args positions.
+	// Without service_id: args = [id, name, protocols, hosts, paths, methods, strip_path, preserve_host,
+	//                           regex_priority, https_redirect_status_code, connection_timeout, enabled, orgID]
+	// With service_id:    args = [id, name, protocols, hosts, paths, methods, strip_path, preserve_host,
+	//                           regex_priority, https_redirect_status_code, connection_timeout, enabled, service_id, orgID]
+
+	args := []interface{}{
+		id,                    // $1
+		r.Name,                // $2
+		"{" + strings.Join(protocols, ",") + "}", // $3
+		"{" + strings.Join(hosts, ",") + "}",    // $4
+		"{" + strings.Join(paths, ",") + "}",    // $5
+		"{" + strings.Join(methods, ",") + "}", // $6
+		orBool(r.StripPath, true),               // $7
+		orBool(r.PreserveHost, false),            // $8
+		orInt(r.RegexPriority, 0),               // $9
+		orInt(r.HTTPSRedirectStatusCode, 426),   // $10
+		orInt(r.ConnectionTimeout, 60000),       // $11
+		orBool(r.Enabled, true),                  // $12
+	}
 	setClauses := []string{
 		"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6",
 		"strip_path=$7", "preserve_host=$8", "regex_priority=$9",
 		"https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12",
 	}
-	args := []interface{}{
-		id,
-		r.Name,
-		"{" + strings.Join(protocols, ",") + "}",
-		"{" + strings.Join(hosts, ",") + "}",
-		"{" + strings.Join(paths, ",") + "}",
-		"{" + strings.Join(methods, ",") + "}",
-		orBool(r.StripPath, true),
-		orBool(r.PreserveHost, false),
-		orInt(r.RegexPriority, 0),
-		orInt(r.HTTPSRedirectStatusCode, 426),
-		orInt(r.ConnectionTimeout, 60000),
-		orBool(r.Enabled, true),
-	}
-	orgIDArgIndex := 13 // id + 12 set clauses, orgID at $13
 
-	// When service_id is provided, insert it at $13 and shift subsequent placeholders
-	var updatedArgs []interface{}
-	if svcID := r.GetServiceID(); svcID != "" {
-		setClauses = append([]string{"service_id=$13"}, setClauses...)
-		// Rebuild args with service_id at correct position ($13)
-		updatedArgs = make([]interface{}, 0, len(args)+2)
-		updatedArgs = append(updatedArgs, args[:11]...) // id through connection_timeout (args[0:10])
-		updatedArgs = append(updatedArgs, svcID)         // service_id at $13
-		updatedArgs = append(updatedArgs, args[11])      // enabled (was at $12, now $14)
-		orgIDArgIndex = 14 // orgID now at $14
-	}
-
-	if updatedArgs != nil {
-		args = append(updatedArgs, orgID)
+	var orgIDArgIndex int
+	if svcID != "" {
+		// service_id goes after enabled (at $13), orgID at $14
+		args = append(args, svcID) // service_id at $13
+		setClauses = append(setClauses, "service_id=$13")
+		orgIDArgIndex = 14
 	} else {
-		args = append(args, orgID)
+		// orgID at $13
+		orgIDArgIndex = 13
 	}
+	args = append(args, orgID) // orgID at $13 or $14
+
 	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($" + strconv.Itoa(orgIDArgIndex) + " = '' OR ($" + strconv.Itoa(orgIDArgIndex) + " != '' AND org_id::text = $" + strconv.Itoa(orgIDArgIndex) + ")) RETURNING updated_at"
 
 	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
