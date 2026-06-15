@@ -182,3 +182,21 @@
 
 **P0 Bugs**: 2（已全部修復 ✅）
 **P1 Bugs**: 0 ✅
+
+### ✅ BUG-Upstreams-Update: Upstream Update 清除 name 欄位（P1）— 已修復
+- **API**: PUT /upstreams/{id}
+- **預期**: Update 時未傳入的欄位應保留原值
+- **實際**: Update `{"description":"..."}` 後，name 欄位被清空成空字串
+- **原因**: store.go UpdateUpstream 的 `name=$2` 直接覆蓋，未使用 COALESCE 保留
+- **修補**: `name=COALESCE(NULLIF($2,''), name)` — 空字串時保留現有值
+- **驗證**:
+  - Create upstream with name="test-upstream-uu2" → name="test-upstream-uu2" ✅
+  - Update with {"description":"updated-desc"} → name="test-upstream-uu2" 保留 ✅
+  - GET /upstreams/{id} → name="test-upstream-uu2" ✅
+- **Tasks**:
+  - [✅] TASK-BUG-UU-1: Fix UpdateUpstream name preservation (COALESCE NULLIF)
+  - [✅] TASK-BUG-UU-2: Docker build --no-cache cont-admin-api
+  - [✅] TASK-BUG-UU-3: Restart cont-admin-api container
+  - [✅] TASK-BUG-UU-4: Smoke test — name preserved after partial update
+- **小黑驗證**: Docker build --no-cache ✅, container healthy ✅, name preserved ✅
+

@@ -639,7 +639,7 @@ func (s *Store) GetUpstream(id, orgID string) (*Upstream, error) {
 
 func (s *Store) UpdateUpstream(id, orgID string, u *Upstream) (*Upstream, error) {
 	err := s.db.QueryRow(`
-		UPDATE upstreams SET name=$2, algorithm=COALESCE(NULLIF($3,''),'roundrobin'), slots=$4,
+		UPDATE upstreams SET name=COALESCE(NULLIF($2,''), name), algorithm=COALESCE(NULLIF($3,''),'roundrobin'), slots=$4,
 			healthchecks=$5, enabled=$6, updated_at=NOW()
 		WHERE id=$1 AND ($7 = '' OR org_id::text = $7) RETURNING updated_at`,
 		id, u.Name, u.Algorithm,
