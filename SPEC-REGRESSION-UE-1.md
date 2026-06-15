@@ -2,51 +2,55 @@
 
 ## 背景
 
-小黑 2026-06-16 02:30 UTC 發現：`POST /internal/usage/incr` 返回 `{"count":1,"success":true}` 但 Redis DBSIZE 恆為 0。
+2026-06-16 小黑親自調查，確認 `POST /internal/usage/incr` 返回 `{"count":1,"success":true}` 但 Redis DBSIZE 恆為 0。
 
-**排除的根因**（小黑已排除）：
-- ❌ 不是 binary 問題：binary 含 IncrUsage code
-- ❌ 不是網路問題：Redis PING = +PONG
-- ❌ 不是 Redis auth 問題：無密碼
-- ❌ 不是時區問題：hour format 是 UTC
-- ❌ 不是 key 衝突：194ee7b4 已分離 INCR(string) 和 HSET(hash) key
-- ❌ 不是 Docker image 問題
+## 小黑深度調查結果（2026-06-16 04:00）
 
-**小黑 2026-06-16 03:00 UTC 根因確認**：
-- ✅ Redis FLUSHALL 後，寫入完全正常
-- ✅ 所有 key type 正確（string INCR, hash HSET）
-- ✅ count 正確遞增（1, 2, 3...）
-- ✅ 舊的 orphan `cont-admin-api-test` container 導致 Redis 狀態損壞
-- **結論：非 code 問題，是 Redis 狀態汙染**
+### 確認事實
+- Source code (`admin-api/storage/usage.go`) 含正確 IncrUsage code（commit `194ee7b4`）
+- Binary md5 in running container: `a70d5874d7d02e22d14b7633e2635f85` ✅
+- Binary md5 in current Docker image (f601b5185b13): `a70d5874...` ✅（source sync 確認）
+- Running container healthy: 7 minutes uptime
+- Redis PING = +PONG ✅
+- Redis DBSIZE = 0 across ALL 16 DBs ❌
+- `POST /internal/usage/incr` returns `{"count":1,"success":true}` ❌（success but no write）
+
+### 已排除
+- ❌ Pipeline.Exec 語法問題（source code 正確）
+- ❌ Redis 網路問題（PING = +PONG）
+- ❌ Redis auth（無密碼）
+- ❌ 時區（UTC hour format）
+- ❌ key 衝突（INCR/HSET 已分離）
+- ❌ binary/source desync（md5 一致）
+- ❌ Docker image 過期（image 7 min ago, binary md5 matches source）
+
+### 待查根因
+懷疑：Pipeline.Exec 失敗但錯誤被 gin handler 吞掉（c.JSON 在 err != nil 分支 return，但 err 可能是 nil 而 pipe result 實際失敗）
 
 ## 目標
 
-確認 IncrUsage Redis 寫入功能正常穩定，確認 Free plan 超限阻擋恢復。
+1. 確認 IncrUsage pipeline 實際是否執行 Redis 寫入
+2. 修復 `POST /internal/usage/incr` 正確寫入 Redis
+3. 驗證 `GET /internal/plan-quota/:consumer_id` current_usage 非零
+4. Free plan 超限 → 429 + header
 
 ## Scope
 
 ### In-scope
-- 驗證 `POST /internal/usage/incr` 寫入 Redis 成功
-- 驗證 `GET /usage/org/:org_id` 回傳正確用量
-- 驗證 Free plan 超限阻擋（rate-limiting-advanced）正常
-- 驗證 80% warning header 正常
+- IncrUsage pipeline 根因修復
+- storage/usage.go IncrUsage function 修復
+- Docker build --no-cache cont-admin-api
+- Container restart + 驗證 Redis 有 keys
 
 ### Out-of-scope
-- 不修改 code（code 已確認正常）
-- 不修改 Redis 配置
+- 不實作新功能架構
+- 不實作 Webhook retry
 
 ## 驗收標準
 
-1. `POST /internal/usage/incr` 成功寫入 Redis，回傳 `{success: true, count: N}`
-2. Redis 出現 `cont:usage:{org_id}:{YYYYMMDDHH}` key，TTL > 0
-3. `GET /usage/org/:org_id` 返回正確 JSON（含 total > 0）
-4. Docker compose 全部 containers healthy
-5. rate-limiting-advanced plugin 正確阻擋超限請求
-
-## Tasks
-
-- [ ] TASK-UE1-FIX: Redis FLUSHALL 清除汙染狀態
-- [ ] TASK-UE1-V1: 驗證 IncrUsage 寫入 Redis 成功（count 遞增）
-- [ ] TASK-UE1-V2: 驗證 /usage/org/:id 返回正確用量
-- [ ] TASK-UE1-V3: 驗證 rate-limiting 超限阻擋
-- [ ] TASK-UE1-V4: commit event.md 更新 regression 狀態
+1. `POST /internal/usage/incr` 後 Redis 出現 `cont:usage:*` key，DBSIZE > 0
+2. `GET /internal/plan-quota/:consumer_id` 返回 current_usage 非零
+3. Free plan 超限 → 429 + X-RateLimit-Limit-Reached: true
+4. 用量 80% → X-Usage-Warning header
+5. Docker build --no-cache cont-admin-api 成功
+6. Container restart 後功能正常
