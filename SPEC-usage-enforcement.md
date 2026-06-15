@@ -43,10 +43,15 @@
 
 ## Tasks
 
-### 🔴 TASK-UE-1: Fix IncrUsage Redis write (root cause)
+### 🔴 TASK-UE-1: Fix IncrUsage Redis write (root cause) — ✅ FIXED 2026-06-16
 - **完成定義**: `POST /internal/usage/incr` 後 Redis DBSIZE > 0，且 `cont:usage:{org_id}:{YYYYMMDDHH}` key 存在
-- **根因分析**: `storage/usage.go` 的 IncrUsage 在 Docker build 時可能未被正確編譯，或 Redis pipeline 未正確執行
-- **驗證**: `curl -X POST http://localhost:18081/internal/usage/incr -d '{"org_id":"test","route_id":"r1","service_id":"s1","latency_ms":1,"status_code":200}'` → Redis `DBSIZE` 為 1
+- **根因分析**: `storage/usage.go` 的 IncrUsage 代碼正確，但 `docker compose` 啟動的 container 名稱是 `cont-admin-api-test`（覆寫了 docker-compose.yml 的 `container_name: cont-admin-api`），導致 `docker compose up cont-admin-api` 啟動了另一個 instance，真正的 service 從未重啟
+- **修補**:
+  1. `docker stop cont-admin-api-test && docker rm cont-admin-api-test` — 移除舊 container
+  2. `docker compose up -d cont-admin-api` — 以正確名稱啟動 service
+  3. 驗證 `POST /internal/usage/incr` → Redis 出現 `cont:usage:test-final:2026061517` key ✅
+  4. Docker build `--no-cache` 成功 ✅
+- **小黑驗證**: Redis DBSIZE > 0，KEY 存在 ✅
 
 ### ✅ TASK-UE-2: Verify GetPlanQuota current_usage (inherited)
 - `handler.lua` line 178: `local current_usage = tonumber(data.current_usage) or 0`
@@ -61,7 +66,7 @@
 - `handler.lua` lines 192-204 已實作 429 + header
 - 需要 TASK-UE-1 完成後才能實際觸發
 
-### TASK-UE-5: Docker build --no-cache admin-api
+### ✅ TASK-UE-5: Docker build --no-cache admin-api — ✅ DONE 2026-06-16
 - **完成定義**: `docker compose build --no-cache cont-admin-api` 成功，container restart 後 healthy
 
 ### TASK-UE-6: Docker build --no-cache cont-proxy
