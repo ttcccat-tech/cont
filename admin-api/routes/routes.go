@@ -1180,7 +1180,13 @@ func ValidateCredential(store *storage.Store) gin.HandlerFunc {
 				return
 			}
 		}
-		c.JSON(200, gin.H{"consumer_id": cred.ConsumerID})
+		// Look up consumer to get org_id
+		consumer, err := store.GetConsumer(cred.ConsumerID, "")
+		orgID := ""
+		if err == nil && consumer != nil {
+			orgID = consumer.OrgID
+		}
+		c.JSON(200, gin.H{"consumer_id": cred.ConsumerID, "org_id": orgID})
 	}
 }
 
@@ -1216,9 +1222,17 @@ func ValidateJWT(store *storage.Store, jwtSecret string) gin.HandlerFunc {
 		userID, _ := claims["sub"].(string)
 		consumerID := userID // consumer_id == user_id in Cont
 
+		// Look up consumer to get org_id
+		orgID := ""
+		consumer, err := store.GetConsumer(consumerID, "")
+		if err == nil && consumer != nil {
+			orgID = consumer.OrgID
+		}
+
 		c.JSON(200, gin.H{
 			"consumer_id": consumerID,
 			"user_id":     userID,
+			"org_id":      orgID,
 		})
 	}
 }

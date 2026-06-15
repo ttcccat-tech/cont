@@ -80,7 +80,7 @@ local function validate_consumer_auth(credential_type)
 
     -- Call Admin API to validate credential via cosocket
     local jv = jwt_validation
-    local consumer_id, user_id = jv.validate_consumer_auth(credential_type, key)
+    local consumer_id, user_id, org_id = jv.validate_consumer_auth(credential_type, key)
     if not consumer_id then
         ngx.status = 401
         ngx.say('{"message":"Invalid credentials","error":"Unauthorized","statusCode":401}')
@@ -88,6 +88,7 @@ local function validate_consumer_auth(credential_type)
     end
     ngx.ctx.authenticated_consumer_id = consumer_id
     ngx.ctx.credential_identifier = key
+    ngx.ctx.authenticated_org_id = org_id
     return true
 end
 
@@ -309,10 +310,11 @@ if route and service_id then
         end
         if token then
             local jv = jwt_validation
-            local consumer_id, user_id = jv.validate_jwt(token)
+            local consumer_id, user_id, org_id = jv.validate_jwt(token)
             if consumer_id then
                 ngx.ctx.authenticated_consumer_id = consumer_id
                 ngx.ctx.authenticated_user_id = user_id
+                ngx.ctx.authenticated_org_id = org_id
             else
                 ngx.status = 401
                 ngx.say('{"message":"Invalid or expired JWT token","error":"Unauthorized","statusCode":401}')
@@ -410,7 +412,18 @@ ngx.ctx.upstream_target = upstream_target
 
 -- TASK-UC-5: Non-blocking usage increment at end of request processing
 pcall(function()
-    ngx.location.capture_multi({{"/__cont_api_internal__/internal/usage/incr", {args = {route_id = route and route.id, service_id = service_id}}}})
+    local org_id = ngx.ctx.authenticated_org_id or "00000000-0000-0000-0000-000000000000"
+    local route_id = route and route.id or ""
+    local service_id = service_id or ""
+    local latency_ms = ngx.now() * 1000 - (ngx.ctx.request_start_time or (ngx.now() * 1000))
+    local status_code = ngx.status or 0
+    local body = string.format('{"org_id":"%s","route_id":"%s","service_id":"%s","latency_ms":%d,"status_code":%d}',
+        org_id, route_id, service_id, latency_ms, status_code)
+    ngx.location.capture("/__cont_api_internal__/internal/usage/incr", {
+        method = ngx.HTTP_POST,
+        body = body,
+        vars = ngx.var,
+    })
 end)
 
 return cont
