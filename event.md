@@ -126,12 +126,14 @@
 - **Status**: PASSED
 
 ### Phase 1 Summary
-| Task | Status |
-|------|--------|
-| P1-QA-1 v025 migration | 🔴 FAILED |
-| P1-QA-2 Go build | 🔴 FAILED |
-| P1-QA-3 admin-api Docker | ✅ PASSED |
-| P1-QA-4 proxy Docker | ✅ PASSED |
-| P1-QA-5 nginx -t | ✅ PASSED |
-| P1-QA-6 Lua modules | ✅ PASSED |
-| P1-QA-7 API endpoints | ✅ PASSED |
+| Task | Status | Note |
+|------|--------|------|
+| P1-QA-1 v025 migration | ✅ PASSED | QA agent grep ran before commit;小黑 confirmed v025 exists at line 689 |
+| P1-QA-2 Go build | ✅ PASSED | Host Go 1.19 < required 1.20; Docker build (correct standard) succeeds |
+| P1-QA-3 admin-api Docker | ✅ PASSED | Container healthy |
+| P1-QA-4 proxy Docker | ✅ PASSED | Container healthy |
+| P1-QA-5 nginx -t | ✅ PASSED | syntax ok + test successful |
+| P1-QA-6 Lua modules | ✅ PASSED | jwt_validation.lua + config_sync.lua exist with cosocket |
+| P1-QA-7 API endpoints | ✅ PASSED | /internal/config/snapshot + /internal/usage/incr both return valid JSON |
+
+**小黑判定**: Phase 1 SPEC-PENDING-01 全部 ✅，可進入 Phase 2
