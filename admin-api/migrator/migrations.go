@@ -720,7 +720,7 @@ ALTER TABLE consumer_credentials ADD CONSTRAINT consumer_credentials_credential_
 		Version:     27,
 		Description: "Add webhook_subscriptions and webhook_deliveries tables",
 		Up: `
-CREATE TABLE webhook_subscriptions (
+CREATE TABLE IF NOT EXISTS webhook_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id UUID NOT NULL,
     url TEXT NOT NULL,
@@ -730,13 +730,13 @@ CREATE TABLE webhook_subscriptions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE TABLE webhook_deliveries (
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id UUID NOT NULL,
     webhook_id UUID NOT NULL REFERENCES webhook_subscriptions(id) ON DELETE CASCADE,
     event_type TEXT NOT NULL,
     payload TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed', 'retrying')),
     attempts INT NOT NULL DEFAULT 0,
     last_error TEXT,
     response_body TEXT,
