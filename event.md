@@ -13,8 +13,6 @@
 
 ## 🔴 ACTIVE REGRESSION — 2026-06-16 小黑發現
 
-（已全部修復，見下方記錄）
-
 ### ✅ REGRESSION-UE-1: IncrUsage Redis Write Silent Failure（P0）— ✅ FIXED 2026-06-16 04:20
 - **發現時間**: 2026-06-16 02:30 UTC
 - **現象**: `POST /internal/usage/incr` 返回 `{"count":1,"success":true}` 但 Redis DBSIZE恆為 0
@@ -45,6 +43,16 @@
 - [✅] TASK-2.5-B1: alerter.go — evaluateUsageQuotas(), fire at 80/90/100%, AlertHistory, webhook trigger
 - [✅] TASK-2.5-B2: AlertRules.tsx — usage_quota alert type + percentage threshold UI（已於 TASK-UA-4 完成）
 - **小黑驗證**: alerter.go Docker build ✅, frontend Docker build ✅, containers running ✅
+
+## ✅ 已完成（本輪 2026-06-16 小黑守護）
+
+### ✅ SPEC-webhooks — Webhook Reliable Delivery（2026-06-16 完成）
+- [✅] TASK-WH-1: v027 migration — `webhook_subscriptions` + `webhook_deliveries` tables
+- [✅] TASK-WH-2+3: Webhook REST API routes + worker（pool size 10, exponential backoff 1s→5s→30s）
+- [✅] TASK-WH-5: Alerter → webhook integration（`TriggerWebhook` + `FireWebhooks`）
+- [✅] Docker build --no-cache admin-api ✅
+- [✅] Container healthy, webhook worker running（10 goroutines）
+- [✅] `POST /webhooks` → 200, `GET /webhooks?org_id=X` → 200, `GET /webhooks/:id/deliveries` → 200
 
 ## ✅ 已完成（本輪 2026-06-15）
 
