@@ -11,6 +11,15 @@
 - ✅ = 完成
 - ⏳ = in progress
 
+## 🔴 ACTIVE REGRESSION — 2026-06-16 小黑發現
+
+### ✅ REGRESSION-UE-1: IncrUsage Redis Write Silent Failure（P0）— ✅ FIXED 2026-06-16 04:20
+- **發現時間**: 2026-06-16 02:30 UTC
+- **現象**: `POST /internal/usage/incr` 返回 `{"count":1,"success":true}` 但 Redis DBSIZE恆為 0
+- **小黑根因確認**: 所有 `pipe.Expire(ctx, key, 62*24*60*60)` 缺少 `*time.Second` — `62*24*60*60 = 5356800` (nanoseconds) → go-redis 轉成 1 second TTL，keys 寫入後立即過期
+- **小黑修復**: `62*24*60*60*time.Second` → 62 days TTL，所有 5 個 Expire call 都已修復 (commit `d99a03de`)
+- **小黑驗證**: Redis DBSIZE=5 keys ✅, TTL=5356693 (~62 days) ✅, GET=1 ✅, Docker build --no-cache ✅, Container healthy ✅
+
 ## Tasks
 
 ### ✅ SPEC-usage-alerting — Usage Alerting（已完成）
@@ -34,6 +43,16 @@
 - [✅] TASK-2.5-B1: alerter.go — evaluateUsageQuotas(), fire at 80/90/100%, AlertHistory, webhook trigger
 - [✅] TASK-2.5-B2: AlertRules.tsx — usage_quota alert type + percentage threshold UI（已於 TASK-UA-4 完成）
 - **小黑驗證**: alerter.go Docker build ✅, frontend Docker build ✅, containers running ✅
+
+## ✅ 已完成（本輪 2026-06-16 小黑守護）
+
+### ✅ SPEC-webhooks — Webhook Reliable Delivery（2026-06-16 完成）
+- [✅] TASK-WH-1: v027 migration — `webhook_subscriptions` + `webhook_deliveries` tables
+- [✅] TASK-WH-2+3: Webhook REST API routes + worker（pool size 10, exponential backoff 1s→5s→30s）
+- [✅] TASK-WH-5: Alerter → webhook integration（`TriggerWebhook` + `FireWebhooks`）
+- [✅] Docker build --no-cache admin-api ✅
+- [✅] Container healthy, webhook worker running（10 goroutines）
+- [✅] `POST /webhooks` → 200, `GET /webhooks?org_id=X` → 200, `GET /webhooks/:id/deliveries` → 200
 
 ## ✅ 已完成（本輪 2026-06-15）
 
@@ -200,3 +219,24 @@
   - [✅] TASK-BUG-UU-4: Smoke test — name preserved after partial update
 - **小黑驗證**: Docker build --no-cache ✅, container healthy ✅, name preserved ✅
 
+
+## Phase 2 QA — 2026-06-16 全功能 QA（第二輪）
+
+### 執行時間：2026-06-16 04:18 UTC
+
+| Phase | 功能 | 結果 |
+|-------|------|------|
+| Phase 1 | Auth 登入 | ✅ Token 取得正常 |
+| Phase 2 | Users CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 3 | Groups CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 4 | Consumers CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 5 | Upstreams CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 6 | Services CRUD | ✅ Create via upstream_id 201, Get 200, Update 200, Delete 204 |
+| Phase 7 | Routes CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 8 | Plugins CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 9 | Proxy 轉發 | ✅ Gateway 200, /test-api/health → 401（JWT auth 正確攔截）|
+| Phase 10 | JWT Auth | ✅ /consumers/{id}/jwt/credentials CRUD 正常, Auth 強制執行 |
+
+**🔴 P0 Bugs**: 0（全部已修復）  
+**🟡 P1/P2 Bugs**: 0  
+**結論**: ✅ Cont 全功能 QA 通過（2026-06-16 04:18 UTC）

@@ -264,6 +264,16 @@ func (s *Store) CreateWebhookDelivery(d *WebhookDelivery) (*WebhookDelivery, err
 	return d, nil
 }
 
+// UpdateWebhookDeliveryStatus updates the status of a webhook delivery
+func (s *Store) UpdateWebhookDeliveryStatus(id, orgID, status string, lastError, responseBody string) error {
+	_, err := s.db.Exec(`
+		UPDATE webhook_deliveries
+		SET status = $3, last_error = $4, response_body = $5
+		WHERE id = $1 AND org_id = $2`,
+		id, orgID, status, nullString(lastError), nullString(responseBody))
+	return err
+}
+
 // UpdateWebhookDelivery updates a delivery record after an attempt
 func (s *Store) UpdateWebhookDelivery(d *WebhookDelivery) error {
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")

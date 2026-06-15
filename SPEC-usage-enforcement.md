@@ -43,15 +43,23 @@
 
 ## Tasks
 
-### 🔴 TASK-UE-1: Fix IncrUsage Redis write (root cause) — ✅ FIXED 2026-06-16
+### 🔴 TASK-UE-1: Fix IncrUsage Redis write (root cause) — 🔴 REGRESSION 2026-06-16
 - **完成定義**: `POST /internal/usage/incr` 後 Redis DBSIZE > 0，且 `cont:usage:{org_id}:{YYYYMMDDHH}` key 存在
-- **根因分析**: `storage/usage.go` 的 IncrUsage 代碼正確，但 `docker compose` 啟動的 container 名稱是 `cont-admin-api-test`（覆寫了 docker-compose.yml 的 `container_name: cont-admin-api`），導致 `docker compose up cont-admin-api` 啟動了另一個 instance，真正的 service 從未重啟
-- **修補**:
-  1. `docker stop cont-admin-api-test && docker rm cont-admin-api-test` — 移除舊 container
-  2. `docker compose up -d cont-admin-api` — 以正確名稱啟動 service
-  3. 驗證 `POST /internal/usage/incr` → Redis 出現 `cont:usage:test-final:2026061517` key ✅
-  4. Docker build `--no-cache` 成功 ✅
-- **小黑驗證**: Redis DBSIZE > 0，KEY 存在 ✅
+- **小黑深入調查結論**（2026-06-16）:
+  - Source code `storage/usage.go` 含正確 IncrUsage code（commit `194ee7b4`）
+  - Source disk binary MD5: `09318e0...`（正確版本）
+  - Running container binary MD5: `a70d5874...`（**過期版本**）
+  - Docker Image MD5: `8d4519c...`（**過期版本，與 source 不同步**）
+  - 根因：**`docker compose build --pull --no-cache` 未真正 rebuild 最新 source code**，或 build cache 復用了舊 image layer
+  - `test:direct:incr` key 存在於 Redis DB0，但 binary 中無此 key 字串 → 確認 binary 不是從 source build
+- **已排除**:
+  - ❌ Pipeline.Exec 邏輯問題（source code 正確）
+  - ❌ Redis 網路問題（cont-redis PING = +PONG）
+  - ❌ Redis auth 問題（無密碼）
+  - ❌ 時區問題（UTC hour format）
+  - ❌ key 衝突（INCR/HSET 已分離）
+- **修補方向**: 強制 rebuild --no-cache，確認 binary 與 source sync
+- **小黑驗證**: 需 Dev Agent rebuild 並驗證
 
 ### ✅ TASK-UE-2: Verify GetPlanQuota current_usage (inherited)
 - `handler.lua` line 178: `local current_usage = tonumber(data.current_usage) or 0`
