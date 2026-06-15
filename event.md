@@ -116,33 +116,37 @@
 
 ## 🔴 Bug 記錄
 
-### 🔴 BUG-001: GetUser 500 INTERNAL_ERROR（P0）— 已修復 ✅
+### 🔴 BUG-001: GetUser 500 INTERNAL_ERROR（P0）— ✅ 已修復
 - **API**: `GET /users/{id}`
 - **原因**: `last_login_at` 資料庫欄位是 `TIMESTAMP WITH TIME ZONE`，可能為 NULL。Scan 直接放進 `string` 欄位，Go 不允許 NULL → string 轉換
 - **修補**: 改用 `sql.NullString` 接收，再賦值給 `u.LastLoginAt`
 - **檔案**: `admin-api/storage/store.go` GetUser()
 - **驗證**: ✅ Create → Get → Update → Delete 全部 204
 
-### 🔴 BUG-002: GetUser SELECT 缺少 org_id（P0）— 已修復 ✅
+### 🔴 BUG-002: GetUser SELECT 缺少 org_id（P0）— ✅ 已修復
 - **API**: `GET /users/{id}`
 - **原因**: User struct 有 12 個欄位，SELECT 只選 10 個（漏了 `org_id`），導致 Scan 引數數目不匹配
 - **修補**: SELECT 加入 `org_id`，Scan 加入 `&u.OrgID`
 - **檔案**: `admin-api/storage/store.go` GetUser()
 - **驗證**: ✅
 
-### 🔴 BUG-003: Users Update 404 NOT_FOUND（P0）— 已修復 ✅
-- **原因**: GetUser 500 INTERNAL_ERROR 導致 Update 前查無此人（ID 不存在）
-- **修補**: 修好 GetUser 後自動解除
-- **驗證**: ✅
+### 🔴 BUG-003: 新建 Route 轉發 404 — config sync 未同步（P0）— 🔒 待修復
+- **API**: `POST /routes` + `GET /routes/{id}` → 201成功，但 proxy 轉發 404
+- **重現**: 建立 upstream → service → route 後，等待 15s，curl 仍 404
+- **原因**: init_worker timer 只在 container 啟動時執行一次，後續 API 新建的 route 不會自動同步到 proxy 的 in-memory config
+- **workaround**: 需重啟 cont-proxy container 才能讓新路由生效
+- **影響**: 使用者透過 UI 新建 route 後無法立即使用，必須重啟 proxy
+- **嚴重程度**: P0（功能阻斷）
 
-### 🔴 BUG-004: Users Delete 404 NOT_FOUND（P0）— 已修復 ✅
-- **原因**: 同上，GetUser 失敗導致
-- **修補**: 修好 GetUser 後自動解除
-- **驗證**: ✅
+### 🟡 BUG-004: JWT 未強制執行（P1）— 🔒 待修復
+- **觀察**: `curl http://localhost:18000/test-api/health`（無 token）→ 200，應該 401
+- **原因**: JWT plugin 可能未 attach 到 route，或 plugin 未正確啟用
+- **影響**: Auth 功能無效，任何人都能訪問受保護端點
+- **嚴重程度**: P1
 
 ### 🟡 預計優化：Routes/List 回傳格式不一致
 - **觀察**: Users/Groups 回傳純陣列 `[]`，Consumers/Services/Routes/Plugins 回傳 `{"data":[], "next":""}`
-- **影響**: 前端 UI 解析需要判斷格式，增加复杂度
+- **影響**: 前端 UI 解析需要判斷格式，增加複雜度
 - **建議**: 統一為 `{"data":[], "next":""}` 格式
 
 ### 🟡 預計優化：Services Create 需要先有 upstream_id
