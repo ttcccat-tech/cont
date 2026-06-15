@@ -24,6 +24,7 @@ type Alerter struct {
 	wg          sync.WaitGroup
 	metricsURL  string
 	lastFiredAt map[int64]time.Time // ruleID -> last fired timestamp (for suppression)
+	quotaLastFiredAt map[string]time.Time // "type:id:threshold" -> last fired timestamp (for usage quota suppression)
 	mu          sync.RWMutex
 }
 
@@ -35,6 +36,7 @@ func NewAlerter(store *storage.Store, interval time.Duration, metricsURL string)
 		stopCh:      make(chan struct{}),
 		metricsURL:  metricsURL,
 		lastFiredAt: make(map[int64]time.Time),
+		quotaLastFiredAt: make(map[string]time.Time),
 	}
 }
 
@@ -85,6 +87,156 @@ func (a *Alerter) evaluate() {
 	// Also evaluate usage quotas for all orgs and consumers (automatic, no rule needed)
 	a.evaluateUsageQuotas()
 }
+
+// evaluateUsageQuotas scans all orgs and consumers for quota usage ≥ 80/90/100%
+// and fires automatic alerts without requiring a user-defined AlertRule.
+func (a *Alerter) evaluateUsageQuotas() {
+	// Evaluate org-level quotas
+	orgs, err := a.store.ListOrganizations()
+	if err != nil {
+		log.Printf("[alerter] evaluateUsageQuotas: failed to list organizations: %v", err)
+	} else {
+		for _, org := range orgs {
+			a.evaluateOrgUsageQuota(&org)
+		}
+	}
+
+	// Evaluate consumer-level quotas
+	consumers, err := a.store.ListConsumers("", 1000, 0)
+	if err != nil {
+		log.Printf("[alerter] evaluateUsageQuotas: failed to list consumers: %v", err)
+	} else {
+		for _, consumer := range consumers {
+			a.evaluateConsumerUsageQuota(&consumer)
+		}
+	}
+}
+
+// evaluateOrgUsageQuota checks a single org's usage vs quota and fires alerts at 80/90/100%.
+func (a *Alerter) evaluateOrgUsageQuota(org *storage.Organization) {
+	if org == nil || org.ID == "" {
+		return
+	}
+	// Skip the admin org
+	if org.ID == "00000000-0000-0000-0000-000000000000" {
+		return
+	}
+
+	percent, err := a.computeUsageQuotaMetric(org.ID)
+	if err != nil {
+		log.Printf("[alerter] evaluateOrgUsageQuota: org %s failed to compute quota: %v", org.ID, err)
+		return
+	}
+
+	a.checkAndFireUsageAlert("org", org.ID, org.Name, percent)
+}
+
+// evaluateConsumerUsageQuota checks a single consumer's usage vs quota and fires alerts at 80/90/100%.
+func (a *Alerter) evaluateConsumerUsageQuota(consumer *storage.Consumer) {
+	if consumer == nil || consumer.ID == "" {
+		return
+	}
+
+	percent, err := a.computeConsumerUsageQuotaMetric(consumer.ID)
+	if err != nil {
+		log.Printf("[alerter] evaluateConsumerUsageQuota: consumer %s failed to compute quota: %v", consumer.ID, err)
+		return
+	}
+
+	a.checkAndFireUsageAlert("consumer", consumer.ID, consumer.Username, percent)
+}
+
+// checkAndFireUsageAlert checks if usage percentage crosses 80/90/100% thresholds and fires alerts.
+// suppressionKey uses the target type + ID to prevent duplicate alerts within the suppression window.
+func (a *Alerter) checkAndFireUsageAlert(targetType, targetID, targetName string, percent float64) {
+	thresholds := []float64{80, 90, 100}
+
+	for _, threshold := range thresholds {
+		if percent >= threshold {
+			suppressionKey := fmt.Sprintf("%s:%s:%.0f", targetType, targetID, threshold)
+			// Check suppression using quotaLastFiredAt map
+			a.mu.RLock()
+			lastFired, ok := a.quotaLastFiredAt[suppressionKey]
+			a.mu.RUnlock()
+			if ok {
+				if time.Since(lastFired) < time.Duration(300)*time.Second { // 5-minute suppression
+					continue
+				}
+			}
+
+			// Fire the alert
+			a.fireUsageQuotaAlert(targetType, targetID, targetName, percent, threshold)
+		}
+	}
+}
+
+// fireUsageQuotaAlert fires an automatic usage quota alert and writes AlertHistory.
+func (a *Alerter) fireUsageQuotaAlert(targetType, targetID, targetName string, percent, threshold float64) {
+	b := make([]byte, 16)
+	rand.Read(b)
+	traceID := hex.EncodeToString(b)
+
+	triggeredAt := time.Now().UTC().Format(time.RFC3339)
+	suppressionKey := fmt.Sprintf("%s:%s:%.0f", targetType, targetID, threshold)
+
+	log.Printf("[alerter] usage_quota alert: %s %s usage %.2f%% (threshold %.0f%%) [trace=%s]",
+		targetType, targetID, percent, threshold, traceID)
+
+	// Broadcast SSE event
+	storage.Hub.BroadcastAll("alert_triggered", map[string]interface{}{
+		"rule_id":       0,
+		"rule_name":     fmt.Sprintf("Usage Quota Alert (%s)", targetType),
+		"metric_type":   "usage_quota",
+		"operator":      ">=",
+		"threshold":     threshold,
+		"current_value": percent,
+		"service_name":  targetID,
+		"triggered_at":  triggeredAt,
+		"target_type":   targetType,
+		"target_name":   targetName,
+	})
+
+	// Trigger webhook
+	TriggerWebhook(a.store, targetID, "alert.triggered", map[string]interface{}{
+		"rule_id":       0,
+		"rule_name":     fmt.Sprintf("Usage Quota Alert (%s)", targetType),
+		"metric_type":   "usage_quota",
+		"operator":      ">=",
+		"threshold":     threshold,
+		"current_value": percent,
+		"service_name":  targetID,
+		"triggered_at":  triggeredAt,
+		"target_type":   targetType,
+		"target_name":   targetName,
+		"trace_id":      traceID,
+	})
+
+	// Write AlertHistory
+	orgID := targetID
+	if targetType == "consumer" {
+		orgID = "00000000-0000-0000-0000-000000000000" // consumer alerts use admin org
+	}
+	history := &storage.AlertHistory{
+		RuleID:      0,
+		RuleName:    fmt.Sprintf("Usage Quota Alert (%s %s at %.0f%%)", targetType, targetName, threshold),
+		OrgID:       &orgID,
+		MetricType:  "usage_quota",
+		Operator:    ">=",
+		Threshold:   threshold,
+		ActualValue: percent,
+		Message:     fmt.Sprintf("Usage quota alert: %s '%s' usage is %.2f%% (threshold %.0f%%)", targetType, targetName, percent, threshold),
+		TraceID:     traceID,
+	}
+	if err := a.store.CreateAlertHistory(history); err != nil {
+		log.Printf("[alerter] failed to create alert history for usage_quota %s %s: %v", targetType, targetID, err)
+	}
+
+	// Update last fired timestamp
+	a.mu.Lock()
+	a.quotaLastFiredAt[suppressionKey] = time.Now()
+	a.mu.Unlock()
+}
+
 func (a *Alerter) evaluateRule(rule *storage.AlertRule) {
 	// Check suppression window
 	a.mu.RLock()
