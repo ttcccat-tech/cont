@@ -9,12 +9,12 @@ import (
 
 // IncrUsageRequest represents the request body for IncrUsage
 type IncrUsageRequest struct {
-	OrgID       string `json:"org_id"`
-	ConsumerID  string `json:"consumer_id"`
-	RouteID     string `json:"route_id"`
-	ServiceID   string `json:"service_id"`
-	LatencyMs   int64  `json:"latency_ms"`
-	StatusCode  int    `json:"status_code"`
+	OrgID      string `json:"org_id"`
+	ConsumerID string `json:"consumer_id"`
+	RouteID    string `json:"route_id"`
+	ServiceID  string `json:"service_id"`
+	LatencyMs  int64  `json:"latency_ms"`
+	StatusCode int    `json:"status_code"`
 }
 
 // IncrUsageResponse represents the response from IncrUsage
@@ -24,20 +24,21 @@ type IncrUsageResponse struct {
 }
 
 // IncrUsage increments the hourly API request counter and stores detailed usage info.
-// Key format: cont:usage:{org_id}:{YYYYMMDDHH}
-// Hash field: {consumer_id}:{route_id} -> JSON payload
+// Key format: cont:usage:{org_id}:{YYYYMMDDHH} (STRING counter via INCR)
+// Detail key: cont:usage:{org_id}:{YYYYMMDDHH}:details (HASH for per-request details)
 // TTL: 62 days (covers month boundary + buffer)
 func (r *Redis) IncrUsage(ctx context.Context, orgID, consumerID, routeID, serviceID string, latencyMs int64, statusCode int) (int64, error) {
 	hour := time.Now().Format("2006010215")
 
-	// Main org counter using INCR
+	// Main org counter using INCR on STRING key (separate from hash detail key)
 	orgKey := fmt.Sprintf("cont:usage:%s:%s", orgID, hour)
 	pipe := r.client.Pipeline()
 	incr := pipe.Incr(ctx, orgKey)
 	pipe.Expire(ctx, orgKey, 62*24*60*60) // 62 days TTL
 
-	// Hash storage for detailed info: HSET cont:usage:{org_id}:{YYYYMMDDHH} {consumer_id}:{route_id} {json}
-	hashKey := orgKey
+	// Hash storage for detailed info on SEPARATE hash key
+	// (Must not mix INCR(string) and HSET(hash) on same key)
+	hashKey := fmt.Sprintf("cont:usage:%s:%s:details", orgID, hour)
 	fieldKey := fmt.Sprintf("%s:%s", consumerID, routeID)
 	detailJSON, _ := json.Marshal(map[string]interface{}{
 		"consumer_id": consumerID,
