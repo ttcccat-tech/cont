@@ -13,33 +13,22 @@
 
 ## Tasks
 
-### 🔴 SPEC-ANALYTICS-01 — Analytics Key Parsing Bug
-- [✅] TASK-ANALYTICS-1: Fix `GetTopRoutesByUsage` key parsing — `parts[2]` → `parts[3]`
-- [✅] TASK-ANALYTICS-2: Fix `GetTopConsumersByUsage` key parsing — `parts[2]` → `parts[3]`
-- **小黑驗證**: code review `redis.go` lines 299, 357 — 兩處均已使用 `parts[3]`
-- **小黑驗證**: Docker build --no-cache proxy ✅ admin-api ✅
+### ✅ SPEC-usage-alerting — Usage Alerting（已完成）
+- [✅] TASK-UA-1: alerter.go — 廢除 evaluateUsageQuota()，在 evaluateRule() 處理 usage_quota
+- [✅] TASK-UA-2: alerter.go — 新增 computeConsumerUsageQuotaMetric()
+- [✅] TASK-UA-3: store.go — AlertRule CRUD 確認 PercentageThreshold + quota_metric_type
+- [✅] TASK-UA-4: AlertRules.tsx — POST/PUT 攜帶 quota_metric_type + percentage_threshold
+- [✅] TASK-UA-5: AlertRules.tsx — 列表顯示 usage_quota 門檻百分比
+- **小黑驗證**: evaluateUsageQuota 已移除 ✅，usage_quota 整合至 evaluateRule() ✅
+- **小黑驗證**: computeConsumerUsageQuotaMetric 存在 line 273 ✅
+- **小黑驗證**: Docker build --no-cache admin-api ✅ frontend ✅
 
-### 🔴 SPEC-BLACKSCREEN-01 — Frontend 頁面修復
-- [✅] TASK-1: Fix Users.tsx `d.map is not a function` (commit `e85ceb37`)
-- [✅] TASK-2: Fix AlertRules.tsx blank page (commit `f55927a2`)
-- [✅] TASK-3: Fix Billing.tsx route — import BillingPortal, use it instead of Settings
-- [✅] TASK-4: /config-snapshots route — 已正確存在
-- [✅] TASK-5: Fix ApiDocs.tsx load failure — `/docs.json` content-type 改為 `application/x-yaml`
-- [✅] TASK-6: Sidebar 工作區導航 — 已正確連結到 `/workspaces`
-- **小黑驗證**: curl localhost:18082/billing → 200 ✅
-- **小黑驗證**: curl localhost:18082/config-snapshots → 200 ✅
-- **小黑驗證**: curl localhost:18082/api-docs → 200 ✅ (Swagger UI loads)
-- **小黑驗證**: curl localhost:18081/docs.json → swagger.yaml + Content-Type: application/x-yaml ✅
-
-### 🟡 SPEC-usage-alerting — Usage Alerting（待處理）
-- 6 tasks，見 SPEC-usage-alerting.md
-
-### ✅ SPEC-2.5-A — Analytics Dashboard 整合
+### ✅ SPEC-2.5-A — Analytics Dashboard 整合（已完成）
 - [✅] TASK-2.5-A1: Backend `/usage/analytics` endpoint (routes/usage.go + redis.go)
 - [✅] TASK-2.5-A2: `getAnalyticsUsage()` API in kong.ts
 - [✅] TASK-2.5-A3: Cont usage panel in Analytics.tsx (progress bar, hourly trend, top entities)
-- **驗證**: docker build --no-cache admin-api ✅ frontend ✅
-- **驗證**: containers restarted ✅
+- **小黑驗證**: docker build --no-cache admin-api ✅ frontend ✅
+- **小黑驗證**: containers restarted ✅
 
 ### 🟡 SPEC-2.5-B — Usage Quota Alerting（待處理）
 - alerter.go 整合 usage quota check
@@ -48,12 +37,15 @@
 ## ✅ 已完成（本輪 2026-06-15）
 
 ### 本輪 hotfix merge 到 main
+- [✅] Usage Alerting — alerter.go 整合 usage_quota + computeConsumerUsageQuotaMetric
+- [✅] AlertRules.tsx — quota_metric_type + percentage_threshold 表單欄位
+- [✅] Analytics Dashboard — /usage/analytics endpoint + Cont usage panel
+
+### 历史完成
 - [✅] GetTopRoutesByUsage parts[3] — analytics key parsing fix
 - [✅] GetTopConsumersByUsage parts[3] — analytics key parsing fix
 - [✅] BillingPortal route — App.tsx /billing → BillingPortal
 - [✅] ApiDocs /docs.json content-type — application/x-yaml
-
-### 历史完成
 - [✅] BUG-001: GetUser 500 INTERNAL_ERROR — `sql.NullString` 修補
 - [✅] BUG-002: GetUser SELECT 缺少 `org_id` — 加入 `org_id`
 - [✅] BUG-003: Route 轉發 404 — config sync 10s + chunked decode
@@ -62,6 +54,7 @@
 - [✅] Users/Groups/Consumers/Upstreams/Plugins CRUD 全部通過
 - [✅] Proxy forwarding /test-api/health → 200
 - [✅] Auth 登入（JWT token）正常
+- [✅] `/api-docs` 正常顯示
 
 ## 成功標準（2.0）
 
@@ -70,6 +63,8 @@
 - [✅] 使用者可在 UI 完成所有操作
 - [✅] JWT / Auth 流程正常
 - [✅] `/api-docs` 正常顯示
+- [✅] `GET /usage/analytics?org_id=X` 返回正確 JSON
+- [✅] Analytics.tsx Cont 用量 panel 渲染正常
 - [ ] Load test 0% 錯誤率
 - [ ] 用量寫入 Redis 每小時 counter
 - [ ] `GET /usage/org/:id` 返回正確 JSON
