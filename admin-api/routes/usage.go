@@ -10,6 +10,46 @@ import (
 	"github.com/ttcccat-tech/cont/admin-api/storage"
 )
 
+// ── POST /internal/usage/incr ──────────────────────────────────────────────────
+
+type IncrUsageRequest struct {
+	OrgID      string `json:"org_id" binding:"required"`
+	ConsumerID string `json:"consumer_id"`
+	RouteID    string `json:"route_id"`
+	ServiceID  string `json:"service_id"`
+	LatencyMs  int64  `json:"latency_ms"`
+	StatusCode int    `json:"status_code"`
+}
+
+func IncrUsage(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req IncrUsageRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": "BAD_REQUEST", "message": err.Error()})
+			return
+		}
+		if req.OrgID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"code": "BAD_REQUEST", "message": "org_id required"})
+			return
+		}
+
+		count, err := store.Redis().IncrUsage(
+			c.Request.Context(),
+			req.OrgID,
+			req.ConsumerID,
+			req.RouteID,
+			req.ServiceID,
+			req.LatencyMs,
+			req.StatusCode,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": "INTERNAL_ERROR", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "count": count})
+	}
+}
+
 // ── GET /usage/org/:org_id ─────────────────────────────────────────────────────
 
 type OrgUsageResponse struct {

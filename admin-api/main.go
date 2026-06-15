@@ -128,6 +128,7 @@ func main() {
 	r.GET("/internal/plan-quota/default", routes.GetDefaultPlanQuota(store))
 	r.GET("/internal/config/snapshot", routes.GetProxyRuntimeConfig(store))
 	r.GET("/internal/circuit-breaker-configs", routes.GetAllCircuitBreakerConfigs(store))
+	r.POST("/internal/usage/incr", routes.IncrUsage(store))
 
 	// Admin API — Kong-compatible (auth protected)
 	admin := r.Group("/")
