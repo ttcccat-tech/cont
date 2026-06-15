@@ -526,7 +526,7 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 		setClauses = append([]string{"service_id=$13"}, setClauses...)
 		// Rebuild args with service_id at correct position ($13)
 		updatedArgs = make([]interface{}, 0, len(args)+2)
-		updatedArgs = append(updatedArgs, args[:12]...) // id through enabled (args[0:12])
+		updatedArgs = append(updatedArgs, args[:11]...) // id through connection_timeout (args[0:10])
 		updatedArgs = append(updatedArgs, svcID)         // service_id at $13
 		updatedArgs = append(updatedArgs, args[11])      // enabled (was at $12, now $14)
 		orgIDArgIndex = 14 // orgID now at $14
