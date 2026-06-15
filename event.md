@@ -13,24 +13,14 @@
 
 ## 🔴 ACTIVE REGRESSION — 2026-06-16 小黑發現
 
-### 🔴 REGRESSION-UE-1: IncrUsage Redis Write Silent Failure（P0）
+（已全部修復，見下方記錄）
+
+### ✅ REGRESSION-UE-1: IncrUsage Redis Write Silent Failure（P0）— ✅ FIXED 2026-06-16 04:20
 - **發現時間**: 2026-06-16 02:30 UTC
 - **現象**: `POST /internal/usage/incr` 返回 `{"count":1,"success":true}` 但 Redis DBSIZE恆為 0
-- **影響**: 
-  - 用量永遠是 0
-  - Free plan 超限阻擋失效
-  - 80% warning header 無法觸發
-  - 所有 2.0 用量相關功能實為空殼
-- **TASK-UE-1 原始判定**: ✅ FIXED（2026-06-16，基於當時 Redis 有 key）
-- **小黑複查結論**: REGRESSION — TASK-UE-1 驗證不正確，需重新調查根因
-- **排除項目**:
-  - ❌ 不是 binary 問題：binary 含 IncrUsage code（已 rebuild --no-cache）
-  - ❌ 不是網路問題：Redis PING = +PONG，go-redis client 已連線
-  - ❌ 不是 Redis auth問題：無密碼配置
-  - ❌ 不是時區問題：hour format 是 UTC 格式
-  - ❌ 不是 key 衝突：194ee7b4 已分離 INCR(string) 和 HSET(hash) key
-  - ❌ 不是 Docker image 問題：重建後仍失敗
-- **待查項目**: Pipeline Exec 實際執行情況（懷疑：Exec 失敗但錯誤被吞）
+- **小黑根因確認**: 所有 `pipe.Expire(ctx, key, 62*24*60*60)` 缺少 `*time.Second` — `62*24*60*60 = 5356800` (nanoseconds) → go-redis 轉成 1 second TTL，keys 寫入後立即過期
+- **小黑修復**: `62*24*60*60*time.Second` → 62 days TTL，所有 5 個 Expire call 都已修復 (commit `d99a03de`)
+- **小黑驗證**: Redis DBSIZE=5 keys ✅, TTL=5356693 (~62 days) ✅, GET=1 ✅, Docker build --no-cache ✅, Container healthy ✅
 
 ## Tasks
 
@@ -221,3 +211,24 @@
   - [✅] TASK-BUG-UU-4: Smoke test — name preserved after partial update
 - **小黑驗證**: Docker build --no-cache ✅, container healthy ✅, name preserved ✅
 
+
+## Phase 2 QA — 2026-06-16 全功能 QA（第二輪）
+
+### 執行時間：2026-06-16 04:18 UTC
+
+| Phase | 功能 | 結果 |
+|-------|------|------|
+| Phase 1 | Auth 登入 | ✅ Token 取得正常 |
+| Phase 2 | Users CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 3 | Groups CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 4 | Consumers CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 5 | Upstreams CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 6 | Services CRUD | ✅ Create via upstream_id 201, Get 200, Update 200, Delete 204 |
+| Phase 7 | Routes CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 8 | Plugins CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 9 | Proxy 轉發 | ✅ Gateway 200, /test-api/health → 401（JWT auth 正確攔截）|
+| Phase 10 | JWT Auth | ✅ /consumers/{id}/jwt/credentials CRUD 正常, Auth 強制執行 |
+
+**🔴 P0 Bugs**: 0（全部已修復）  
+**🟡 P1/P2 Bugs**: 0  
+**結論**: ✅ Cont 全功能 QA 通過（2026-06-16 04:18 UTC）
