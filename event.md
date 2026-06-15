@@ -154,15 +154,19 @@
 - **修補**: store.go UpdateRoute 完全重寫 args/setClauses 對齊邏輯 (commit TASK-RU-FINAL)
 - **驗證**: with service_id → 200 ✅, without → 200 ✅
 
-### 🔴 BUG-JWT-Credential: JWT credential API 返回 404（P1）
-- **API**: POST /consumers/{id}/jwt
-- **預期**: 201 + JWT credential 物件
-- **實際**: `404 page not found`
-- **原因**: Cont Admin API 未實作 JWT credential 端點（使用全局 key）
-- **修補方向**: 評估是否需要實作 JWT credential API，或確認文件說明使用全局 key
-- **驗證**: QA 跑完後由 subagent 評估
-
-### Phase 2 QA Summary
+### ✅ BUG-JWT-Credential: JWT credential API 返回 404（P1）— 已修復
+- **API**: POST /consumers/{id}/jwt/credentials
+- **驗證時間**: 2026-06-15 23:04 UTC
+- **容器狀態**: cont-admin-api healthy ✅
+- **Tasks**:
+  - [✅] TASK-JWT-FIX-1: Docker build --no-cache cont-admin-api
+  - [✅] TASK-JWT-FIX-2: Restart cont-admin-api container
+  - [✅] TASK-JWT-FIX-3: 驗證 JWT credential CRUD APIs
+- **CRUD 驗證**:
+  - POST /consumers/{id}/jwt/credentials → 201 ✅ (created JWT credential)
+  - GET /consumers/{id}/jwt/credentials → 200 ✅ (list returns credential)
+  - PATCH /consumers/{id}/jwt/credentials/:credId → 200 ✅ (enabled=false)
+  - DELETE /consumers/{id}/jwt/credentials/:credId → 204 ✅
 || Phase | 功能 | 狀態 |
 |-------|------|------|
 | Auth | 登入取得 token | ✅ |
@@ -174,7 +178,7 @@
 | Routes | CRUD | ✅ Update P0 已修 |
 | Plugins | CRUD | ✅ |
 | Proxy | 轉發鏈路 | ✅ |
-| JWT | Auth | ⚠️ Credential API P1 |
+| JWT | Auth + Credential CRUD | ✅ |
 
 **P0 Bugs**: 2（已全部修復 ✅）
-**P1 Bugs**: 1（JWT Credential API）
+**P1 Bugs**: 0 ✅
