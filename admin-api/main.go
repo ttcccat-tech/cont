@@ -88,7 +88,7 @@ func main() {
 		c.File("docs/swagger.yaml")
 	})
 	r.GET("/docs.json", func(c *gin.Context) {
-		c.Header("Content-Type", "application/json")
+		c.Header("Content-Type", "application/x-yaml")
 		c.File("docs/swagger.yaml")
 	})
 
