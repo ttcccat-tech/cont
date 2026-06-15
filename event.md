@@ -30,9 +30,10 @@
 - **小黑驗證**: docker build --no-cache admin-api ✅ frontend ✅
 - **小黑驗證**: containers restarted ✅
 
-### 🟡 SPEC-2.5-B — Usage Quota Alerting（待處理）
-- alerter.go 整合 usage quota check
-- 見 SPEC-2.5-B.md
+### ✅ SPEC-2.5-B — Usage Quota Alerting（已完成）
+- [✅] TASK-2.5-B1: alerter.go — evaluateUsageQuotas(), fire at 80/90/100%, AlertHistory, webhook trigger
+- [✅] TASK-2.5-B2: AlertRules.tsx — usage_quota alert type + percentage threshold UI（已於 TASK-UA-4 完成）
+- **小黑驗證**: alerter.go Docker build ✅, frontend Docker build ✅, containers running ✅
 
 ## ✅ 已完成（本輪 2026-06-15）
 
