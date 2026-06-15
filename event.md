@@ -182,3 +182,16 @@
 
 **P0 Bugs**: 2（已全部修復 ✅）
 **P1 Bugs**: 0 ✅
+
+### 🔴 BUG-Upstreams-Update: Upstream Update 清除 name 欄位（P1）
+- **API**: PUT /upstreams/{id}
+- **預期**: Update 時未傳入的欄位應保留原值
+- **實際**: Update `{"description":"..."}` 後，name 欄位被清空成空字串
+- **原因**: store.go UpdateUpstream 的 args/setClauses 未使用 SELECT 查詢後 UPDATE，而是直接 UPDATE SET name='' WHERE 未指定 name
+- **修補方向**: 使用 GET 查詢現有值後再 UPDATE，或使用 COALESCE 保留未更新欄位
+- **驗證**: 
+  - Create upstream with name="test" → name="test" ✅
+  - Update with {"description":"x"} → name="" ❌
+  - Expected: name="test" preserved
+- **嚴重程度**: P1（資料損壞 - upstream name 丢失影響負載平衡目標識別）
+
