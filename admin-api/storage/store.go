@@ -489,12 +489,14 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 
 	setClauses := []string{"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6", "strip_path=$7", "preserve_host=$8", "regex_priority=$9", "https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12"}
 	args := []interface{}{id, r.Name, "{"+strings.Join(protocols, ",")+"}", "{"+strings.Join(hosts, ",")+"}", "{"+strings.Join(paths, ",")+"}", "{"+strings.Join(methods, ",")+"}", orBool(r.StripPath, true), orBool(r.PreserveHost, false), orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426), orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true)}
+	orgIDArgIndex := 14 // default: id + 12 set clauses + orgID at $14
 	if svcID := r.GetServiceID(); svcID != "" {
 		setClauses = append([]string{"service_id=$13"}, setClauses...)
 		args = append([]interface{}{svcID}, args...)
+		orgIDArgIndex = 15 // shifted by 1 when service_id is prepended
 	}
 	args = append(args, orgID)
-	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($14 = '' OR ($14 != '' AND org_id::text = $14)) RETURNING updated_at"
+	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($" + strconv.Itoa(orgIDArgIndex) + " = '' OR ($" + strconv.Itoa(orgIDArgIndex) + " != '' AND org_id::text = $" + strconv.Itoa(orgIDArgIndex) + ")) RETURNING updated_at"
 
 	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
 	if err != nil {
@@ -791,7 +793,7 @@ func (s *Store) DeleteConsumer(id, orgID string) error {
 // ListConsumerCredentials returns all credentials for a consumer of a given type
 func (s *Store) ListConsumerCredentials(consumerID, credentialType string) ([]ConsumerCredential, error) {
 	rows, err := s.db.Query(`
-		SELECT id, consumer_id, credential_type, key, secret, enabled, expires_at, created_at
+		SELECT id, consumer_id, credential_type, key, secret, algorithm, enabled, expires_at, created_at
 		FROM consumer_credentials
 		WHERE consumer_id=$1 AND credential_type=$2
 		ORDER BY created_at DESC`,
@@ -803,12 +805,15 @@ func (s *Store) ListConsumerCredentials(consumerID, credentialType string) ([]Co
 	var out []ConsumerCredential
 	for rows.Next() {
 		var c ConsumerCredential
-		var secret, expires, created sql.NullString
-		if err := rows.Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &expires, &created); err != nil {
+		var secret, expires, created, algorithm sql.NullString
+		if err := rows.Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &algorithm, &c.Enabled, &expires, &created); err != nil {
 			return nil, err
 		}
 		if secret.Valid {
 			c.Secret = secret.String
+		}
+		if algorithm.Valid {
+			c.Algorithm = algorithm.String
 		}
 		if expires.Valid {
 			c.ExpiresAt = &expires.String
@@ -824,10 +829,10 @@ func (s *Store) ListConsumerCredentials(consumerID, credentialType string) ([]Co
 // CreateConsumerCredential creates a new credential for a consumer
 func (s *Store) CreateConsumerCredential(c *ConsumerCredential) (*ConsumerCredential, error) {
 	err := s.db.QueryRow(`
-		INSERT INTO consumer_credentials (consumer_id, credential_type, key, secret, enabled, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO consumer_credentials (consumer_id, credential_type, key, secret, algorithm, enabled, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at`,
-		c.ConsumerID, c.CredentialType, c.Key, c.Secret, orBool(c.Enabled, true), c.ExpiresAt,
+		c.ConsumerID, c.CredentialType, c.Key, c.Secret, c.Algorithm, orBool(c.Enabled, true), c.ExpiresAt,
 	).Scan(&c.ID, &c.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -838,18 +843,21 @@ func (s *Store) CreateConsumerCredential(c *ConsumerCredential) (*ConsumerCreden
 // GetConsumerCredentialByKey looks up a credential by type and key (for auth middleware)
 func (s *Store) GetConsumerCredentialByKey(credentialType, key string) (*ConsumerCredential, error) {
 	var c ConsumerCredential
-	var secret, expires, created sql.NullString
+	var secret, expires, created, algorithm sql.NullString
 	err := s.db.QueryRow(`
-		SELECT id, consumer_id, credential_type, key, secret, enabled, expires_at, created_at
+		SELECT id, consumer_id, credential_type, key, secret, algorithm, enabled, expires_at, created_at
 		FROM consumer_credentials
 		WHERE credential_type=$1 AND key=$2 AND enabled=true`,
 		credentialType, key,
-	).Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &expires, &created)
+	).Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &algorithm, &c.Enabled, &expires, &created)
 	if err != nil {
 		return nil, err
 	}
 	if secret.Valid {
 		c.Secret = secret.String
+	}
+	if algorithm.Valid {
+		c.Algorithm = algorithm.String
 	}
 	if expires.Valid {
 		c.ExpiresAt = &expires.String
@@ -863,18 +871,21 @@ func (s *Store) GetConsumerCredentialByKey(credentialType, key string) (*Consume
 // GetConsumerCredential fetches a credential by ID for a consumer
 func (s *Store) GetConsumerCredential(consumerID, credentialType, credentialID string) (*ConsumerCredential, error) {
 	var c ConsumerCredential
-	var secret, expires, created sql.NullString
+	var secret, expires, created, algorithm sql.NullString
 	err := s.db.QueryRow(`
-		SELECT id, consumer_id, credential_type, key, secret, enabled, expires_at, created_at
+		SELECT id, consumer_id, credential_type, key, secret, algorithm, enabled, expires_at, created_at
 		FROM consumer_credentials
 		WHERE id=$1 AND consumer_id=$2 AND credential_type=$3`,
 		credentialID, consumerID, credentialType,
-	).Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &c.Enabled, &expires, &created)
+	).Scan(&c.ID, &c.ConsumerID, &c.CredentialType, &c.Key, &secret, &algorithm, &c.Enabled, &expires, &created)
 	if err != nil {
 		return nil, err
 	}
 	if secret.Valid {
 		c.Secret = secret.String
+	}
+	if algorithm.Valid {
+		c.Algorithm = algorithm.String
 	}
 	if expires.Valid {
 		c.ExpiresAt = &expires.String

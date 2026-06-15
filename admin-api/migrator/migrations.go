@@ -698,6 +698,22 @@ END $$;
 `,
 		Down: `ALTER TABLE services DROP COLUMN IF EXISTS upstream_id;`,
 	})
+
+	// v026: JWT Credential Support
+	m.Register(Migration{
+		Version:     26,
+		Description: "JWT Credential support (algorithm field for jwt credential type)",
+		Up: `
+ALTER TABLE consumer_credentials ADD COLUMN IF NOT EXISTS algorithm TEXT;
+ALTER TABLE consumer_credentials DROP CONSTRAINT IF EXISTS consumer_credentials_credential_type_check;
+ALTER TABLE consumer_credentials ADD CONSTRAINT consumer_credentials_credential_type_check CHECK (credential_type IN ('key-auth', 'basic-auth', 'hmac-auth', 'jwt'));
+`,
+		Down: `
+ALTER TABLE consumer_credentials DROP COLUMN IF EXISTS algorithm;
+ALTER TABLE consumer_credentials DROP CONSTRAINT IF EXISTS consumer_credentials_credential_type_check;
+ALTER TABLE consumer_credentials ADD CONSTRAINT consumer_credentials_credential_type_check CHECK (credential_type IN ('key-auth', 'basic-auth', 'hmac-auth'));
+`,
+	})
 }
 
 // Migrate runs all pending migrations

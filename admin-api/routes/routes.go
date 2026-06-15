@@ -1073,6 +1073,7 @@ func CreateCredential(store *storage.Store, credentialType string) gin.HandlerFu
 		var req struct {
 			Key       string  `json:"key" binding:"required"`
 			Secret    string  `json:"secret,omitempty"`
+			Algorithm string  `json:"algorithm,omitempty"`
 			ExpiresAt *string `json:"expires_at,omitempty"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -1088,6 +1089,7 @@ func CreateCredential(store *storage.Store, credentialType string) gin.HandlerFu
 			CredentialType: credentialType,
 			Key:            req.Key,
 			Secret:         req.Secret,
+			Algorithm:      req.Algorithm,
 			Enabled:        true,
 			ExpiresAt:      req.ExpiresAt,
 		}

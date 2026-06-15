@@ -211,6 +211,11 @@ func main() {
 			cred.POST("/hmac-auth/credentials", routes.RequirePermission(store, "consumers", true), routes.CreateCredential(store, "hmac-auth"))
 			cred.PATCH("/hmac-auth/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.UpdateCredential(store, "hmac-auth"))
 			cred.DELETE("/hmac-auth/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.DeleteCredential(store, "hmac-auth"))
+			// JWT credentials
+			cred.GET("/jwt/credentials", routes.RequirePermission(store, "consumers", false), routes.ListCredentials(store, "jwt"))
+			cred.POST("/jwt/credentials", routes.RequirePermission(store, "consumers", true), routes.CreateCredential(store, "jwt"))
+			cred.PATCH("/jwt/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.UpdateCredential(store, "jwt"))
+			cred.DELETE("/jwt/credentials/:credId", routes.RequirePermission(store, "consumers", true), routes.DeleteCredential(store, "jwt"))
 		}
 
 		plugs := admin.Group("/plugins")

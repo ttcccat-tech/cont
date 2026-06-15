@@ -271,37 +271,40 @@ type Consumer struct {
 
 // ConsumerCredential represents a consumer authentication credential
 type ConsumerCredential struct {
-	ID             string  `json:"id"`
-	ConsumerID     string  `json:"consumer_id"`
-	CredentialType string  `json:"credential_type" binding:"required,oneof=key-auth basic-auth hmac-auth"`
-	Key            string  `json:"key"` // API key for key-auth, username for basic-auth, consumer key for hmac-auth
-	Secret         string  `json:"secret,omitempty"` // bcrypt hash for basic-auth, HMAC secret for hmac-auth (never returned)
-	Enabled        bool    `json:"enabled"`
-	ExpiresAt      *string `json:"expires_at,omitempty"` // nil = never expires
-	CreatedAt      string  `json:"created_at,omitempty"`
+	ID              string  `json:"id"`
+	ConsumerID      string  `json:"consumer_id"`
+	CredentialType  string  `json:"credential_type" binding:"required,oneof=key-auth basic-auth hmac-auth jwt"`
+	Key             string  `json:"key"` // API key for key-auth, username for basic-auth, consumer key for hmac-auth, key ID for jwt
+	Secret          string  `json:"secret,omitempty"` // bcrypt hash for basic-auth, HMAC secret for hmac-auth, JWT secret for jwt (never returned)
+	Algorithm       string  `json:"algorithm,omitempty"` // RS256, RS384, RS512, HS256, HS384, HS512 for jwt
+	Enabled         bool    `json:"enabled"`
+	ExpiresAt       *string `json:"expires_at,omitempty"` // nil = never expires
+	CreatedAt       string  `json:"created_at,omitempty"`
 }
 
 // CredentialResponse hides secret when returning to clients
 type CredentialResponse struct {
-	ID             string  `json:"id"`
-	ConsumerID     string  `json:"consumer_id"`
-	CredentialType string  `json:"credential_type"`
-	Key            string  `json:"key"`
-	Enabled        bool    `json:"enabled"`
-	ExpiresAt      *string `json:"expires_at,omitempty"`
-	CreatedAt      string  `json:"created_at,omitempty"`
+	ID              string  `json:"id"`
+	ConsumerID      string  `json:"consumer_id"`
+	CredentialType  string  `json:"credential_type"`
+	Key             string  `json:"key"`
+	Algorithm       string  `json:"algorithm,omitempty"`
+	Enabled         bool    `json:"enabled"`
+	ExpiresAt       *string `json:"expires_at,omitempty"`
+	CreatedAt       string  `json:"created_at,omitempty"`
 }
 
 // ToResponse converts a credential to an API-safe response (hides secret)
 func (c *ConsumerCredential) ToResponse() CredentialResponse {
 	return CredentialResponse{
-		ID:             c.ID,
-		ConsumerID:     c.ConsumerID,
-		CredentialType: c.CredentialType,
-		Key:            c.Key,
-		Enabled:        c.Enabled,
-		ExpiresAt:      c.ExpiresAt,
-		CreatedAt:      c.CreatedAt,
+		ID:              c.ID,
+		ConsumerID:      c.ConsumerID,
+		CredentialType:  c.CredentialType,
+		Key:             c.Key,
+		Algorithm:       c.Algorithm,
+		Enabled:         c.Enabled,
+		ExpiresAt:       c.ExpiresAt,
+		CreatedAt:       c.CreatedAt,
 	}
 }
 
