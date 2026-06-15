@@ -140,21 +140,19 @@
 
 ## Phase 2 QA — 2026-06-15 全功能 QA
 
-### 🔴 BUG-Services-Update: Services Update 返回 INTERNAL_ERROR（P0）
+### ✅ BUG-Services-Update: Services Update 返回 INTERNAL_ERROR（P0）
 - **API**: PUT /services/{id}
-- **預期**: 200 + 更新後的 service JSON
-- **實際**: `{"code":"INTERNAL_ERROR","message":"internal server error"}`
-- **原因**: 初步分析 PUT handler 可能有 nil pointer 或 SQL update 問題
-- **修補方向**: 檢查 services update handler，確認 upstream_id 處理邏輯
-- **驗證**: QA 跑完後由 subagent 診斷
+- **狀態**: ✅ 已修復（2026-06-15）
+- **修補**: 
+  - store.go: upstream_id UUID validation (commit 4caad121)
+  - routes.go: handler 返回 400 for invalid upstream_id (commit 648caf8a)
+- **驗證**: valid update → 200 ✅, invalid upstream_id → 400 ✅
 
-### 🔴 BUG-Routes-Update: Routes Update 返回 INTERNAL_ERROR（P0）
+### ✅ BUG-Routes-Update: Routes Update 返回 INTERNAL_ERROR（P0）
 - **API**: PUT /routes/{id}
-- **預期**: 200 + 更新後的 route JSON
-- **實際**: `{"code":"INTERNAL_ERROR","message":"internal server error"}`
-- **原因**: 初步分析 route update handler 有 nil pointer 或 SQL error
-- **修補方向**: 檢查 routes update handler，確認 service_id paths 處理
-- **驗證**: QA 跑完後由 subagent 診斷
+- **狀態**: ✅ 已修復（2026-06-15）
+- **修補**: store.go UpdateRoute 完全重寫 args/setClauses 對齊邏輯 (commit TASK-RU-FINAL)
+- **驗證**: with service_id → 200 ✅, without → 200 ✅
 
 ### 🔴 BUG-JWT-Credential: JWT credential API 返回 404（P1）
 - **API**: POST /consumers/{id}/jwt
@@ -165,18 +163,18 @@
 - **驗證**: QA 跑完後由 subagent 評估
 
 ### Phase 2 QA Summary
-| Phase | 功能 | 狀態 |
+|| Phase | 功能 | 狀態 |
 |-------|------|------|
 | Auth | 登入取得 token | ✅ |
 | Users | CRUD | ✅ |
 | Groups | CRUD | ✅ |
 | Consumers | CRUD | ✅ |
 | Upstreams | CRUD | ✅ |
-| Services | CRUD | ⚠️ Update P0 |
-| Routes | CRUD | ⚠️ Update P0 |
+| Services | CRUD | ✅ Update P0 已修 |
+| Routes | CRUD | ✅ Update P0 已修 |
 | Plugins | CRUD | ✅ |
 | Proxy | 轉發鏈路 | ✅ |
 | JWT | Auth | ⚠️ Credential API P1 |
 
-**P0 Bugs**: 2（Services Update, Routes Update）
+**P0 Bugs**: 2（已全部修復 ✅）
 **P1 Bugs**: 1（JWT Credential API）
