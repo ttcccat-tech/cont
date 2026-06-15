@@ -3,7 +3,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o cont-admin-api .
+RUN go build -mod=mod -o cont-admin-api .
 
 FROM alpine:3.19
 RUN apk add --no-cache ca-certificates tzdata
