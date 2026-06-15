@@ -32,8 +32,18 @@ P1 bug：當 `PUT /upstreams/{id}` 只傳入部分欄位（如 `{"description":"
 
 ## Tasks
 
-- [ ] TASK-BUG-UU-1: Analyze UpdateUpstream args/setClauses in store.go
-- [ ] TASK-BUG-UU-2: Fix UpdateUpstream using COALESCE or GET-then-UPDATE pattern
-- [ ] TASK-BUG-UU-3: Docker build --no-cache admin-api
-- [ ] TASK-BUG-UU-4: Restart cont-admin-api container
-- [ ] TASK-BUG-UU-5: Smoke test — Create → Update{partial} → Verify name preserved
+- [ ] TASK-BUG-UU-1: Fix UpdateUpstream name preservation in store.go
+  - **完成定義**: `name=$2` → `name=COALESCE(NULLIF($2,''), name)` — 空字串不覆蓋現有值
+  - **對應驗收標準**: 標準 2、3
+- [ ] TASK-BUG-UU-2: Docker build --no-cache admin-api
+  - **完成定義**: `docker compose build --no-cache cont-admin-api` 成功，container restart 後 healthy
+  - **對應驗收標準**: 標準 4
+- [ ] TASK-BUG-UU-3: Restart cont-admin-api container
+  - **完成定義**: `docker restart cont-admin-api` 後 container healthy
+  - **對應驗收標準**: 標準 4
+- [ ] TASK-BUG-UU-4: Smoke test — Create → Update{partial} → Verify name preserved
+  - **完成定義**:
+    1. `POST /upstreams` (name="test-upstream-uu") → 201，name="test-upstream-uu" ✅
+    2. `PATCH /upstreams/{id}` (description="updated-desc") → 200，name 仍為 "test-upstream-uu" ✅
+    3. `GET /upstreams/{id}` → name="test-upstream-uu"（未變）✅
+  - **對應驗收標準**: 標準 1、2、3
