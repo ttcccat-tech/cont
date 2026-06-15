@@ -28,3 +28,10 @@ Phase 2 QA 發現 PUT /services/{id} 返回 INTERNAL_ERROR。初步分析指向 
 4. `PUT /services/{id}` with upstream_id field → upstream_id 正確更新
 5. Docker build --no-cache admin-api 成功
 6. 容器重啟後服務正常
+
+## Tasks
+- [ ] TASK-SU-DIAG: 確認 UpdateService INTERNAL_ERROR 根因（檢查 upstream_id UUID cast 是否為問題）
+- [ ] TASK-SU-FIX: 修復 UpdateService（若 upstream_id UUID cast 是問題則加 NULLIF）
+- [ ] TASK-SU-BUILD: Docker build --no-cache admin-api
+- [ ] TASK-SU-RESTART: 重啟 admin-api container
+- [ ] TASK-SU-QA: QA 驗證 PUT /services/{id} → 200

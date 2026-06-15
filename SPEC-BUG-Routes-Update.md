@@ -31,3 +31,9 @@ f1a50c04 merge commit 已實作 args 重建邏輯修正。
 4. `PUT /routes/{id}` with paths, methods, hosts → 正確更新
 5. Docker build --no-cache admin-api 成功
 6. 容器重啟後服務正常
+
+## Tasks
+- [ ] TASK-RU-DIAG: 確認 UpdateRoute args 重建邏輯（f1a50c04 修復後）無其他問題
+- [ ] TASK-RU-BUILD: Docker build --no-cache admin-api（確保最新程式碼）
+- [ ] TASK-RU-RESTART: 重啟 admin-api container
+- [ ] TASK-RU-QA: QA 驗證 PUT /routes/{id} → 200（含 service_id 案例）
