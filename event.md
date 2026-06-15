@@ -130,19 +130,17 @@
 - **檔案**: `admin-api/storage/store.go` GetUser()
 - **驗證**: ✅
 
-### 🔴 BUG-003: 新建 Route 轉發 404 — config sync 未同步（P0）— 🔒 待修復
+### 🔴 BUG-003: 新建 Route 轉發 404 — config sync 未同步（P0）— ✅ 已修復
 - **API**: `POST /routes` + `GET /routes/{id}` → 201成功，但 proxy 轉發 404
-- **重現**: 建立 upstream → service → route 後，等待 15s，curl 仍 404
 - **原因**: init_worker timer 只在 container 啟動時執行一次，後續 API 新建的 route 不會自動同步到 proxy 的 in-memory config
-- **workaround**: 需重啟 cont-proxy container 才能讓新路由生效
-- **影響**: 使用者透過 UI 新建 route 後無法立即使用，必須重啟 proxy
-- **嚴重程度**: P0（功能阻斷）
+- **修補**: `nginx.conf` 的 periodic timer 間隔從 30s 改為 10s，並修補 chunked encoding body 解析（原本 chunked 回應會 decode 失敗導致 config 未更新）
+- **驗證**: 新建 upstream → service → route，等待 12s，curl → 401（路由已匹配，只是需要 JWT）
 
-### 🟡 BUG-004: JWT 未強制執行（P1）— 🔒 待修復
+### 🟡 BUG-004: JWT 未強制執行（P1）— ✅ 已修復
 - **觀察**: `curl http://localhost:18000/test-api/health`（無 token）→ 200，應該 401
-- **原因**: JWT plugin 可能未 attach 到 route，或 plugin 未正確啟用
-- **影響**: Auth 功能無效，任何人都能訪問受保護端點
-- **嚴重程度**: P1
+- **原因**: `nginx.conf` 的 access_by_lua_block 繞過了 `access.lua` 的 JWT 驗證邏輯，inline 程式碼沒有實作 auth 檢查
+- **修補**: 在 `nginx.conf` inline access_by_lua_block 中加入 JWT validation logic（參考 `access.lua` 原有實作），透過 Admin API `/internal/validate-jwt/:token` endpoint 驗證 token
+- **驗證**: 無 token → 401 `{"message":"No JWT token provided"...}` ✅
 
 ### 🟡 預計優化：Routes/List 回傳格式不一致
 - **觀察**: Users/Groups 回傳純陣列 `[]`，Consumers/Services/Routes/Plugins 回傳 `{"data":[], "next":""}`
