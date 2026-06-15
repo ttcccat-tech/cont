@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -34,7 +35,7 @@ func (r *Redis) IncrUsage(ctx context.Context, orgID, consumerID, routeID, servi
 	orgKey := fmt.Sprintf("cont:usage:%s:%s", orgID, hour)
 	pipe := r.client.Pipeline()
 	incr := pipe.Incr(ctx, orgKey)
-	pipe.Expire(ctx, orgKey, 62*24*60*60) // 62 days TTL
+	pipe.Expire(ctx, orgKey, 62*24*60*60*time.Second) // 62 days TTL
 
 	// Hash storage for detailed info on SEPARATE hash key
 	// (Must not mix INCR(string) and HSET(hash) on same key)
@@ -49,32 +50,34 @@ func (r *Redis) IncrUsage(ctx context.Context, orgID, consumerID, routeID, servi
 		"timestamp":   time.Now().UTC().Format(time.RFC3339),
 	})
 	pipe.HSet(ctx, hashKey, fieldKey, string(detailJSON))
-	pipe.Expire(ctx, hashKey, 62*24*60*60)
+	pipe.Expire(ctx, hashKey, 62*24*60*60*time.Second)
 
 	// Consumer counter (only if consumer_id is present)
 	if consumerID != "" {
 		consumerKey := fmt.Sprintf("cont:usage:consumer:%s:%s", consumerID, hour)
 		pipe.Incr(ctx, consumerKey)
-		pipe.Expire(ctx, consumerKey, 62*24*60*60)
+		pipe.Expire(ctx, consumerKey, 62*24*60*60*time.Second)
 	}
 
 	// Route counter (only if route_id is present)
 	if routeID != "" {
 		routeKey := fmt.Sprintf("cont:usage:route:%s:%s", routeID, hour)
 		pipe.Incr(ctx, routeKey)
-		pipe.Expire(ctx, routeKey, 62*24*60*60)
+		pipe.Expire(ctx, routeKey, 62*24*60*60*time.Second)
 	}
 
 	// Service counter (only if service_id is present)
 	if serviceID != "" {
 		serviceKey := fmt.Sprintf("cont:usage:service:%s:%s", serviceID, hour)
 		pipe.Incr(ctx, serviceKey)
-		pipe.Expire(ctx, serviceKey, 62*24*60*60)
+		pipe.Expire(ctx, serviceKey, 62*24*60*60*time.Second)
 	}
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
+		log.Printf("[DEBUG] IncrUsage pipeline Exec error: %v", err)
 		return 0, err
 	}
+	log.Printf("[DEBUG] IncrUsage pipeline Exec success: count=%d, orgKey=%s, hashKey=%s", incr.Val(), orgKey, hashKey)
 	return incr.Val(), nil
 }
