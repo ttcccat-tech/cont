@@ -11,6 +11,27 @@
 - ✅ = 完成
 - ⏳ = in progress
 
+## 🔴 ACTIVE REGRESSION — 2026-06-16 小黑發現
+
+### 🔴 REGRESSION-UE-1: IncrUsage Redis Write Silent Failure（P0）
+- **發現時間**: 2026-06-16 02:30 UTC
+- **現象**: `POST /internal/usage/incr` 返回 `{"count":1,"success":true}` 但 Redis DBSIZE恆為 0
+- **影響**: 
+  - 用量永遠是 0
+  - Free plan 超限阻擋失效
+  - 80% warning header 無法觸發
+  - 所有 2.0 用量相關功能實為空殼
+- **TASK-UE-1 原始判定**: ✅ FIXED（2026-06-16，基於當時 Redis 有 key）
+- **小黑複查結論**: REGRESSION — TASK-UE-1 驗證不正確，需重新調查根因
+- **排除項目**:
+  - ❌ 不是 binary 問題：binary 含 IncrUsage code（已 rebuild --no-cache）
+  - ❌ 不是網路問題：Redis PING = +PONG，go-redis client 已連線
+  - ❌ 不是 Redis auth問題：無密碼配置
+  - ❌ 不是時區問題：hour format 是 UTC 格式
+  - ❌ 不是 key 衝突：194ee7b4 已分離 INCR(string) 和 HSET(hash) key
+  - ❌ 不是 Docker image 問題：重建後仍失敗
+- **待查項目**: Pipeline Exec 實際執行情況（懷疑：Exec 失敗但錯誤被吞）
+
 ## Tasks
 
 ### ✅ SPEC-usage-alerting — Usage Alerting（已完成）
