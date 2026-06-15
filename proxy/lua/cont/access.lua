@@ -407,4 +407,10 @@ if route.strip_path and route.paths and #route.paths > 0 then
 end
 
 ngx.ctx.upstream_target = upstream_target
+
+-- TASK-UC-5: Non-blocking usage increment at end of request processing
+pcall(function()
+    ngx.location.capture_multi({{"/__cont_api_internal__/internal/usage/incr", {args = {route_id = route and route.id, service_id = service_id}}}})
+end)
+
 return cont
