@@ -487,14 +487,43 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	paths := orSlice(r.Paths, []string{})
 	methods := orSlice(r.Methods, []string{})
 
-	setClauses := []string{"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6", "strip_path=$7", "preserve_host=$8", "regex_priority=$9", "https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12"}
-	args := []interface{}{id, r.Name, "{"+strings.Join(protocols, ",")+"}", "{"+strings.Join(hosts, ",")+"}", "{"+strings.Join(paths, ",")+"}", "{"+strings.Join(methods, ",")+"}", orBool(r.StripPath, true), orBool(r.PreserveHost, false), orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426), orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true)}
-	orgIDArgIndex := 14 // default: id + 12 set clauses + orgID at $14
+	// Build setClauses and args with correct placeholder indices.
+	// Default: id($1), name($2), protocols($3), hosts($4), paths($5), methods($6),
+	//          strip_path($7), preserve_host($8), regex_priority($9), https_redirect_status_code($10),
+	//          connection_timeout($11), enabled($12), orgID($13)
+	setClauses := []string{
+		"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6",
+		"strip_path=$7", "preserve_host=$8", "regex_priority=$9",
+		"https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12",
+	}
+	args := []interface{}{
+		id,
+		r.Name,
+		"{" + strings.Join(protocols, ",") + "}",
+		"{" + strings.Join(hosts, ",") + "}",
+		"{" + strings.Join(paths, ",") + "}",
+		"{" + strings.Join(methods, ",") + "}",
+		orBool(r.StripPath, true),
+		orBool(r.PreserveHost, false),
+		orInt(r.RegexPriority, 0),
+		orInt(r.HTTPSRedirectStatusCode, 426),
+		orInt(r.ConnectionTimeout, 60000),
+		orBool(r.Enabled, true),
+	}
+	orgIDArgIndex := 13 // id + 12 set clauses, orgID at $13
+
+	// When service_id is provided, insert it at $13 and shift subsequent placeholders
 	if svcID := r.GetServiceID(); svcID != "" {
 		setClauses = append([]string{"service_id=$13"}, setClauses...)
-		args = append([]interface{}{svcID}, args...)
-		orgIDArgIndex = 15 // shifted by 1 when service_id is prepended
+		// Rebuild args with service_id at correct position ($13)
+		updatedArgs := make([]interface{}, 0, len(args)+2)
+		updatedArgs = append(updatedArgs, args[:12]...) // id through enabled (args[0:12])
+		updatedArgs = append(updatedArgs, svcID)         // service_id at $13
+		updatedArgs = append(updatedArgs, args[12])       // enabled (was at $12, now $14)
+		args = updatedArgs
+		orgIDArgIndex = 14 // orgID now at $14
 	}
+
 	args = append(args, orgID)
 	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($" + strconv.Itoa(orgIDArgIndex) + " = '' OR ($" + strconv.Itoa(orgIDArgIndex) + " != '' AND org_id::text = $" + strconv.Itoa(orgIDArgIndex) + ")) RETURNING updated_at"
 
