@@ -362,6 +362,10 @@ func UpdateService(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
+			if strings.Contains(err.Error(), "invalid upstream_id") {
+				badRequest(c, err)
+				return
+			}
 			internalError(c)
 			return
 		}

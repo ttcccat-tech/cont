@@ -521,18 +521,22 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	orgIDArgIndex := 13 // id + 12 set clauses, orgID at $13
 
 	// When service_id is provided, insert it at $13 and shift subsequent placeholders
+	var updatedArgs []interface{}
 	if svcID := r.GetServiceID(); svcID != "" {
 		setClauses = append([]string{"service_id=$13"}, setClauses...)
 		// Rebuild args with service_id at correct position ($13)
-		updatedArgs := make([]interface{}, 0, len(args)+2)
+		updatedArgs = make([]interface{}, 0, len(args)+2)
 		updatedArgs = append(updatedArgs, args[:12]...) // id through enabled (args[0:12])
 		updatedArgs = append(updatedArgs, svcID)         // service_id at $13
 		updatedArgs = append(updatedArgs, args[11])      // enabled (was at $12, now $14)
-		args = updatedArgs
 		orgIDArgIndex = 14 // orgID now at $14
 	}
 
-	args = append(args, orgID)
+	if updatedArgs != nil {
+		args = append(updatedArgs, orgID)
+	} else {
+		args = append(args, orgID)
+	}
 	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($" + strconv.Itoa(orgIDArgIndex) + " = '' OR ($" + strconv.Itoa(orgIDArgIndex) + " != '' AND org_id::text = $" + strconv.Itoa(orgIDArgIndex) + ")) RETURNING updated_at"
 
 	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
