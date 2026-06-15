@@ -137,6 +137,12 @@
 
 ---
 
+## ✅ 本輪完成（2026-06-15）
+
+- [✅] SPEC-PENDING-01 — Cosocket refactor + upstream_id migration 已確認存在於 v024，build 驗證全部通過（nginx -t ✅, docker build proxy --no-cache ✅, docker build admin-api --no-cache ✅, 所有 containers healthy ✅）
+
+---
+
 ## 成功標準
 
 - ✅ Admin API 所有端點正常（CRUD）
