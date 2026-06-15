@@ -1,30 +1,33 @@
 # SPEC-BUG-Routes-Update
 
+## Bug 概述
+- **Issue**: BUG-Routes-Update
+- **等級**: P0
+- **API**: `PUT /routes/{id}`
+- **現象**: 返回 `{"code":"INTERNAL_ERROR","message":"internal server error"}`
+
 ## 背景
-- QA Full-System 測試發現：`PUT /routes/{id}` 返回 `{"code":"INTERNAL_ERROR","message":"internal server error"}`
-- 功能阻斷：Routes Update 操作完全失效，P0 bug
+Phase 2 QA 發現 PUT /routes/{id} 返回 INTERNAL_ERROR。根因分析（commit 051a4c4f）：
+當 service_id 存在時，args slice 重建邏輯會錯誤地將 service_id 置於 $13，但 enabled 被推到 $14，導致所有 placeholder 索引偏移 1。
+
+f1a50c04 merge commit 已實作 args 重建邏輯修正。
 
 ## 目標
-- 修復 `PUT /routes/:id` INTERNAL_ERROR bug
-- 確認更新後 Route 資料正確寫入 DB
+確認 UpdateRoute 修復完成，PUT /routes/{id} 返回 200 + 更新後的 route JSON。
 
 ## Scope
-
 ### In-scope
-- `routes.UpdateRoute` handler (routes/routes.go)
-- `store.UpdateRoute` storage function
-- Route JSON deserialization（含 `Service` nested object解析）
-- DB transaction / commit 邏輯
+- 驗證 store.go UpdateRoute() 的 args 重建邏輯正確
+- 確認 PUT /routes/{id} 正常運作
 
 ### Out-of-scope
-- Route creation (CreateRoute 已正常)
-- Route deletion
-- Service 本身的 CRUD
+- CreateRoute 修復
+- 其它 CRUD 操作
 
 ## 驗收標準
-1. `PUT /routes/:id` with valid JSON body → 200 OK + updated route JSON
-2. `PUT /routes/:id` with invalid ID → 404 not found
-3. `PUT /routes/:id` with invalid JSON → 400 validation error
-4. Updated route can be retrieved via `GET /routes/:id` and matches submitted data
-5. Docker build --no-cache succeeds for admin-api
-6. Container restarts successfully
+1. `PUT /routes/{id}` with valid JSON body (含 service_id) → 200 + updated route JSON
+2. `PUT /routes/{id}` with non-existent id → 404
+3. `PUT /routes/{id}` with empty name → 400 validation error
+4. `PUT /routes/{id}` with paths, methods, hosts → 正確更新
+5. Docker build --no-cache admin-api 成功
+6. 容器重啟後服務正常

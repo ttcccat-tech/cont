@@ -1,30 +1,30 @@
 # SPEC-BUG-Services-Update
 
+## Bug 概述
+- **Issue**: BUG-Services-Update
+- **等級**: P0
+- **API**: `PUT /services/{id}`
+- **現象**: 返回 `{"code":"INTERNAL_ERROR","message":"internal server error"}`
+
 ## 背景
-- QA Full-System 測試發現：`PUT /services/{id}` 返回 `{"code":"INTERNAL_ERROR","message":"internal server error"}`
-- 功能阻斷：Services Update 操作完全失效，P0 bug
+Phase 2 QA 發現 PUT /services/{id} 返回 INTERNAL_ERROR。初步分析指向 store.go UpdateService() 可能的 nil pointer 或 SQL error。
 
 ## 目標
-- 修復 `PUT /services/:id` INTERNAL_ERROR bug
-- 確認更新後 Service 資料正確寫入 DB
+修復 UpdateService，使得 PUT /services/{id} 返回 200 + 更新後的 service JSON。
 
 ## Scope
-
 ### In-scope
-- `services.UpdateService` handler (services/services.go)
-- `store.UpdateService` storage function
-- Service JSON deserialization（含 `Upstream` nested object 解析）
-- DB transaction / commit 邏輯
+- store.go UpdateService() 函數的 SQL binding 問題修復
+- 驗證 UpdateService 正常運作
 
 ### Out-of-scope
-- Service creation (CreateService 已正常)
-- Service deletion
-- Upstream 本身的 CRUD
+- CreateService 修復（已於 TASK-SU-2 處理）
+- 其它 CRUD 操作
 
 ## 驗收標準
-1. `PUT /services/:id` with valid JSON body → 200 OK + updated service JSON
-2. `PUT /services/:id` with invalid ID → 404 not found
-3. `PUT /services/:id` with invalid JSON → 400 validation error
-4. Updated service can be retrieved via `GET /services/:id` and matches submitted data
-5. Docker build --no-cache succeeds for admin-api
-6. Container restarts successfully
+1. `PUT /services/{id}` with valid JSON body → 200 + updated service JSON
+2. `PUT /services/{id}` with non-existent id → 404
+3. `PUT /services/{id}` with empty name → 400 validation error
+4. `PUT /services/{id}` with upstream_id field → upstream_id 正確更新
+5. Docker build --no-cache admin-api 成功
+6. 容器重啟後服務正常
