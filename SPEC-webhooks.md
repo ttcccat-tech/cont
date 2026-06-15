@@ -42,35 +42,35 @@
 
 ## Tasks
 
-### TASK-WH-1: Migration — Create webhook tables
+### [ ] TASK-WH-1: Migration — Create webhook tables
 - 完成定義：`v026_webhook_tables` migration 執行後，`webhook_subscriptions` 和 `webhook_deliveries` tables 存在於 PostgreSQL
 - File: `admin-api/migrations/` (new migration file)
 - Tables:
   - `webhook_subscriptions`: id, org_id, url, event_types (text[]), secret, active, created_at, updated_at
   - `webhook_deliveries`: id, org_id, webhook_id, event_type, payload, status (text), attempts (int), last_error (text), response_body (text), created_at, delivered_at
 
-### TASK-WH-2: Storage CRUD — Confirm webhook CRUD functions
+### [ ] TASK-WH-2: Storage CRUD — Confirm webhook CRUD functions
 - 完成定義：`CreateWebhookSubscription`, `ListWebhookSubscriptions`, `DeleteWebhookSubscription`, `ListWebhookDeliveries` 在 `storage/webhook.go` 存在且正確
 - Files: `admin-api/storage/webhook.go`
 
-### TASK-WH-3: Routes — Register webhook REST API routes
+### [ ] TASK-WH-3: Routes — Register webhook REST API routes
 - 完成定義：`GET /webhooks` (list), `POST /webhooks` (create), `DELETE /webhooks/:id`, `GET /webhooks/:id/deliveries` 全部正常運作
 - File: `admin-api/routes/webhooks.go` (new)
 - Also register in `main.go` or appropriate router
 
-### TASK-WH-4: Worker — Webhook delivery worker with retry
+### [ ] TASK-WH-4: Worker — Webhook delivery worker with retry
 - 完成定義：Webhook worker 從 channel 接收 job，發送 HTTP POST，指數回退重試 3 次（1s → 5s → 30s），結果寫入 `webhook_deliveries` table
 - Files: `admin-api/routes/webhooks.go` or dedicated `webhook/worker.go`
 - Pool: max 10 concurrent goroutines
 
-### TASK-WH-5: Alerter integration — Fire webhook on alert
+### [ ] TASK-WH-5: Alerter integration — Fire webhook on alert
 - 完成定義：`alerter.go` 的 `fireAlert()` 成功後，將 webhook job 送入 worker queue
 - File: `admin-api/routes/alerter.go`
 
-### TASK-WH-6: Docker build — admin-api
+### [ ] TASK-WH-6: Docker build — admin-api
 - 完成定義：`docker compose build --no-cache cont-admin-api` 成功
 
-### TASK-WH-7: Smoke test — Webhook end-to-end
+### [ ] TASK-WH-7: Smoke test — Webhook end-to-end
 - 完成定義：
   1. `POST /webhooks` 建立 subscription
   2. 手動 trigger alert
