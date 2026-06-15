@@ -137,3 +137,46 @@
 | P1-QA-7 API endpoints | ✅ PASSED | /internal/config/snapshot + /internal/usage/incr both return valid JSON |
 
 **小黑判定**: Phase 1 SPEC-PENDING-01 全部 ✅，可進入 Phase 2
+
+## Phase 2 QA — 2026-06-15 全功能 QA
+
+### 🔴 BUG-Services-Update: Services Update 返回 INTERNAL_ERROR（P0）
+- **API**: PUT /services/{id}
+- **預期**: 200 + 更新後的 service JSON
+- **實際**: `{"code":"INTERNAL_ERROR","message":"internal server error"}`
+- **原因**: 初步分析 PUT handler 可能有 nil pointer 或 SQL update 問題
+- **修補方向**: 檢查 services update handler，確認 upstream_id 處理邏輯
+- **驗證**: QA 跑完後由 subagent 診斷
+
+### 🔴 BUG-Routes-Update: Routes Update 返回 INTERNAL_ERROR（P0）
+- **API**: PUT /routes/{id}
+- **預期**: 200 + 更新後的 route JSON
+- **實際**: `{"code":"INTERNAL_ERROR","message":"internal server error"}`
+- **原因**: 初步分析 route update handler 有 nil pointer 或 SQL error
+- **修補方向**: 檢查 routes update handler，確認 service_id paths 處理
+- **驗證**: QA 跑完後由 subagent 診斷
+
+### 🔴 BUG-JWT-Credential: JWT credential API 返回 404（P1）
+- **API**: POST /consumers/{id}/jwt
+- **預期**: 201 + JWT credential 物件
+- **實際**: `404 page not found`
+- **原因**: Cont Admin API 未實作 JWT credential 端點（使用全局 key）
+- **修補方向**: 評估是否需要實作 JWT credential API，或確認文件說明使用全局 key
+- **驗證**: QA 跑完後由 subagent 評估
+
+### Phase 2 QA Summary
+| Phase | 功能 | 狀態 |
+|-------|------|------|
+| Auth | 登入取得 token | ✅ |
+| Users | CRUD | ✅ |
+| Groups | CRUD | ✅ |
+| Consumers | CRUD | ✅ |
+| Upstreams | CRUD | ✅ |
+| Services | CRUD | ⚠️ Update P0 |
+| Routes | CRUD | ⚠️ Update P0 |
+| Plugins | CRUD | ✅ |
+| Proxy | 轉發鏈路 | ✅ |
+| JWT | Auth | ⚠️ Credential API P1 |
+
+**P0 Bugs**: 2（Services Update, Routes Update）
+**P1 Bugs**: 1（JWT Credential API）
