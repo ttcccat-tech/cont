@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,9 @@ import (
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// uuidV4Regex matches valid UUID v4 format
+var uuidV4Regex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
 
 func NewStore(db *sql.DB, rdb *Redis) *Store {
 	return &Store{db: db, rdb: rdb}
@@ -111,6 +115,10 @@ func (s *Store) GetService(id, orgID string) (*Service, error) {
 }
 
 func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) {
+	// Validate upstream_id format: empty is OK, otherwise must be valid UUID v4
+	if svc.UpstreamID != "" && !uuidV4Regex.MatchString(svc.UpstreamID) {
+		return nil, fmt.Errorf("invalid upstream_id format: must be a valid UUID v4")
+	}
 	err := s.db.QueryRow(`
 		UPDATE services SET
 			name=$2, protocol=$3, host=$4, port=$5, path=$6, url=$7,
