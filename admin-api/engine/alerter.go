@@ -149,7 +149,7 @@ func (a *Alerter) evaluateConditions(rule *storage.AlertRule) bool {
 	// For usage_quota, use PercentageThreshold (default 80)
 	threshold := cond.ThresholdValue
 	if cond.MetricType == "usage_quota" {
-		threshold = rule.PercentageThreshold
+		threshold = cond.PercentageThreshold
 		if threshold == 0 {
 			threshold = 80.0
 		}
@@ -167,7 +167,7 @@ func (a *Alerter) evaluateConditions(rule *storage.AlertRule) bool {
 		// For usage_quota, use PercentageThreshold (default 80)
 		threshold = cond.ThresholdValue
 		if cond.MetricType == "usage_quota" {
-			threshold = rule.PercentageThreshold
+			threshold = cond.PercentageThreshold
 			if threshold == 0 {
 				threshold = 80.0
 			}

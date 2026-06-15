@@ -57,12 +57,13 @@ type AuditLog struct {
 // ── Alert Rules ────────────────────────────────────────────────────────────
 
 type Condition struct {
-	MetricType       string  `json:"metric_type"`
-	ServiceName      string  `json:"service_name"`
-	ThresholdValue   float64 `json:"threshold_value"`
-	Operator         string  `json:"operator"`
-	Logic            string  `json:"logic"`            // "AND" or "OR", applies between this and next condition
-	QuotaMetricType  string  `json:"quota_metric_type"` // "org" or "consumer" for usage_quota metric
+	MetricType         string  `json:"metric_type"`
+	ServiceName        string  `json:"service_name"`
+	ThresholdValue     float64 `json:"threshold_value"`
+	Operator           string  `json:"operator"`
+	Logic              string  `json:"logic"`             // "AND" or "OR", applies between this and next condition
+	QuotaMetricType    string  `json:"quota_metric_type"` // "org" or "consumer" for usage_quota metric
+	PercentageThreshold float64 `json:"percentage_threshold"` // e.g. 80.0 for 80%; overrides ThresholdValue for usage_quota
 }
 
 type AlertRule struct {
