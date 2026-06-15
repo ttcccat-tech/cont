@@ -75,3 +75,63 @@
 - [ ] Webhook delivery 寫入 `webhook_deliveries` table
 - [ ] Webhook 失敗自動重試（3次，指數回退）
 - [ ] `GET /webhooks/:id/deliveries` 可查到送達歷史
+
+## Phase 1 QA Verification (SPEC-PENDING-01) — 2026-06-15
+
+### 🔴 TASK-P1-QA-1: Verify v025 migration exists
+- **Command**: `grep -n "v025" /var/repo/cont/admin-api/migrator/migrations.go`
+- **Result**: No matches found (exit_code=1)
+- **Status**: FAILED — v025 migration not found
+
+### 🔴 TASK-P1-QA-2: Verify Go build
+- **Command**: `cd /var/repo/cont/admin-api && go vet ./... 2>&1 | head -10`
+- **Result**:
+  ```
+  # go.opentelemetry.io/otel/internal/global
+  /root/go/pkg/mod/go.opentelemetry.io/otel@v1.18.0/internal/global/handler.go:44:18: undefined: atomic.Pointer
+  note: module requires Go 1.20
+  # google.golang.org/grpc
+  /root/go/pkg/mod/google.golang.org/grpc@v1.60.1/server.go:2165:14: undefined: atomic.Int64
+  note: module requires Go 1.19
+  ```
+- **Status**: FAILED — go vet reports errors (not just warnings)
+
+### ✅ TASK-P1-QA-3: Verify admin-api Docker build
+- **Command**: `docker compose ps cont-admin-api`
+- **Result**: cont-admin-api | cont-cont-admin-api | "./cont-admin-api" | Up 2 hours (healthy)
+- **Logs**: Only redis duration truncation warnings (not errors)
+- **Status**: PASSED
+
+### ✅ TASK-P1-QA-4: Verify proxy Docker build
+- **Command**: `docker compose ps cont-proxy`
+- **Result**: cont-proxy | cont-cont-proxy | "nginx -g 'daemon of…" | Up About an hour
+- **Logs**: Only worker_connections limit warning + normal access logs
+- **Status**: PASSED
+
+### ✅ TASK-P1-QA-5: Verify nginx -t
+- **Command**: `docker exec cont-proxy nginx -t 2>&1`
+- **Result**: "nginx: the configuration file /usr/local/openresty/nginx/conf/nginx.conf syntax is ok" + "nginx: configuration file /usr/local/openresty/nginx/conf/nginx.conf test is successful"
+- **Status**: PASSED
+
+### ✅ TASK-P1-QA-6: Verify Lua modules
+- **jwt_validation.lua**: EXISTS — contains cosocket code for JWT validation via Admin API
+- **config_sync.lua**: EXISTS — contains cosocket code for config sync
+- **Status**: PASSED
+
+### ✅ TASK-P1-QA-7: Verify API endpoints
+- **Command**: `curl -s http://localhost:18081/internal/config/snapshot | head -5`
+- **Result**: Valid JSON with plugins, routes, services, upstreams arrays
+- **Command**: `curl -s -X POST http://localhost:18081/internal/usage/incr -H "Content-Type: application/json" -d '{"org_id":"test","consumer_id":"c1","route_id":"r1","service_id":"s1","latency_ms":1,"status_code":200}'`
+- **Result**: `{"count":1,"success":true}`
+- **Status**: PASSED
+
+### Phase 1 Summary
+| Task | Status |
+|------|--------|
+| P1-QA-1 v025 migration | 🔴 FAILED |
+| P1-QA-2 Go build | 🔴 FAILED |
+| P1-QA-3 admin-api Docker | ✅ PASSED |
+| P1-QA-4 proxy Docker | ✅ PASSED |
+| P1-QA-5 nginx -t | ✅ PASSED |
+| P1-QA-6 Lua modules | ✅ PASSED |
+| P1-QA-7 API endpoints | ✅ PASSED |

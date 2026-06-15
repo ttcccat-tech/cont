@@ -685,6 +685,19 @@ END $$;
 		Up:          `ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS quota_metric_type TEXT DEFAULT 'org';`,
 		Down:        `ALTER TABLE alert_rules DROP COLUMN IF EXISTS quota_metric_type;`,
 	})
+
+	// v025: Services upstream_id column
+	m.Register(Migration{
+		Version:     25,
+		Description: "Add upstream_id to services for binding a service to an upstream",
+		Up: `
+DO $$ BEGIN
+  ALTER TABLE services ADD COLUMN IF NOT EXISTS upstream_id UUID REFERENCES upstreams(id) ON DELETE SET NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+`,
+		Down: `ALTER TABLE services DROP COLUMN IF EXISTS upstream_id;`,
+	})
 }
 
 // Migrate runs all pending migrations
