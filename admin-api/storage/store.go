@@ -73,7 +73,7 @@ func (s *Store) CreateService(svc *Service) (*Service, error) {
 	err := s.db.QueryRow(`
 		INSERT INTO services (name, protocol, host, port, path, url, retries,
 			connect_timeout, read_timeout, write_timeout, upstream_id, enabled, org_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULLIF($11, '')::uuid,$12,$13)
 		RETURNING id, created_at, updated_at`,
 		svc.Name, orString(svc.Protocol, "http"), svc.Host, orInt(svc.Port, 80),
 		svc.Path, svc.URL, orInt(svc.Retries, 5),
