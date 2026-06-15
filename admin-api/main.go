@@ -349,11 +349,11 @@ func main() {
 		// Webhooks (Reliable)
 		admin.GET("/webhooks", routes.ListWebhooks(store))
 		admin.POST("/webhooks", routes.CreateWebhook(store))
-	admin.GET("/webhooks/:id", routes.GetWebhook(store))
-	admin.PATCH("/webhooks/:id", routes.UpdateWebhook(store))
-	admin.DELETE("/webhooks/:id", routes.DeleteWebhook(store))
+		admin.GET("/webhooks/:id", routes.GetWebhook(store))
+		admin.PATCH("/webhooks/:id", routes.UpdateWebhook(store))
+		admin.DELETE("/webhooks/:id", routes.DeleteWebhook(store))
 		admin.GET("/webhooks/:id/deliveries", routes.ListWebhookDeliveries(store))
-		admin.POST("/webhooks/:id/retry/:deliveryId", routes.RetryWebhookDelivery(store))
+		admin.POST("/webhooks/:id/retry", routes.RetryWebhookDelivery(store))
 	}
 
 	// Stripe Webhook — public (Stripe signs with secret, no JWT auth)
