@@ -115,7 +115,7 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 		UPDATE services SET
 			name=$2, protocol=$3, host=$4, port=$5, path=$6, url=$7,
 			retries=$8, connect_timeout=$9, read_timeout=$10,
-			write_timeout=$11, upstream_id=$12, enabled=$13, updated_at=NOW()
+			write_timeout=$11, upstream_id=NULLIF($12, '')::uuid, enabled=$13, updated_at=NOW()
 		WHERE id=$1 AND ($14 = '' OR ($14 != '' AND org_id::text = $14)) RETURNING updated_at`,
 		id, svc.Name, orString(svc.Protocol, "http"), svc.Host,
 		orInt(svc.Port, 80), svc.Path, svc.URL, orInt(svc.Retries, 5),
@@ -490,6 +490,11 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	setClauses := []string{"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6", "strip_path=$7", "preserve_host=$8", "regex_priority=$9", "https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12"}
 	args := []interface{}{id, r.Name, "{"+strings.Join(protocols, ",")+"}", "{"+strings.Join(hosts, ",")+"}", "{"+strings.Join(paths, ",")+"}", "{"+strings.Join(methods, ",")+"}", orBool(r.StripPath, true), orBool(r.PreserveHost, false), orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426), orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true)}
 	orgIDArgIndex := 14 // default: id + 12 set clauses + orgID at $14
+	// DIAGNOSIS: When service_id is provided, the code prepends to args with
+	// args = append([]interface{}{svcID}, args...) which shifts ALL placeholder
+	// indices by 1. setClauses still reference $2,$3...$12 but args now have
+	// svcID at [0], id at [1], name at [2]... so name=$2 gets id, not name.
+	// This causes PostgreSQL binding errors -> INTERNAL_ERROR.
 	if svcID := r.GetServiceID(); svcID != "" {
 		setClauses = append([]string{"service_id=$13"}, setClauses...)
 		args = append([]interface{}{svcID}, args...)
