@@ -25,6 +25,7 @@ import GrpcServices from './pages/GrpcServices'
 import WorkspaceDetail from './pages/WorkspaceDetail'
 import Workspaces from './pages/Workspaces'
 import WebhookDeliveries from './pages/WebhookDeliveries'
+import BillingPortal from './components/BillingPortal'
 import { getToken, clearAuth } from './api/kong'
 import { WorkspaceProvider } from './context/WorkspaceContext'
 import { AuthProvider } from './context/AuthContext'
@@ -137,7 +138,7 @@ export default function App() {
                   <Route path="/grpc-services" element={<GrpcServices />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
-                  <Route path="/billing" element={<Settings />} />
+                  <Route path="/billing" element={<BillingPortal />} />
                   <Route path="/audit" element={<AuditLog />} />
                   <Route path="/config-versioning" element={<ConfigVersioning />} />
                   <Route path="/config-snapshots" element={<ConfigVersioning />} />
