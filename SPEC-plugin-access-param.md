@@ -29,3 +29,19 @@ local ok2, err = pcall(handler.access, handler)  -- 缺少 plugin 參數
 - [ ] TASK-PLUGIN-2: Verify `nginx -t` passes
 - [ ] TASK-PLUGIN-3: Run Lua tests (busted)
 - [ ] TASK-PLUGIN-4: Docker build `--no-cache` succeeds
+
+---
+
+## Updated Plan — 2026-06-15 小黑
+
+小黑 PLAN 拆解（4 tasks，每個 3~10 tool calls 可完成）：
+
+### Tasks
+- [ ] TASK-PLUGIN-1: Fix `run_plugin_access()` pcall to pass `plugin` parameter
+  - 完成定義：`access.lua` 中 `pcall(handler.access, handler)` → `pcall(handler.access, handler, plugin)`
+- [ ] TASK-PLUGIN-2: Verify `nginx -t` passes
+  - 完成定義：`nginx -t` 在 container 內執行，exit 0
+- [ ] TASK-PLUGIN-3: Run Lua tests (busted)
+  - 完成定義：`busted` tests 全部 pass 或 skip（不新增 fail）
+- [ ] TASK-PLUGIN-4: Docker build `--no-cache` succeeds
+  - 完成定義：`docker compose build --no-cache cont-proxy` 成功，無 error
