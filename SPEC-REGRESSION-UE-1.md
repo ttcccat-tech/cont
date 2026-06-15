@@ -46,6 +46,18 @@
 - 不實作新功能架構
 - 不實作 Webhook retry
 
+## Tasks
+
+- [ ] TASK-UE-DIAG-1: Add debug logging to IncrUsage pipeline (print Exec result + error)
+- [ ] TASK-UE-DIAG-2: Docker build --no-cache cont-admin-api with debug logging
+- [ ] TASK-UE-DIAG-3: Restart container, trigger /internal/usage/incr, capture logs
+- [ ] TASK-UE-DIAG-4: Analyze logs to identify root cause (nil err vs actual failure)
+- [ ] TASK-UE-FIX-1: Apply root cause fix in storage/usage.go
+- [ ] TASK-UE-FIX-2: Docker build --no-cache cont-admin-api
+- [ ] TASK-UE-FIX-3: Restart container
+- [ ] TASK-UE-FIX-4: Verify Redis DBSIZE > 0 after /internal/usage/incr call
+- [ ] TASK-UE-FIX-5: Verify GET /internal/plan-quota returns non-zero current_usage
+
 ## 驗收標準
 
 1. `POST /internal/usage/incr` 後 Redis 出現 `cont:usage:*` key，DBSIZE > 0
