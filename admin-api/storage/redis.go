@@ -354,7 +354,7 @@ func (r *Redis) GetTopConsumersByUsage(ctx context.Context, startHour, endHour s
 		if len(parts) >= 4 {
 			hourPart := parts[len(parts)-1]
 			if hourPart >= startHour && hourPart <= endHour {
-				consumerID := parts[3]
+				consumerID := parts[2]
 				val, _ := r.client.Get(ctx, key).Int64()
 				consumerCounts[consumerID] += val
 			}
