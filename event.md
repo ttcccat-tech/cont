@@ -34,10 +34,12 @@
 ### 🟡 SPEC-usage-alerting — Usage Alerting（待處理）
 - 6 tasks，見 SPEC-usage-alerting.md
 
-### 🟡 SPEC-2.5-A — Analytics Dashboard 整合（待處理）
-- Backend `GET /usage/analytics` endpoint
-- Frontend Cont 用量 panel
-- 見 SPEC-2.5-A.md
+### ✅ SPEC-2.5-A — Analytics Dashboard 整合
+- [✅] TASK-2.5-A1: Backend `/usage/analytics` endpoint (routes/usage.go + redis.go)
+- [✅] TASK-2.5-A2: `getAnalyticsUsage()` API in kong.ts
+- [✅] TASK-2.5-A3: Cont usage panel in Analytics.tsx (progress bar, hourly trend, top entities)
+- **驗證**: docker build --no-cache admin-api ✅ frontend ✅
+- **驗證**: containers restarted ✅
 
 ### 🟡 SPEC-2.5-B — Usage Quota Alerting（待處理）
 - alerter.go 整合 usage quota check
