@@ -8,23 +8,23 @@
 ## Phase 1：系統基礎建設
 
 ### 1.1 清理舊環境
-- 停止並移除所有 Cont containers
-- 清理 PostgreSQL 資料（可選）或建立新 DB
-- 清理 Docker volumes（如需）
+- [ ] 停止並移除所有 Cont containers
+- [ ] 清理 PostgreSQL 資料（可選）或建立新 DB
+- [ ] 清理 Docker volumes（如需）
 
 ### 1.2 啟動基礎服務
-- `docker compose up -d cont-postgres`
-- `docker compose up -d cont-redis`
-- 驗證 DB migration 完成
+- [ ] `docker compose up -d cont-postgres`
+- [ ] `docker compose up -d cont-redis`
+- [ ] 驗證 DB migration 完成
 
 ### 1.3 啟動 Admin API
-- `docker compose up -d cont-admin-api`
-- 驗證：`curl http://localhost:18081/health`
-- 驗證：`POST /auth/login` → 取得 JWT token
+- [ ] `docker compose up -d cont-admin-api`
+- [ ] 驗證：`curl http://localhost:18081/health`
+- [ ] 驗證：`POST /auth/login` → 取得 JWT token
 
 ### 1.4 啟動 Proxy
-- `docker compose up -d cont-proxy`
-- 驗證：`curl http://localhost:18000/` → 200
+- [ ] `docker compose up -d cont-proxy`
+- [ ] 驗證：`curl http://localhost:18000/` → 200
 
 ---
 
@@ -116,30 +116,53 @@
 
 ## 🔴 Bug 記錄
 
-（發現問題後填入）
+### 🔴 BUG-001: GetUser 500 INTERNAL_ERROR（P0）— 已修復 ✅
+- **API**: `GET /users/{id}`
+- **原因**: `last_login_at` 資料庫欄位是 `TIMESTAMP WITH TIME ZONE`，可能為 NULL。Scan 直接放進 `string` 欄位，Go 不允許 NULL → string 轉換
+- **修補**: 改用 `sql.NullString` 接收，再賦值給 `u.LastLoginAt`
+- **檔案**: `admin-api/storage/store.go` GetUser()
+- **驗證**: ✅ Create → Get → Update → Delete 全部 204
 
-## ✅ 本輪完成
+### 🔴 BUG-002: GetUser SELECT 缺少 org_id（P0）— 已修復 ✅
+- **API**: `GET /users/{id}`
+- **原因**: User struct 有 12 個欄位，SELECT 只選 10 個（漏了 `org_id`），導致 Scan 引數數目不匹配
+- **修補**: SELECT 加入 `org_id`，Scan 加入 `&u.OrgID`
+- **檔案**: `admin-api/storage/store.go` GetUser()
+- **驗證**: ✅
 
-- [✅] SPEC-INLINE-ROUTE — inline route matching + upstream_id fix，7 tasks 全部完成，merge to main
+### 🔴 BUG-003: Users Update 404 NOT_FOUND（P0）— 已修復 ✅
+- **原因**: GetUser 500 INTERNAL_ERROR 導致 Update 前查無此人（ID 不存在）
+- **修補**: 修好 GetUser 後自動解除
+- **驗證**: ✅
+
+### 🔴 BUG-004: Users Delete 404 NOT_FOUND（P0）— 已修復 ✅
+- **原因**: 同上，GetUser 失敗導致
+- **修補**: 修好 GetUser 後自動解除
+- **驗證**: ✅
+
+### 🟡 預計優化：Routes/List 回傳格式不一致
+- **觀察**: Users/Groups 回傳純陣列 `[]`，Consumers/Services/Routes/Plugins 回傳 `{"data":[], "next":""}`
+- **影響**: 前端 UI 解析需要判斷格式，增加复杂度
+- **建議**: 統一為 `{"data":[], "next":""}` 格式
+
+### 🟡 預計優化：Services Create 需要先有 upstream_id
+- **觀察**: Service 只能透過 `upstream_id` 建立（host/port 直接傳入會 500）
+- **建議**: UI 流程需引導使用者先建 Upstream 再建 Service
 
 ---
 
-## ✅ 本輪完成
+## ✅ 本輪完成（2026-06-15 QA）
 
-- [✅] SPEC-INLINE-ROUTE — inline route matching + upstream_id fix，7 tasks 全部完成，merge to main
-- [✅] SPEC-BLACKSCREEN-01 — 6 tasks 全部驗證通過（billing/config-snapshots/api-docs/workspaces 均正常渲染）
-
----
-
-## 🟡 預計優化
-
-（過程中發現的改進點）
-
----
-
-## ✅ 本輪完成（2026-06-15）
-
-- [✅] SPEC-PENDING-01 — Cosocket refactor + upstream_id migration 已確認存在於 v024，build 驗證全部通過（nginx -t ✅, docker build proxy --no-cache ✅, docker build admin-api --no-cache ✅, 所有 containers healthy ✅）
+- [✅] GetUser 500 INTERNAL_ERROR — `sql.NullString` 修補 `last_login_at` NULL 問題
+- [✅] GetUser SELECT 缺少 `org_id` — 加入 `org_id` 至 SELECT 和 Scan
+- [✅] Users CRUD 全部通過（Create → Get → Update → Delete → 204）
+- [✅] Groups CRUD 全部通過
+- [✅] Consumers CRUD 全部通過
+- [✅] Upstreams CRUD 全部通過
+- [✅] Plugins CRUD 全部通過
+- [✅] Proxy `/test-api/health` → 200 ✅ 轉發正常
+- [✅] Proxy `/` → 200 ✅
+- [✅] Auth 登入正常（JWT token 取得成功）
 
 ---
 

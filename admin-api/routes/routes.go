@@ -2364,6 +2364,7 @@ func GetUser(store *storage.Store) gin.HandlerFunc {
 		id := c.Param("id")
 		user, err := store.GetUser(id)
 		if err != nil {
+			log.Printf("GetUser error: id=%s err=%v", id, err)
 			internalError(c)
 			return
 		}
