@@ -127,7 +127,7 @@ export default function AlertRulesPage() {
           operator: r.operator || '>',
           logic: 'AND',
           quota_metric_type: 'org',
-          percentage_threshold: r.threshold_value || 0,
+          percentage_threshold: r.percentage_threshold || r.threshold_value || 80,
         }]
     form.setFieldsValue({
       ...r,
@@ -150,11 +150,11 @@ export default function AlertRulesPage() {
         values.conditions = values.conditions.map((c: Condition, idx: number) => ({
           metric_type: c.metric_type || 'error_rate',
           service_name: c.service_name || '',
-          threshold_value: c.threshold_value ?? 0,
+          threshold_value: (c.metric_type === 'usage_quota' ? c.percentage_threshold : c.threshold_value) ?? 0,
           operator: c.operator || '>',
           logic: idx === 0 ? 'AND' : (c.logic || 'AND'),
           quota_metric_type: c.quota_metric_type || 'org',
-          percentage_threshold: c.threshold_value ?? 0,
+          percentage_threshold: c.percentage_threshold ?? 0,
         }))
       } else {
         // Fallback: single condition from flat fields
@@ -165,7 +165,7 @@ export default function AlertRulesPage() {
           operator: values.operator || '>',
           logic: 'AND',
           quota_metric_type: 'org',
-          percentage_threshold: values.threshold_value ?? 0,
+          percentage_threshold: values.percentage_threshold ?? values.threshold_value ?? 0,
         }]
       }
       if (editingRule) {
@@ -402,7 +402,7 @@ export default function AlertRulesPage() {
                             const mType = getFieldValue([name, 'metric_type'])
                             if (mType === 'usage_quota') {
                               return (
-                                <Form.Item {...rest} name={[name, 'threshold_value']} label="閾值" rules={[{ required: true }]} initialValue={80} style={{ marginBottom: 0 }}>
+                                <Form.Item {...rest} name={[name, 'percentage_threshold']} label="閾值" rules={[{ required: true }]} initialValue={80} style={{ marginBottom: 0 }}>
                                   <Select options={quotaThresholdOptions} />
                                 </Form.Item>
                               )
