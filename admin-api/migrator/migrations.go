@@ -714,6 +714,41 @@ ALTER TABLE consumer_credentials DROP CONSTRAINT IF EXISTS consumer_credentials_
 ALTER TABLE consumer_credentials ADD CONSTRAINT consumer_credentials_credential_type_check CHECK (credential_type IN ('key-auth', 'basic-auth', 'hmac-auth'));
 `,
 	})
+
+	// v027: Webhook tables
+	m.Register(Migration{
+		Version:     27,
+		Description: "Add webhook_subscriptions and webhook_deliveries tables",
+		Up: `
+CREATE TABLE webhook_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL,
+    url TEXT NOT NULL,
+    event_types TEXT[] NOT NULL,
+    secret TEXT,
+    active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE webhook_deliveries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL,
+    webhook_id UUID NOT NULL REFERENCES webhook_subscriptions(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
+    attempts INT NOT NULL DEFAULT 0,
+    last_error TEXT,
+    response_body TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    delivered_at TIMESTAMPTZ
+);
+`,
+		Down: `
+DROP TABLE IF EXISTS webhook_deliveries;
+DROP TABLE IF EXISTS webhook_subscriptions;
+`,
+	})
 }
 
 // Migrate runs all pending migrations
