@@ -377,11 +377,8 @@ end
 -- Determine upstream target
 local upstream_target = nil
 
-if service.host then
-    upstream_target = service.host .. ":" .. (service.port or 80)
-    ngx.var.cont_upstream = "http://" .. upstream_target
-    ngx.var.cont_upstream_host = service.host
-elseif service.upstream_id then
+if service.upstream_id then
+    -- Use upstream (priority over direct host)
     local target = select_target(service.upstream_id)
     if not target then
         ngx.status = 503
@@ -398,6 +395,10 @@ elseif service.upstream_id then
     if ngx.status >= 400 then
         return
     end
+elseif service.host then
+    upstream_target = service.host .. ":" .. (service.port or 80)
+    ngx.var.cont_upstream = "http://" .. upstream_target
+    ngx.var.cont_upstream_host = service.host
 end
 
 -- Strip path if route.strip_path
