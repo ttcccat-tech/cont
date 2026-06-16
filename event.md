@@ -517,6 +517,7 @@
 - Proxy `/test-api/health` → 200 ✅
 
 #### 🟡 BUG-JWT-CREDENTIAL-SKILL-OUTDATED — 暫不處理（P2 文件問題）
+#### 🟡 BUG-JWT-CREDENTIAL-SKILL-OUTDATED — 暫不處理（P2 文件問題）
 
 ### ✅ BUG-HEALTH-PORTAL-ZERO-COUNT — 健康度計數為 0（2026-06-16 小黑修復）
 - **發現時間**: 2026-06-16 22:54 UTC
@@ -525,3 +526,28 @@
 - **小黑修復**: `fetchUpstreams()` 改為 `Promise.all` 對每個 upstream 並發呼叫 `/upstreams/{id}/health`，從 targets 陣列計算真實的 healthyCount/unhealthyCount/overallStatus
 - **小黑驗證**: 健康上游=4 ✅、Target 總數=4 ✅、Target 健康=4/4 ✅
 - **小黑commit**: `c0c174fd` (frontend fix) → `26047e76` (merge develop → main)
+
+## 🔴 QA Bug Report — 2026-06-17 01:18 UTC
+
+### 🔴 BUG-ROUTES-UPDATE: Routes Update returns 500 Internal Error（P0）
+- **API**: PUT /routes/{id}
+- **預期**: 200 OK
+- **實際**: 500 Internal Server Error (INTERNAL_ERROR)
+- **原因**: 初步分析 — Routes 建立後 service_id 欄位為 nil，Update 時 store.UpdateRoute 嘗試將 service_id=$13 寫入 SQL 但該欄位為 NULL，導致 SQL 執行失敗。根因可能出在 CreateRoute 時 service_id 未正確寫入 DB（store.CreateRoute vs PostgreSQL pg_dump 顯示有 service_id 的舊 routes 存在）。
+- **修補方向**: 由小黑進一步診斷 store.CreateRoute vs store.UpdateRoute 的 service_id 處理邏輯（見 PLAN-BUG-Routes-Update.md）
+- **驗證**: QA 完成後填寫
+- **嚴重程度**: P0（功能阻斷）
+
+### 🔴 BUG-PROXY-UPSTREAM-503: Proxy 轉發返回 503（P0）
+- **API**: GET /{route_path}/health via Gateway
+- **預期**: 200 OK（轉發到 192.168.1.202:3010）
+- **實際**: 503 Service Unavailable
+- **原因**: 已知根因 — GetProxyRuntimeConfig 的 targetsMap：當 upstream 無任何 targets 時，map entry 為 nil 而非 []，Lua 中 `next(nil)` 失敗導致 upstream_target=nil。修復策略已知（見 SPEC-BUG-PROXY-SERVICE-NIL-UPSTREAM.md）：targetsMap 初始化為空陣列。
+- **修補方向**: 
+  1. Go: store.go GetProxyRuntimeConfig — targetsMap[upstream.ID] = []ProxyTarget{}（empty array）
+  2. Lua: nginx.conf 增加 type check for nil
+- **驗證**: QA 完成後填寫
+- **嚴重程度**: P0（Proxy 轉發功能阻斷）
+
+---
+*QA 执行时间: 2026-06-17 01:18 UTC | 39 tests passed, 2 P0 bugs found*
