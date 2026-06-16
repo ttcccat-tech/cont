@@ -75,12 +75,25 @@ function _M.sync_into_cont(cont)
         return false
     end
     cont.routes = data.routes or {}
-    cont.services = data.services or {}
+
+    -- Convert services from array to dict keyed by service.id
+    local services_dict = {}
+    if data.services then
+        for _, svc in ipairs(data.services) do
+            if svc.id then
+                services_dict[svc.id] = svc
+            end
+        end
+    end
+    cont.services = services_dict
+
     cont.upstreams = data.upstreams or {}
     cont.plugins = data.plugins or {}
     cont.targets = data.targets or {}
     cont.config_loaded = true
-    ngx.log(ngx.WARN, "config_sync: synced ", #cont.routes, " routes, ", #cont.services, " services, config_loaded=true")
+    local service_count = 0
+    for _ in pairs(cont.services) do service_count = service_count + 1 end
+    ngx.log(ngx.WARN, "config_sync: synced ", #cont.routes, " routes, ", service_count, " services, config_loaded=true")
     return true
 end
 
