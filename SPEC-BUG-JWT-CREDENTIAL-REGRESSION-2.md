@@ -25,3 +25,9 @@
 2. `GET /consumers/{id}/jwt/credentials` 返回 200（list）
 3. JWT credential CRUD 全流程：POST 201, GET 200, PATCH 200, DELETE 204
 4. Docker build --no-cache cont-admin-api 成功
+
+## Tasks
+- [ ] TASK-JWT-REG2-1: Check cont-admin-api container health
+- [ ] TASK-JWT-REG2-2: Smoke test JWT credential CRUD (POST 201, GET 200, PATCH 200, DELETE 204)
+- [ ] TASK-JWT-REG2-3: If any step fails, rebuild and restart cont-admin-api container
+- [ ] TASK-JWT-REG2-4: Final verification — all CRUD endpoints return expected status codes

@@ -25,3 +25,12 @@
 2. 確認轉發 upstream 為 192.168.1.202:3010（不是 final.com:80）
 3. upstream_id 解析邏輯正確（無 fallback 到 service.host）
 4. Docker build --no-cache cont-proxy 成功
+
+## Tasks
+- [ ] TASK-UPSTREAM-1: Check cont-proxy container health
+- [ ] TASK-UPSTREAM-2: Get config snapshot — verify service.upstream_id is populated for test-api service
+- [ ] TASK-UPSTREAM-3: Check nginx.conf upstream_id logic (line 563) — confirm priority over service.host
+- [ ] TASK-UPSTREAM-4: Smoke test — GET /test-api/health returns 200 with correct upstream
+- [ ] TASK-UPSTREAM-5: If upstream_id is nil in snapshot, fix config_sync.lua to include service.upstream_id
+- [ ] TASK-UPSTREAM-6: Docker build --no-cache cont-proxy
+- [ ] TASK-UPSTREAM-7: Final verification — /test-api/health → 200, upstream is 192.168.1.202:3010
