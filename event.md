@@ -181,6 +181,35 @@
 
 ||**小黑判定**: Phase 1 SPEC-PENDING-01 全部 ✅，可進入 Phase 2
 
+## Phase 3 QA — 2026-06-16 第四輪（下午）— cron QA
+
+### 執行時間：2026-06-16 16:49 UTC
+
+|| Phase | 功能 | 結果 |
+|-------|------|------|------|
+| Phase 1 | Auth 登入 | ✅ Token 取得正常 |
+| Phase 2 | Users CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 3 | Groups CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 4 | Consumers CRUD | ✅ Create 201, Get 200, Delete 204 |
+| Phase 5 | Upstreams CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 6 | Services CRUD | ✅ Create via upstream_id 201, Get 200, Update 200, Delete 204 |
+| Phase 7 | Routes CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 8 | Plugins CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 9 | Proxy 轉發 | 🔴 新建 route → 502（upstream 連線失敗）|
+| Phase 10 | JWT Credential API | 🔴 POST /consumers/{id}/jwt → 404（regression）|
+
+### ✅ BUG-PROXY-502: Proxy 轉發 502 Bad Gateway（P0）— ✅ VERIFIED FIXED 2026-06-16 17:05
+- **API**: GET /test-api/health via Gateway
+- **預期**: 200（轉發到 upstream 192.168.1.202:3010）
+- **小黑驗證**: `curl http://localhost:18000/test-api/health` → 200 ✅, JSON `{"status":"ok"}` ✅
+- **結論**: Bug 已自動修復（與 BUG-PROXY-UPSTREAM-WRONG 同時修復）
+
+### ✅ BUG-JWT-CREDENTIAL-REGRESSION-3: JWT Credential API 回歸 404（P1）— ✅ VERIFIED FIXED 2026-06-16 17:05
+- **API**: POST /consumers/{id}/jwt/credentials
+- **預期**: 201
+- **小黑驗證**: `POST /consumers/{cid}/jwt/credentials` → 201 ✅
+- **結論**: Bug 是 QA 使用錯誤 endpoint（`/jwt` 而非 `/jwt/credentials`），程式碼正常
+
 ## Phase 3 QA — 2026-06-16 第四輪（中午）— cron QA
 
 ### 執行時間：2026-06-16 04:37 UTC
