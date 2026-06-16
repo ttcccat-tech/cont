@@ -1,7 +1,7 @@
 # Cont 2.0 Development Event Log
 
 ## Active Session
-- Date: 2026-06-16 (third session — 22:00)
+- Date: 2026-06-16 (second session)
 - PM: 小黑
 - Scope: Default org usage tracking + Anonymous quota enforcement
 
@@ -67,10 +67,6 @@
 - [✅] TASK-2.5-B1: alerter.go — evaluateUsageQuotas(), fire at 80/90/100%, AlertHistory, webhook trigger
 - [✅] TASK-2.5-B2: AlertRules.tsx — usage_quota alert type + percentage threshold UI（已於 TASK-UA-4 完成）
 - **小黑驗證**: alerter.go Docker build ✅, frontend Docker build ✅, containers running ✅
-
-## 🔴 ACTIVE REGRESSION — 2026-06-16 小黑發現
-
-（無）
 
 ## ✅ 已完成（本輪 2026-06-16 小黑守護）
 
@@ -184,6 +180,52 @@
 | P1-QA-7 API endpoints | ✅ PASSED | /internal/config/snapshot + /internal/usage/incr both return valid JSON |
 
 ||**小黑判定**: Phase 1 SPEC-PENDING-01 全部 ✅，可進入 Phase 2
+
+## Phase 3 QA — 2026-06-16 第五輪（晚間）— cron QA
+
+### 執行時間：2026-06-16 15:13 UTC
+
+|| Phase | 功能 | 結果 |
+|-------|------|------|------|
+| Phase 1 | Auth 登入 | ✅ Token 取得正常 |
+| Phase 2 | Users CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 3 | Groups CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 4 | Consumers CRUD | ✅ Create 201, Get 200, Delete 204 |
+| Phase 5 | Upstreams CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 6 | Services CRUD | ✅ Create/Get/Delete PASS, Update ❌ 500 INTERNAL_ERROR |
+| Phase 7 | Routes CRUD | ✅ Create/Get/Delete PASS, Update ❌ 500 INTERNAL_ERROR |
+| Phase 8 | Plugins CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 9 | Proxy 轉發 | ⚠️ 現有路由 200，新路由 503（upstream_id 未同步） |
+| Phase 10 | JWT Auth | ✅ JWT credential CRUD 201/200/204 |
+
+### 🔴 BUG-Services-Update-500: Services Update 返回 INTERNAL_ERROR（P0）
+- **API**: PUT /services/{id}
+- **預期**: 200 Update 成功
+- **實際**: 500 {"code":"INTERNAL_ERROR","message":"internal server error"}
+- **原因**: 初步分析 — Services Update 時攜帶 upstream_id，config_sync.lua 同步時未正確處理 upstream host 解析
+- **修補方向**: config_sync.lua 中 Update Service 時需要同步解析 upstream host
+- **驗證**: QA 跑完後填寫
+- **嚴重程度**: P0（功能阻斷 — Service 無法更新）
+
+### 🔴 BUG-Routes-Update-500: Routes Update 返回 INTERNAL_ERROR（P0）
+- **API**: PUT /routes/{id}
+- **預期**: 200 Update 成功
+- **實際**: 500 {"code":"INTERNAL_ERROR","message":"internal server error"}
+- **原因**: 初步分析 — Routes Update 呼叫 Store.UpdateRoute，store.go 中間層問題
+- **修補方向**: 檢查 store.go UpdateRoute 實作，比對 CreateRoute 找出差異
+- **驗證**: QA 跑完後填寫
+- **嚴重程度**: P0（功能阻斷 — Route 無法更新）
+
+### 🔴 BUG-Proxy-NewRoute-503: 新建路由 proxy 轉發 503（P0）
+- **API**: GET /{new_route_path}/health via Gateway
+- **預期**: 200（轉發到 upstream 192.168.1.202:3010）
+- **實際**: 503 {"message":"no upstream target"}
+- **根因分析**: nginx.conf access_by_lua DEBUG log 顯示 `upstream_target=nil` — config_sync.lua 同步新建 Service 時未攜帶 upstream_id
+- **已知修復方向**: config_sync.lua service_lookup 需要正確解析 upstream_id 並取到 targets
+- **驗證**: QA 跑完後填寫
+- **嚴重程度**: P0（功能阻斷 — 新建路由無法轉發）
+
+---
 
 ## Phase 3 QA — 2026-06-16 第四輪（下午）— cron QA
 
@@ -475,3 +517,40 @@
 - Proxy `/test-api/health` → 200 ✅
 
 #### 🟡 BUG-JWT-CREDENTIAL-SKILL-OUTDATED — 暫不處理（P2 文件問題）
+#### 🟡 BUG-JWT-CREDENTIAL-SKILL-OUTDATED — 暫不處理（P2 文件問題）
+
+### ✅ BUG-HEALTH-PORTAL-ZERO-COUNT — 健康度計數為 0（2026-06-16 小黑修復）
+- **發現時間**: 2026-06-16 22:54 UTC
+- **現象**: Health Portal 上游健康度卡片全是 0（健康上游 0、異常上游 0、Target 總數 0）
+- **小黑根因確認**: `fetchUpstreams()` 抓到 upstream 列表後，直接 hardcode `healthyCount: 0 / unhealthyCount: 0`，從頭到尾沒呼叫 `/upstreams/{id}/health` API
+- **小黑修復**: `fetchUpstreams()` 改為 `Promise.all` 對每個 upstream 並發呼叫 `/upstreams/{id}/health`，從 targets 陣列計算真實的 healthyCount/unhealthyCount/overallStatus
+- **小黑驗證**: 健康上游=4 ✅、Target 總數=4 ✅、Target 健康=4/4 ✅
+- **小黑commit**: `c0c174fd` (frontend fix) → `26047e76` (merge develop → main)
+
+## 🔴 QA Bug Report — 2026-06-17 01:18 UTC
+
+### ✅ BUG-ROUTES-UPDATE: Routes Update returns 500 Internal Error（P0）— ✅ FIXED 2026-06-17
+- **API**: PUT /routes/{id}
+- **小黑根因確認**: `store.UpdateRoute` 的 service_id 處理 — 當 request body 不含 `service` 欄位時，`r.Service=nil`，但條件 `if svcID != ""` 仍為 true（空字串賦值），導致 `service_id=NULL` 被寫入 SQL
+- **小黑修復**: `if svcID != ""` → `if r.Service != nil && r.Service.ID != ""`（與 CreateRoute 相同模式）
+- **小黑commit**: TASK-RU-FIX-1 → develop
+- **小黑驗證**:
+  - Create route with service ✅
+  - Update name only (no service) → 200 ✅, service_id preserved ✅
+  - Update with new service_id → 200 ✅
+- **小黑判定**: 🔴 P0 → ✅ FIXED
+
+### ⚠️ BUG-PROXY-UPSTREAM-503: Proxy 轉發返回 503（P0）— ⚠️ QA 誤判，非程式碼問題
+- **API**: GET /test-api/health via Gateway
+- **小黑根因確認**: 
+  1. QA 01:18 UTC 當時 `/test-api` route 不存在於 DB（從未建立或已被刪除）→ Lua `no route matched` → 404（並非 503）
+  2. 今晨重新建立 test-api route + service chain 後，upstream_target 正確解析為 `192.168.1.210:30110`（DEBUG log 確認）
+  3. 502 = upstream 網路不可達（`connect() failed (113: Host is unreachable)`），非程式碼 bug
+  4. `routes/routes.go:1375` targetsMap 初始化 ✅，`nginx.conf` nil guard ✅，無 regression
+- **小黑判定**: ⚠️ QA 環境問題，非 P0 bug，不需 Dev Agent 返工
+- **小黑建議**: QA agent 建立 route 前需確認 upstream targets 存在且可達
+
+---
+
+*小黑守護完成時間: 2026-06-17 02:00 UTC | develop ahead of main: 5 commits*
+*小黑判定: BUG-ROUTES-UPDATE 🔴→✅ (P0 fixed) | BUG-PROXY-UPSTREAM-503 ⚠️ (QA false positive, no code change needed)*
