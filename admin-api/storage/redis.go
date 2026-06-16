@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -170,13 +171,17 @@ func (r *Redis) UsageByTimeRange(ctx context.Context, keyPattern string, startHo
 	for i := range keys {
 		var count int64
 		if vals[i] != nil {
-			count, _ = vals[i].(int64)
+			switch v := vals[i].(type) {
+			case int64:
+				count = v
+			case string:
+				count, _ = strconv.ParseInt(v, 10, 64)
+			case []byte:
+				count, _ = strconv.ParseInt(string(v), 10, 64)
+			}
 		}
-		hour := time.Now().Format("2006010215")
-		if len(keys) == len(vals) {
-			t, _ := time.Parse("2006010215", startHour)
-			hour = t.Add(time.Duration(i) * time.Hour).Format("2006010215")
-		}
+		t, _ := time.Parse("2006010215", startHour)
+		hour := t.Add(time.Duration(i) * time.Hour).Format("2006010215")
 		results = append(results, HourlyUsage{Hour: hour, Count: count})
 	}
 	return results, nil

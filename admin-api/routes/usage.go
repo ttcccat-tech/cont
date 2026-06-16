@@ -79,10 +79,17 @@ func GetOrgUsage(store *storage.Store) gin.HandlerFunc {
 		endHour := c.DefaultQuery("end", time.Now().Format("2006010215"))
 		period := c.DefaultQuery("period", "daily")
 
-		org, err := store.GetOrganization(orgID)
-		if err != nil || org == nil {
-			c.JSON(http.StatusNotFound, gin.H{"code": "NOT_FOUND", "message": "organization not found"})
-			return
+		var orgPlan string
+		if orgID == "00000000-0000-0000-0000-000000000000" {
+			// Default org — no DB record, use free plan
+			orgPlan = "default"
+		} else {
+			org, err := store.GetOrganization(orgID)
+			if err != nil || org == nil {
+				c.JSON(http.StatusNotFound, gin.H{"code": "NOT_FOUND", "message": "organization not found"})
+				return
+			}
+			orgPlan = org.Plan
 		}
 
 		hourlyData, err := store.Redis().GetOrgUsageByHour(c.Request.Context(), orgID, startHour, endHour)
@@ -99,14 +106,14 @@ func GetOrgUsage(store *storage.Store) gin.HandlerFunc {
 		}
 
 		// Get plan limits
-		plan, err := store.GetPlanByName(org.Plan)
+		plan, err := store.GetPlanByName(orgPlan)
 		if err != nil || plan == nil {
 			plan = &storage.Plan{RequestLimit: 100000, WorkspaceLimit: 3, UserLimit: 5}
 		}
 
 		c.JSON(http.StatusOK, OrgUsageResponse{
 			OrgID:  orgID,
-			Plan:   org.Plan,
+			Plan:   orgPlan,
 			Period: period,
 			Total:  total,
 			Limit:  plan.RequestLimit,
