@@ -141,8 +141,8 @@ func main() {
 			svcs.GET("", routes.RequirePermission(store, "services", false), routes.ListServices(store))
 			svcs.POST("", routes.RequirePermission(store, "services", true), routes.CreateService(store))
 			svcs.GET("/:id", routes.RequirePermission(store, "services", false), routes.GetService(store))
-			svcs.PUT("/:id", routes.RequirePermission(store, "services", true), routes.UpdateService(store))
-			svcs.PATCH("/:id", routes.RequirePermission(store, "services", true), routes.UpdateService(store))
+		svcs.PUT("/:id", routes.RequirePermission(store, "services", true), routes.UpdateService(store))
+		svcs.PATCH("/:id", routes.RequirePermission(store, "services", true), routes.PatchService(store))
 			svcs.DELETE("/:id", routes.RequirePermission(store, "services", true), routes.DeleteService(store))
 		}
 
