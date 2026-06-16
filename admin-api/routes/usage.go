@@ -106,14 +106,14 @@ func GetOrgUsage(store *storage.Store) gin.HandlerFunc {
 		}
 
 		// Get plan limits
-		plan, err := store.GetPlanByName(org.Plan)
+		plan, err := store.GetPlanByName(orgPlan)
 		if err != nil || plan == nil {
 			plan = &storage.Plan{RequestLimit: 100000, WorkspaceLimit: 3, UserLimit: 5}
 		}
 
 		c.JSON(http.StatusOK, OrgUsageResponse{
 			OrgID:  orgID,
-			Plan:   org.Plan,
+			Plan:   orgPlan,
 			Period: period,
 			Total:  total,
 			Limit:  plan.RequestLimit,
