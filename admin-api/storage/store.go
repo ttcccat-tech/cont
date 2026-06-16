@@ -1435,7 +1435,10 @@ func orInt(v int, def int) int {
 }
 
 func orBool(v bool, def bool) bool {
-	return v || def
+	if !v { // v is false (zero value or explicitly false)
+		return def
+	}
+	return v
 }
 
 func orSlice(v []string, def []string) []string {
