@@ -33,3 +33,10 @@ cred.POST("/jwt/credentials", routes.RequirePermission(store, "consumers", true)
 4. [ ] DELETE /consumers/{id}/jwt/credentials/:credId → 204
 5. [ ] Docker build --no-cache cont-admin-api 成功
 6. [ ] cont-admin-api container healthy
+
+## Tasks
+- [ ] TASK-JWT-CRED-1: Inspect main.go consumersRoutes JWT credential registration
+- [ ] TASK-JWT-CRED-2: Inspect routes.go CreateCredential handler
+- [ ] TASK-JWT-CRED-3: Docker build --no-cache cont-admin-api
+- [ ] TASK-JWT-CRED-4: Restart cont-admin-api container
+- [ ] TASK-JWT-CRED-5: Verify JWT credential CRUD (POST/GET/PATCH/DELETE)

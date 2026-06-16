@@ -240,3 +240,40 @@
 **🔴 P0 Bugs**: 0（全部已修復）  
 **🟡 P1/P2 Bugs**: 0  
 **結論**: ✅ Cont 全功能 QA 通過（2026-06-16 04:18 UTC）
+
+## Phase 2 QA — 2026-06-16 第二輪（上午）
+
+### 執行時間：2026-06-16 08:26 UTC（cron job）
+
+| Phase | 功能 | 結果 |
+|-------|------|------|
+| Phase 1 | Auth 登入 | ✅ Token 取得正常 |
+| Phase 2 | Users CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 3 | Groups CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 4 | Consumers CRUD | ✅ Create 201, Get 200, Delete 204 |
+| Phase 5 | Upstreams CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 6 | Services CRUD | ✅ Create via upstream_id 201, Get 200, Update 200, Delete 204 |
+| Phase 7 | Routes CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 8 | Plugins CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 9 | Proxy 轉發 | 🔴 所有路由（無 auth plugin）都回 401 — 全域 JWT 強制執行（回歸）|
+| Phase 10 | JWT Credential API | 🔴 POST /consumers/{id}/jwt → 404（昨修復，今日又壞）|
+
+### 🔴 BUG-PROXY-GLOBAL-JWT: Proxy 全域路由無 JWT 也回 401（P0）
+- **API**: GET /routes/{newly_created_route}/health（無任何 auth plugin）
+- **預期**: 200（新建 route 無 plugin，應直接轉發到 upstream）
+- **實際**: 401 {"message":"No JWT token provided","error":"Unauthorized","statusCode":401}
+- **原因**: nginx 配置全域 enforce JWT，或 config_sync.lua 對所有路由統一加 JWT validation
+- **修補方向**: 檢查 nginx.conf 或 jwt_validation.lua 是否對所有 /qa_fwd_* 路徑做 JWT 檢查
+- **驗證**: QA Phase 9 proxy 鏈路（upstream→service→route）完整新建，仍回 401
+
+### 🔴 BUG-JWT-CREDENTIAL-REGRESSION: JWT Credential API 回歸 404（P1）
+- **API**: POST /consumers/{id}/jwt
+- **預期**: 201（2026-06-16 04:18 已修復並驗證通過）
+- **實際**: 404 page not found
+- **原因**: 可能 container 重啟後 JWT credential route 未正確註冊，或程式碼有變
+- **修補方向**: 確認 consumersRoutes 是否有 `/consumers/:consumerId/jwt` POST handler
+- **驗證**: Phase 10 驗證，consumer 建立成功但 jwt credential 建立失敗
+
+**🔴 P0 Bugs**: 1（BUG-PROXY-GLOBAL-JWT）
+**🔴 P1 Bugs**: 1（BUG-JWT-CREDENTIAL-REGRESSION）
+**結論**: ⚠️ Cont QA 发现 2 个 Bug 需要修复（2026-06-16 08:26 UTC）
