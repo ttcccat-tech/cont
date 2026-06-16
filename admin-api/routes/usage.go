@@ -79,10 +79,17 @@ func GetOrgUsage(store *storage.Store) gin.HandlerFunc {
 		endHour := c.DefaultQuery("end", time.Now().Format("2006010215"))
 		period := c.DefaultQuery("period", "daily")
 
-		org, err := store.GetOrganization(orgID)
-		if err != nil || org == nil {
-			c.JSON(http.StatusNotFound, gin.H{"code": "NOT_FOUND", "message": "organization not found"})
-			return
+		var orgPlan string
+		if orgID == "00000000-0000-0000-0000-000000000000" {
+			// Default org — no DB record, use free plan
+			orgPlan = "default"
+		} else {
+			org, err := store.GetOrganization(orgID)
+			if err != nil || org == nil {
+				c.JSON(http.StatusNotFound, gin.H{"code": "NOT_FOUND", "message": "organization not found"})
+				return
+			}
+			orgPlan = org.Plan
 		}
 
 		hourlyData, err := store.Redis().GetOrgUsageByHour(c.Request.Context(), orgID, startHour, endHour)

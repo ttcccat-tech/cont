@@ -4024,9 +4024,10 @@ func CountUnreadNotifications(store *storage.Store) gin.HandlerFunc {
 // Called by the Cont proxy's access.lua when no authenticated consumer is present.
 func GetDefaultPlanQuota(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		currentUsage, _ := store.Redis().GetMonthlyUsage(c.Request.Context(), "00000000-0000-0000-0000-000000000000")
 		c.JSON(200, gin.H{
 			"request_limit": 1000,
-			"current_usage": 0,
+			"current_usage": currentUsage,
 			"plan_name":     "free",
 		})
 	}
