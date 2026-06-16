@@ -204,7 +204,7 @@
 - **實際**: 500 Internal Server Error — `attempt to get length of local 'targets' (a userdata value)`
 - **原因**: `targets` 為 FFI cdata，不能用 `#` 取長度，應改用 `next()` 檢查
 - **修補方向**: nginx.conf access_by_lua 中遍歷 targets 時，用 `next(targets)` 而非 `#targets`
-- **驗證**: QA 跑完後填寫
+- **驗證**: ✅ 2026-06-16 TASK-FFI-1~6 完成 — curl /test-api/health 返回 200
 - **嚴重程度**: P0（功能阻斷）
 
 ### 🔴 BUG-JWT-CREDENTIAL-REGRESSION-2: JWT Credential API 回歸 404（P1）
