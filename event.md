@@ -31,12 +31,20 @@
 
 ## Tasks
 
-### 🔴 In Progress — SPEC-default-org-usage
-- [ ] TASK-DU-1: Fix GetDefaultPlanQuota to query Redis for current_usage (routes/routes.go)
-- [ ] TASK-DU-2: Fix GetOrgUsage for zero-UUID default org (routes/usage.go)
-- [ ] TASK-DU-3: Docker build --no-cache admin-api
-- [ ] TASK-DU-4: Docker build --no-cache cont-proxy
-- [ ] TASK-DU-5: Smoke test — default org quota + usage
+### ✅ SPEC-default-org-usage — Default Org Usage Tracking（2026-06-16 小黑發現並修復）
+- **發現時間**: 2026-06-16 09:00 UTC
+- **小黑根因確認**:
+  1. `GetDefaultPlanQuota` hardcodes `current_usage: 0` → 修復：呼叫 `GetMonthlyUsage`
+  2. `GetOrgUsage` 對 zero-UUID 回 404 → 修復：跳過 DB lookup
+  3. `UsageByTimeRange` Redis string→int64 type assertion 失敗 → 修復：加入 string parsing + hour calculation bug
+- **小黑驗證**: ✅ `current_usage=5` (not 0), ✅ `GET /usage/org` returns total=5 with correct hourly data
+- [✅] TASK-DU-1: GetDefaultPlanQuota → GetMonthlyUsage ✅
+- [✅] TASK-DU-2: GetOrgUsage zero-UUID fast path ✅
+- [✅] TASK-DU-2-FIX: org.Plan → orgPlan (build fix) ✅
+- [✅] TASK-DU-6: UsageByTimeRange string→int64 + hour bug ✅
+- [✅] TASK-DU-3: Docker build --no-cache admin-api ✅
+- [✅] TASK-DU-4: Docker build --no-cache cont-proxy ✅
+- [✅] TASK-DU-5: Smoke test — `current_usage=5`, `GET /usage/org` → `total=5` ✅
 
 ### ✅ SPEC-usage-alerting — Usage Alerting（已完成）
 - [✅] TASK-UA-1: alerter.go — 廢除 evaluateUsageQuota()，在 evaluateRule() 處理 usage_quota
