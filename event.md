@@ -1,7 +1,7 @@
 # Cont 2.0 Development Event Log
 
 ## Active Session
-- Date: 2026-06-16 (second session)
+- Date: 2026-06-16 (third session — 22:00)
 - PM: 小黑
 - Scope: Default org usage tracking + Anonymous quota enforcement
 
@@ -67,6 +67,10 @@
 - [✅] TASK-2.5-B1: alerter.go — evaluateUsageQuotas(), fire at 80/90/100%, AlertHistory, webhook trigger
 - [✅] TASK-2.5-B2: AlertRules.tsx — usage_quota alert type + percentage threshold UI（已於 TASK-UA-4 完成）
 - **小黑驗證**: alerter.go Docker build ✅, frontend Docker build ✅, containers running ✅
+
+## 🔴 ACTIVE REGRESSION — 2026-06-16 小黑發現
+
+（無）
 
 ## ✅ 已完成（本輪 2026-06-16 小黑守護）
 
