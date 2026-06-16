@@ -1339,10 +1339,16 @@ func GetProxyRuntimeConfig(store *storage.Store) gin.HandlerFunc {
 				for _, t := range tgts {
 					pts = append(pts, ProxyTarget{Target: t.Target, Weight: t.Weight})
 				}
-				targetsMap[u.ID] = pts
-			}
+			targetsMap[u.ID] = pts
 		}
-		type ProxyPlugin struct {
+	}
+	// Initialize empty array for upstreams with no targets (prevents JSON null)
+	for _, u := range upstreams {
+		if _, ok := targetsMap[u.ID]; !ok {
+			targetsMap[u.ID] = []ProxyTarget{}
+		}
+	}
+	type ProxyPlugin struct {
 			ID        string                 `json:"id"`
 			Name      string                 `json:"name"`
 			RouteID   string                 `json:"route_id,omitempty"`
