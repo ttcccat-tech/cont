@@ -656,8 +656,6 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	paths := orSlice(r.Paths, []string{})
 	methods := orSlice(r.Methods, []string{})
 
-	svcID := r.GetServiceID()
-
 	// Build args FIRST, then setClauses with correct placeholder indices based on actual args positions.
 	// Without service_id: args = [id, name, protocols, hosts, paths, methods, strip_path, preserve_host,
 	//                           regex_priority, https_redirect_status_code, connection_timeout, enabled, orgID]
