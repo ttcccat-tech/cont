@@ -542,3 +542,39 @@
 
 *小黑守護完成時間: 2026-06-17 02:00 UTC | develop ahead of main: 5 commits*
 *小黑判定: BUG-ROUTES-UPDATE 🔴→✅ (P0 fixed) | BUG-PROXY-UPSTREAM-503 ⚠️ (QA false positive, no code change needed)*
+
+---
+
+## 🔴 QA Session — 2026-06-17 05:38 UTC (cron automated)
+
+### 🔴 BUG-Routes-Update-500: Routes Update returns 500（P1）
+- **API**: PUT /routes/{id}
+- **預期**: 200 with updated fields
+- **實際**: 500 Internal Error `{"code":"INTERNAL_ERROR","message":"internal server error"}`
+- **原因**: 初步分析：route.service_id 為 nil 時，SQL WHERE 條件綁定 nil 導致查詢失敗（見 PLAN-BUG-Routes-Update.md）
+- **修補方向**: 確認 route.service_id 在 CreateRoute 後是否正確寫入，若為 nil 則修補 CreateRoute 或調整 UpdateRoute SQL
+- **驗證**: QA Phase 7 — `curl -X PUT /routes/{id} -d '{"description":"QA route"}'`
+- **嚴重程度**: P1
+
+### 🔴 BUG-Proxy-503-NewRoute: Proxy returns 503 on newly created routes（P1）
+- **API**: GET /{route_path}/health via Gateway (http://localhost:18000)
+- **預期**: 200 (新建立的 upstream + service + route，無 auth plugin)
+- **實際**: 503 Service Unavailable
+- **原因**: 已知問題（見 SPEC-BUG-PROXY-SERVICE-NIL-UPSTREAM.md）— upstream 無 targets 時 GetProxyRuntimeConfig targetsMap 為 null，Lua next(nil) 失敗 → upstream_target=nil → 503
+- **修補方向**: 見 SPEC-BUG-PROXY-SERVICE-NIL-UPSTREAM.md
+- **驗證**: QA Phase 9 — 新建 upstream/service/route 後 `curl http://localhost:18000/qa_fwd_xxx/health`
+- **嚴重程度**: P1
+
+### ✅ 已驗證通過
+- Phase 1: Auth ✅
+- Phase 2: Users CRUD ✅
+- Phase 3: Groups CRUD ✅
+- Phase 4: Consumers CRUD ✅
+- Phase 5: Upstreams CRUD ✅
+- Phase 6: Services CRUD（upstream_id 方式）✅，Update ✅
+- Phase 8: Plugins CRUD ✅
+- Phase 10: JWT credential creation ✅
+
+### 🟡 環境備註
+- 現有路由 /test-api2 → upstream 192.168.1.210:30110 返回 502（上游服務在此網路環境不可達，非 Cont bug）
+- Upstream 192.168.1.202:3010 可達（200）
