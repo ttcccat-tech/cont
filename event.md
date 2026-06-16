@@ -419,3 +419,55 @@
 |**🔴 P0 Bugs**: 0（全部已修復 ✅）
 |**🔴 P1 Bugs**: 0（全部已修復 ✅）
 |**結論**: ✅ Cont QA 2 個 Bug 已修復（2026-06-16）
+
+---
+
+## 🔴 QA Session — 2026-06-16 18:51 UTC
+
+### ✅ BUG-PROXY-SERVICE-NIL-UPSTREAM: 新建 Service upstream_id 未同步（P0）— ✅ FIXED 2026-06-16
+- **API**: POST /services（透過 upstream_id 方式）
+- **預期**: Service 關聯 upstream_id，proxy 轉發至正確 upstream
+- **小黑根因確認**:
+  1. Admin API `store.CreateService` 將 `upstream_id` 正確寫入 PostgreSQL ✅
+  2. `GET /internal/config/snapshot` 返回 `targets` map — **當 upstream 無 targets 時，Go map value 為 `nil` → JSON `null`**
+  3. Lua 中 `next(nil)` 失敗（非 absent key），condition 變 false，fallback 到 `service.host`
+  4. 若 `service.host` 也是靜態 host，轉發到錯誤 upstream → 502
+- **小黑修復**:
+  1. `routes/routes.go`: `targetsMap[u.ID] = []ProxyTarget{}` 初始化每個 upstream（不論有無 targets）
+  2. `nginx.conf` line 566: 增加 `type(cont.targets[svc.upstream_id]) ~= "nil"` guard
+- **小黑驗證**: 
+  - `GET /internal/config/snapshot` → targets 全為 `[]` 而非 `null` ✅
+  - `/test-api/health` → 200 ✅（upstream_id=0a694256, target=192.168.1.202:3010）
+- **小黑任務**:
+  - [✅] TASK-FIX-1: routes/routes.go targetsMap init empty array
+  - [✅] TASK-FIX-2: nginx.conf type nil guard
+  - [✅] TASK-FIX-3: Docker build --no-cache cont-proxy
+  - [✅] TASK-FIX-4: Restart cont-proxy
+  - [✅] TASK-FIX-5: Smoke test — `/test-api/health` → 200
+  - [✅] TASK-FIX-6: Regression — existing service+route → 200
+
+### 🟡 BUG-JWT-CREDENTIAL-SKILL-OUTDATED: JWT Credential API skill 文件與實際不符（P2）
+- **API**: POST /consumers/{id}/jwt（skill 記載）vs POST /consumers/{id}/jwt/credentials（正確）
+- **預期**: Skill 記載的 API path 可用
+- **實際**: Skill 記載路徑 404，正確路徑為 `/jwt/credentials`
+- **原因**: Skill 文件未更新
+- **修補方向**: 更新 cont-full-system-qa skill 的 Phase 10
+- **驗證**: 
+  - `POST /consumers/{id}/jwt` → 404 ❌
+  - `POST /consumers/{id}/jwt/credentials` → 201 ✅
+- **嚴重程度**: P2（文件錯誤，不影響系統功能）
+
+### 🔴 P0 Bugs Summary
+- **BUG-PROXY-SERVICE-NIL-UPSTREAM**: 1 個 P0（Proxy 轉發新建鏈路失敗）
+
+### 🟡 P2 Bugs Summary  
+- **BUG-JWT-CREDENTIAL-SKILL-OUTDATED**: 1 個 P2（Skill 文件需更新）
+
+### 小黑判定（2026-06-16 20:00 UTC）
+
+#### 🔴 BUG-PROXY-SERVICE-NIL-UPSTREAM — ✅ MERGED 2026-06-16
+- develop → main Fast-forward merge ✅ (commit 9cc1c875)
+- event.md line 467 矛盾已修正：此 bug 早已於 18:51 修復並驗證
+- Proxy `/test-api/health` → 200 ✅
+
+#### 🟡 BUG-JWT-CREDENTIAL-SKILL-OUTDATED — 暫不處理（P2 文件問題）
