@@ -357,12 +357,51 @@ func UpdateService(store *storage.Store) gin.HandlerFunc {
 		}
 		orgID := getOrgID(c)
 		result, err := store.UpdateService(c.Param("id"), orgID, &s)
-		if err == sql.ErrNoRows {
-			notFound(c, "service not found")
+		if err != nil {
+			if err == sql.ErrNoRows {
+				notFound(c, "service not found")
+				return
+			}
+			if strings.Contains(err.Error(), "invalid upstream_id") {
+				badRequest(c, err)
+				return
+			}
+			internalError(c)
 			return
 		}
+		c.JSON(200, result)
+	}
+}
+
+// PatchService handles PATCH /services/:id — partial update preserving unchanged fields.
+func PatchService(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var fields map[string]interface{}
+		if err := c.ShouldBindJSON(&fields); err != nil {
+			badRequest(c, err)
+			return
+		}
+		// Reject unexpected fields to prevent accidental column injection
+		allowed := map[string]bool{
+			"name": true, "protocol": true, "host": true, "port": true,
+			"path": true, "url": true, "retries": true,
+			"connect_timeout": true, "read_timeout": true, "write_timeout": true,
+			"upstream_id": true, "enabled": true,
+		}
+		for k := range fields {
+			if !allowed[k] {
+				badRequestMsg(c, "unknown field: "+k)
+				return
+			}
+		}
+		orgID := getOrgID(c)
+		result, err := store.PatchService(c.Param("id"), orgID, fields)
 		if err != nil {
-			if strings.Contains(err.Error(), "invalid upstream_id") {
+			if err == sql.ErrNoRows {
+				notFound(c, "service not found")
+				return
+			}
+			if err != nil && strings.Contains(err.Error(), "invalid upstream_id") {
 				badRequest(c, err)
 				return
 			}

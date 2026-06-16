@@ -114,6 +114,8 @@ func (s *Store) GetService(id, orgID string) (*Service, error) {
 		FROM services WHERE id = $1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))`, id, orgID))
 }
 
+// UpdateService does a full replace (PUT) — all fields are updated.
+// For partial updates use PatchService instead.
 func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) {
 	// Validate upstream_id format: empty is OK, otherwise must be valid UUID v4
 	if svc.UpstreamID != "" && !uuidV4Regex.MatchString(svc.UpstreamID) {
@@ -137,6 +139,159 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 	}
 	svc.ID = id
 	return svc, nil
+}
+
+// PatchService does a partial update (PATCH) — only fields present in `fields`
+// are updated; all other fields retain their current values.
+func (s *Store) PatchService(id, orgID string, fields map[string]interface{}) (*Service, error) {
+	// Fetch current service to know existing values
+	current, err := s.GetService(id, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, sql.ErrNoRows
+	}
+
+	// Build dynamic SET clause
+	setParts := []string{}
+	args := []interface{}{}
+	// argIdx starts at 3 because $1=id and $2=orgID are used in WHERE clause
+	argIdx := 3
+
+	addSet := func(field string, value interface{}) {
+		setParts = append(setParts, fmt.Sprintf("%s=$%d", field, argIdx))
+		args = append(args, value)
+		argIdx++
+	}
+
+	if _, present := fields["name"]; present {
+		addSet("name", coalesceString(fields["name"], current.Name))
+	}
+	if _, present := fields["protocol"]; present {
+		addSet("protocol", coalesceString(fields["protocol"], current.Protocol))
+	}
+	if _, present := fields["host"]; present {
+		addSet("host", coalesceString(fields["host"], current.Host))
+	}
+	if _, present := fields["port"]; present {
+		addSet("port", coalesceInt(fields["port"], current.Port))
+	}
+	if _, present := fields["path"]; present {
+		addSet("path", coalesceString(fields["path"], current.Path))
+	}
+	if _, present := fields["url"]; present {
+		addSet("url", coalesceString(fields["url"], current.URL))
+	}
+	if _, present := fields["retries"]; present {
+		addSet("retries", coalesceInt(fields["retries"], current.Retries))
+	}
+	if _, present := fields["connect_timeout"]; present {
+		addSet("connect_timeout", coalesceInt(fields["connect_timeout"], current.ConnectTimeout))
+	}
+	if _, present := fields["read_timeout"]; present {
+		addSet("read_timeout", coalesceInt(fields["read_timeout"], current.ReadTimeout))
+	}
+	if _, present := fields["write_timeout"]; present {
+		addSet("write_timeout", coalesceInt(fields["write_timeout"], current.WriteTimeout))
+	}
+	if _, present := fields["upstream_id"]; present {
+		upstreamID := fields["upstream_id"]
+		if upstreamID == nil || upstreamID == "" {
+			addSet("upstream_id", nil)
+		} else {
+			upstreamIDStr, ok := upstreamID.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid upstream_id format: must be a string")
+			}
+			if upstreamIDStr != "" && !uuidV4Regex.MatchString(upstreamIDStr) {
+				return nil, fmt.Errorf("invalid upstream_id format: must be a valid UUID v4")
+			}
+			addSet("upstream_id", upstreamIDStr)
+		}
+	}
+	if _, present := fields["enabled"]; present {
+		addSet("enabled", coalesceBool(fields["enabled"], current.Enabled))
+	}
+
+	if len(setParts) == 0 {
+		// Nothing to update — return current service as-is
+		return current, nil
+	}
+
+	setParts = append(setParts, "updated_at=NOW()")
+	whereClause := `WHERE id=$1 AND ($2 = '' OR ($2 != '' AND org_id::text = $2))`
+	args = append([]interface{}{id, orgID}, args...)
+
+	query := fmt.Sprintf("UPDATE services SET %s %s RETURNING id, name, protocol, host, port, path, url, retries, connect_timeout, read_timeout, write_timeout, upstream_id, enabled, created_at, updated_at", strings.Join(setParts, ", "), whereClause)
+
+	row := s.db.QueryRow(query, args...)
+	var name, protocol, host, path, url, upstreamID sql.NullString
+	var port, retries, connect, read, write sql.NullInt64
+	var enabled sql.NullBool
+	var created, updated sql.NullString
+
+	err = row.Scan(&current.ID, &name, &protocol, &host, &port, &path, &url,
+		&retries, &connect, &read, &write, &upstreamID, &enabled, &created, &updated)
+	if err != nil {
+		return nil, err
+	}
+	current.Name = name.String
+	current.Protocol = protocol.String
+	current.Host = host.String
+	if port.Valid {
+		current.Port = int(port.Int64)
+	}
+	current.Path = path.String
+	current.URL = url.String
+	current.UpstreamID = upstreamID.String
+	if retries.Valid {
+		current.Retries = int(retries.Int64)
+	}
+	if connect.Valid {
+		current.ConnectTimeout = int(connect.Int64)
+	}
+	if read.Valid {
+		current.ReadTimeout = int(read.Int64)
+	}
+	if write.Valid {
+		current.WriteTimeout = int(write.Int64)
+	}
+	if enabled.Valid {
+		current.Enabled = enabled.Bool
+	}
+	current.OrgID = orgID
+	if created.Valid {
+		current.CreatedAt = created.String
+	}
+	if updated.Valid {
+		current.UpdatedAt = updated.String
+	}
+	return current, nil
+}
+
+// coalesceString returns val if non-empty, otherwise def.
+func coalesceString(val interface{}, def string) string {
+	if s, ok := val.(string); ok && s != "" {
+		return s
+	}
+	return def
+}
+
+// coalesceInt returns val if non-zero, otherwise def.
+func coalesceInt(val interface{}, def int) int {
+	if v, ok := val.(float64); ok && v != 0 {
+		return int(v)
+	}
+	return def
+}
+
+// coalesceBool returns val if explicitly set, otherwise def.
+func coalesceBool(val interface{}, def bool) bool {
+	if v, ok := val.(bool); ok {
+		return v
+	}
+	return def
 }
 
 func (s *Store) DeleteService(id, orgID string) error {
