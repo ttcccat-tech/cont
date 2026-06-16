@@ -63,15 +63,36 @@ export default function HealthPortal() {
   const fetchUpstreams = () => {
     setLoading(true)
     apiGet('/upstreams')
-      .then(data => {
+      .then(async data => {
         const list = Array.isArray(data) ? data : (data?.data || [])
-        const upstreamsWithHealth: UpstreamHealthData[] = list.map((u: KongUpstream) => ({
-          ...u,
-          targets: [],
-          healthyCount: 0,
-          unhealthyCount: 0,
-          overallStatus: 'unknown' as const,
-        }))
+        // fetch health data for each upstream concurrently
+        const upstreamsWithHealth: UpstreamHealthData[] = await Promise.all(
+          list.map(async (u: KongUpstream) => {
+            try {
+              const health: UpstreamHealth = await apiGet(`/upstreams/${u.id}/health`)
+              const targets: TargetHealth[] = health?.targets || []
+              const healthyCount = targets.filter((t: TargetHealth) => t.healthy).length
+              const unhealthyCount = targets.filter((t: TargetHealth) => !t.healthy).length
+              const overallStatus: UpstreamHealthData['overallStatus'] =
+                healthyCount === 0 && unhealthyCount === 0
+                  ? 'unknown'
+                  : unhealthyCount === 0
+                  ? 'healthy'
+                  : healthyCount === 0
+                  ? 'unhealthy'
+                  : 'partial'
+              return { ...u, targets, healthyCount, unhealthyCount, overallStatus }
+            } catch {
+              return {
+                ...u,
+                targets: [],
+                healthyCount: 0,
+                unhealthyCount: 0,
+                overallStatus: 'unknown' as const,
+              }
+            }
+          })
+        )
         setUpstreams(upstreamsWithHealth)
       })
       .catch(() => {
