@@ -222,14 +222,24 @@
   - [✅] TASK-4: Final verification — JWT CRUD all PASS
 - **小黑結論**: Root cause = container state issue, code is correct. No code changes needed.
 
-### 🟡 BUG-PROXY-UPSTREAM-WRONG: 路由 proxy 到錯誤 upstream（P1）
+### ✅ BUG-PROXY-UPSTREAM-WRONG: 路由 proxy 到錯誤 upstream（P0）— ✅ FIXED 2026-06-16
 - **API**: GET /test-api/health via Gateway
 - **預期**: 轉發到 192.168.1.202:3010
-- **實際**: 轉發到 final.com:80（upstream_id 解析失敗 fallback 到 service.host）
-- **原因**: upstream_id 解析失敗，正確 upstream 未被使用
-- **修補方向**: 檢查 config_sync.lua 中 upstream_id → target 解析邏輯
-- **驗證**: /test-api/health 返回 200 但 upstream 為 final.com:80（並非目標 upstream）
-- **嚴重程度**: P1（功能異常）
+- **實際**: 轉發到 final.com:80（BUG，應為 192.168.1.202:3010）
+- **小黑根因確認**（2026-06-16 15:30 UTC）:
+  1. config_sync.lua services→dict 轉換已完成（commit `4b682b33`）✅
+  2. **真正根因**: `nginx.conf:489` route matching priority 邏輯 bug
+  3. `if priority > highest_priority then` — 當兩個 route priority 都是 0，**最後**遍歷到的 route 勝出
+  4. `with-svc` route（`paths=["/test-api"]`）在 routes array 中較後面，取代了 `test-api-route`
+  5. `with-svc` service → `host=final.com:80`（錯誤 upstream）
+- **小黑修復**: `nginx.conf:490` `priority >` → `priority >=` — 讓同等 priority 時取**第一個**
+- **小黑驗證**: `matched_route name=test-api-route`, `upstream_target=192.168.1.202:3010` ✅, Docker build --no-cache ✅, Container healthy ✅
+- **小黑任務**:
+  - [✅] TASK-UPSTREAM-FIX-1: Fix nginx.conf route priority logic (priority > → priority >=)
+  - [✅] TASK-UPSTREAM-FIX-2: Docker build --no-cache cont-proxy
+  - [✅] TASK-UPSTREAM-FIX-3: Restart cont-proxy container
+  - [✅] TASK-UPSTREAM-FIX-4: Smoke test — `GET /test-api/health` → 200, upstream = `192.168.1.202:3010`
+- **小黑結論**: 真正根因是 route matching priority bug，不是 upstream_id 解析問題
 
 ## Phase 3 QA — 2026-06-16 第三輪（上午）— 小黑親自 QA 2026-06-16 09:30
 
