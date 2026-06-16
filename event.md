@@ -179,7 +179,51 @@
 | P1-QA-6 Lua modules | ✅ PASSED | jwt_validation.lua + config_sync.lua exist with cosocket |
 | P1-QA-7 API endpoints | ✅ PASSED | /internal/config/snapshot + /internal/usage/incr both return valid JSON |
 
-|**小黑判定**: Phase 1 SPEC-PENDING-01 全部 ✅，可進入 Phase 2
+||**小黑判定**: Phase 1 SPEC-PENDING-01 全部 ✅，可進入 Phase 2
+
+## Phase 3 QA — 2026-06-16 第四輪（中午）— cron QA
+
+### 執行時間：2026-06-16 04:37 UTC
+
+| Phase | 功能 | 結果 |
+|-------|------|------|
+| Phase 1 | Auth 登入 | ✅ Token 取得正常 |
+| Phase 2 | Users CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 3 | Groups CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 4 | Consumers CRUD | ✅ Create 201, Get 200, Delete 204 |
+| Phase 5 | Upstreams CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 6 | Services CRUD | ✅ Create via upstream_id 201, Get 200, Update 200, Delete 204 |
+| Phase 7 | Routes CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 8 | Plugins CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+| Phase 9 | Proxy 轉發 | 🔴 新建 route → 500（Lua FFI targets crash）|
+| Phase 10 | JWT Credential API | 🔴 POST /consumers/{id}/jwt → 404（regression）|
+
+### 🔴 BUG-PROXY-500-LUA-FFI: Proxy 轉發 500 Lua FFI targets crash（P0）
+- **API**: GET /{new_route_path}/health via Gateway
+- **預期**: 200（轉發到 upstream 192.168.1.202:3010）
+- **實際**: 500 Internal Server Error — `attempt to get length of local 'targets' (a userdata value)`
+- **原因**: `targets` 為 FFI cdata，不能用 `#` 取長度，應改用 `next()` 檢查
+- **修補方向**: nginx.conf access_by_lua 中遍歷 targets 時，用 `next(targets)` 而非 `#targets`
+- **驗證**: QA 跑完後填寫
+- **嚴重程度**: P0（功能阻斷）
+
+### 🔴 BUG-JWT-CREDENTIAL-REGRESSION-2: JWT Credential API 回歸 404（P1）
+- **API**: POST /consumers/{id}/jwt
+- **預期**: 201（2026-06-16 上午已修復並驗證通過）
+- **實際**: 404 page not found
+- **原因**: 需排查 consumersRoutes 是否正確註冊了 `/jwt` POST handler
+- **修補方向**: 檢查 handler registration 或 container 狀態
+- **驗證**: QA 跑完後填寫
+- **嚴重程度**: P1（功能異常）
+
+### 🟡 BUG-PROXY-UPSTREAM-WRONG: 路由 proxy 到錯誤 upstream（P1）
+- **API**: GET /test-api/health via Gateway
+- **預期**: 轉發到 192.168.1.202:3010
+- **實際**: 轉發到 final.com:80（upstream_id 解析失敗 fallback 到 service.host）
+- **原因**: upstream_id 解析失敗，正確 upstream 未被使用
+- **修補方向**: 檢查 config_sync.lua 中 upstream_id → target 解析邏輯
+- **驗證**: /test-api/health 返回 200 但 upstream 為 final.com:80（並非目標 upstream）
+- **嚴重程度**: P1（功能異常）
 
 ## Phase 3 QA — 2026-06-16 第三輪（上午）— 小黑親自 QA 2026-06-16 09:30
 
