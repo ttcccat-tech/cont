@@ -685,9 +685,10 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	}
 
 	var orgIDArgIndex int
-	if svcID != "" {
+	// Only include service_id in UPDATE if explicitly set with non-empty ID (same as CreateRoute)
+	if r.Service != nil && r.Service.ID != "" {
 		// service_id goes after enabled (at $13), orgID at $14
-		args = append(args, svcID) // service_id at $13
+		args = append(args, r.Service.ID) // service_id at $13
 		setClauses = append(setClauses, "service_id=$13")
 		orgIDArgIndex = 14
 	} else {
