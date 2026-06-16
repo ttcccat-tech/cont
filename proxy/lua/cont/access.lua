@@ -190,7 +190,7 @@ local function select_target(upstream_id)
     end
 
     local targets = cont.targets and cont.targets[upstream_id]
-    if not targets or #targets == 0 then
+    if not targets or next(targets) == nil then
         ngx.log(ngx.WARN, "cont: no healthy targets for upstream ", upstream_id)
         return nil
     end
@@ -222,7 +222,9 @@ local function select_target(upstream_id)
         for i = 1, string.len(ip) do
             hash = (hash * 31 + string.byte(ip, i)) % 2147483647
         end
-        local target_idx = (hash % #targets) + 1
+        local target_count = 0
+        for _ in pairs(targets) do target_count = target_count + 1 end
+        local target_idx = (hash % target_count) + 1
         return targets[target_idx].target
     end
 
