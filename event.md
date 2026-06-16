@@ -1,9 +1,18 @@
 # Cont 2.0 Development Event Log
 
 ## Active Session
-- Date: 2026-06-15
+- Date: 2026-06-16 (second session)
 - PM: 小黑
-- Scope: 2.0 用量追蹤 + 超限阻擋 + Webhook 可靠化
+- Scope: Default org usage tracking + Anonymous quota enforcement
+
+## 🔴 SPEC-default-org-usage — Default Org Usage Tracking（2026-06-16 小黑發現）
+- **發現時間**: 2026-06-16 09:00 UTC
+- **現象**: Anonymous requests 永遠 `current_usage=0`，Free plan 超限阻擋失效
+- **小黑根因確認**:
+  1. `GetDefaultPlanQuota` (routes/routes.go:4029) hardcodes `current_usage: 0`，從不查 Redis
+  2. `GetOrgUsage` (routes/usage.go:82-84) 對 zero-UUID org 回 404（DB 無此記錄）
+  3. IncrUsage 本身是正確的 — Redis 已有 keys (DBSIZE=36)
+- **小黑修復方向**: 對 zero-UUID org 查 Redis GetMonthlyUsage，跳過 DB lookup
 
 ## Status
 - 🔴 = blocked/bug 需要修
@@ -21,6 +30,13 @@
 - **小黑驗證**: Redis DBSIZE=5 keys ✅, TTL=5356693 (~62 days) ✅, GET=1 ✅, Docker build --no-cache ✅, Container healthy ✅
 
 ## Tasks
+
+### 🔴 In Progress — SPEC-default-org-usage
+- [ ] TASK-DU-1: Fix GetDefaultPlanQuota to query Redis for current_usage (routes/routes.go)
+- [ ] TASK-DU-2: Fix GetOrgUsage for zero-UUID default org (routes/usage.go)
+- [ ] TASK-DU-3: Docker build --no-cache admin-api
+- [ ] TASK-DU-4: Docker build --no-cache cont-proxy
+- [ ] TASK-DU-5: Smoke test — default org quota + usage
 
 ### ✅ SPEC-usage-alerting — Usage Alerting（已完成）
 - [✅] TASK-UA-1: alerter.go — 廢除 evaluateUsageQuota()，在 evaluateRule() 處理 usage_quota
