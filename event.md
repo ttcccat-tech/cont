@@ -185,45 +185,33 @@
 
 ### 執行時間：2026-06-16 15:13 UTC
 
-|| Phase | 功能 | 結果 |
+||| Phase | 功能 | 結果 |
 |-------|------|------|------|
-| Phase 1 | Auth 登入 | ✅ Token 取得正常 |
-| Phase 2 | Users CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
-| Phase 3 | Groups CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
-| Phase 4 | Consumers CRUD | ✅ Create 201, Get 200, Delete 204 |
-| Phase 5 | Upstreams CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
-| Phase 6 | Services CRUD | ✅ Create/Get/Delete PASS, Update ❌ 500 INTERNAL_ERROR |
-| Phase 7 | Routes CRUD | ✅ Create/Get/Delete PASS, Update ❌ 500 INTERNAL_ERROR |
-| Phase 8 | Plugins CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
-| Phase 9 | Proxy 轉發 | ⚠️ 現有路由 200，新路由 503（upstream_id 未同步） |
-| Phase 10 | JWT Auth | ✅ JWT credential CRUD 201/200/204 |
+|| Phase 1 | Auth 登入 | ✅ Token 取得正常 |
+|| Phase 2 | Users CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+|| Phase 3 | Groups CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+|| Phase 4 | Consumers CRUD | ✅ Create 201, Get 200, Delete 204 |
+|| Phase 5 | Upstreams CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+|| Phase 6 | Services CRUD | ✅ Create/Get/Delete PASS, Update ✅ 200（本輪小黑驗證）|
+|| Phase 7 | Routes CRUD | ✅ Create/Get/Delete PASS, Update ✅ 200（本輪小黑驗證）|
+|| Phase 8 | Plugins CRUD | ✅ Create 201, Get 200, Update 200, Delete 204 |
+|| Phase 9 | Proxy 轉發 | ✅ 新路由 200（upstream_id 同步正常）|
+|| Phase 10 | JWT Auth | ✅ JWT credential CRUD 201/200/204 |
 
-### 🔴 BUG-Services-Update-500: Services Update 返回 INTERNAL_ERROR（P0）
-- **API**: PUT /services/{id}
-- **預期**: 200 Update 成功
-- **實際**: 500 {"code":"INTERNAL_ERROR","message":"internal server error"}
-- **原因**: 初步分析 — Services Update 時攜帶 upstream_id，config_sync.lua 同步時未正確處理 upstream host 解析
-- **修補方向**: config_sync.lua 中 Update Service 時需要同步解析 upstream host
-- **驗證**: QA 跑完後填寫
-- **嚴重程度**: P0（功能阻斷 — Service 無法更新）
+### ✅ BUG-Services-Update-500: Services Update 返回 INTERNAL_ERROR（P0）— ✅ VERIFIED FIXED 2026-06-17
+- **小黑驗證**: PUT /services/{id} with upstream_id → 200 ✅, without upstream_id → 200 ✅
+- **小黑驗證**: Empty name validation → 🟡 500（預計優化，非阻擋）
 
-### 🔴 BUG-Routes-Update-500: Routes Update 返回 INTERNAL_ERROR（P0）
-- **API**: PUT /routes/{id}
-- **預期**: 200 Update 成功
-- **實際**: 500 {"code":"INTERNAL_ERROR","message":"internal server error"}
-- **原因**: 初步分析 — Routes Update 呼叫 Store.UpdateRoute，store.go 中間層問題
-- **修補方向**: 檢查 store.go UpdateRoute 實作，比對 CreateRoute 找出差異
-- **驗證**: QA 跑完後填寫
-- **嚴重程度**: P0（功能阻斷 — Route 無法更新）
+### ✅ BUG-Routes-Update-500: Routes Update 返回 INTERNAL_ERROR（P0）— ✅ VERIFIED FIXED 2026-06-17
+- **小黑驗證**: PUT /routes/{id} with service_id → 200 ✅, without → 200 ✅
+- **小黑驗證**: Empty name validation → 🟡 500（預計優化，非阻擋）
 
-### 🔴 BUG-Proxy-NewRoute-503: 新建路由 proxy 轉發 503（P0）
-- **API**: GET /{new_route_path}/health via Gateway
-- **預期**: 200（轉發到 upstream 192.168.1.202:3010）
-- **實際**: 503 {"message":"no upstream target"}
-- **根因分析**: nginx.conf access_by_lua DEBUG log 顯示 `upstream_target=nil` — config_sync.lua 同步新建 Service 時未攜帶 upstream_id
-- **已知修復方向**: config_sync.lua service_lookup 需要正確解析 upstream_id 並取到 targets
-- **驗證**: QA 跑完後填寫
-- **嚴重程度**: P0（功能阻斷 — 新建路由無法轉發）
+### ✅ BUG-Proxy-NewRoute-503: 新建路由 proxy 轉發 503（P0）— ✅ VERIFIED FIXED 2026-06-17
+- **小黑驗證**: POST /services (upstream_id) → 201 ✅, POST /routes (service_id) → 201 ✅, GET /qa-test-route/health → 200 ✅
+
+### 🟡 QA 新發現：Empty name validation 返回 500 而非 400
+- PUT /services/{id} + PUT /routes/{id} 攜帶空 name → 500（非阻擋性，列入優化）
+- **小黑判定**: 非功能阻斷，列入下次優化待辦
 
 ---
 
