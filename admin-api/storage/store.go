@@ -432,13 +432,19 @@ func (s *Store) CreateRoute(r *Route) (*Route, error) {
 	if orgID == "" {
 		orgID = "00000000-0000-0000-0000-000000000000"
 	}
+	// serviceID "" → pass nil so PostgreSQL UUID column gets NULL (not empty string)
+	serviceID := r.GetServiceID()
+	var serviceIDArg interface{}
+	if serviceID != "" {
+		serviceIDArg = serviceID
+	}
 	err := s.db.QueryRow(`
 		INSERT INTO routes (name, service_id, protocols, hosts, paths, methods,
 			strip_path, preserve_host, regex_priority, https_redirect_status_code,
 			connection_timeout, enabled, org_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING id, created_at, updated_at`,
-		r.Name, r.GetServiceID(), "{"+strings.Join(protocols,",")+"}", "{"+strings.Join(hosts,",")+"}", "{"+strings.Join(paths,",")+"}", "{"+strings.Join(methods,",")+"}",
+		r.Name, serviceIDArg, "{"+strings.Join(protocols,",")+"}", "{"+strings.Join(hosts,",")+"}", "{"+strings.Join(paths,",")+"}", "{"+strings.Join(methods,",")+"}",
 		orBool(r.StripPath, true), orBool(r.PreserveHost, false),
 		orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426),
 		orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true), orgID,
