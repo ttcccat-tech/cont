@@ -130,8 +130,8 @@ export default function Analytics() {
   if (error) {
     return (
       <div style={{ textAlign:'center', marginTop:80 }}>
-        <Tag color="red" style={{fontSize:16}}>無法連線至 Kong Metrics</Tag>
-        <p style={{color:'var(--muted)', marginTop:8}}>請確認 Kong Prometheus 插件已啟用</p>
+        <Tag color="red" style={{fontSize:16}}>無法連線至 Cont Metrics</Tag>
+        <p style={{color:'var(--muted)', marginTop:8}}>請確認 Cont Prometheus 插件已啟用</p>
       </div>
     )
   }

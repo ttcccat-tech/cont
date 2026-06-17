@@ -20,7 +20,7 @@ export default function Services() {
     setLoading(true)
     api.listServices()
       .then(data => setServices(data))
-      .catch(() => message.error('無法連接 Kong Admin API'))
+        .catch(() => message.error('無法連接 Cont Admin API'))
       .finally(() => setLoading(false))
   }
 

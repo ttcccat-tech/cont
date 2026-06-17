@@ -244,7 +244,7 @@ export default function PluginsPage() {
         setRoutes(routes)
         setConsumers(consumers)
       })
-      .catch(() => message.error('無法連接 Kong Admin API'))
+        .catch(() => message.error('無法連接 Cont Admin API'))
       .finally(() => setLoading(false))
   }
 

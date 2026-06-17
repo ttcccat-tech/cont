@@ -32,11 +32,11 @@ export default function Sidebar() {
 
   const baseItems = [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'dashboard 儀表板' },
-    { key: '/services', icon: <ApiOutlined />, label: 'api 前端' },
-    { key: '/routes', icon: <ThunderboltOutlined />, label: 'routes 路由' },
+    { key: '/services', icon: <ApiOutlined />, label: 'API名稱(前端)' },
+    { key: '/routes', icon: <ThunderboltOutlined />, label: 'API路由URL' },
     { key: '/plugins', icon: <KeyOutlined />, label: 'plugins 插件' },
     { key: '/consumers', icon: <UserOutlined />, label: 'consumers 消費者' },
-    { key: '/upstreams', icon: <NodeIndexOutlined />, label: 'api 負載平衡後端' },
+    { key: '/upstreams', icon: <NodeIndexOutlined />, label: 'API 目標(後端)' },
     { key: '/grpc-services', icon: <CloudOutlined />, label: 'grpc gRPC 服務' },
     { key: '/analytics', icon: <BarChartOutlined />, label: 'analytics 統計報告' },
     { key: '/audit', icon: <AuditOutlined />, label: 'audit 審計日誌' },
@@ -84,7 +84,7 @@ export default function Sidebar() {
             fontSize: 16,
             fontWeight: 700
           }}>
-            K
+            C
           </div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Cont</div>

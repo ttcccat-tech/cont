@@ -222,7 +222,7 @@ export default function ConfigVersioning() {
           </Button>
           <Popconfirm
             title="確定要回滾至此快照？"
-            description={<span style={{ color: 'var(--warning)' }}>当前 Kong 配置将被此快照覆盖</span>}
+            description={<span style={{ color: 'var(--warning)' }}>当前 Cont 配置将被此快照覆盖</span>}
             onConfirm={() => handleRollback(record.id)}
             okText="確定回滾"
             cancelText="取消"

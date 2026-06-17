@@ -52,8 +52,8 @@ export default function Dashboard() {
     return (
       <div style={{ textAlign: 'center', marginTop: 80 }}>
         <ExclamationCircleOutlined style={{ fontSize: 48, color: '#faad14' }} />
-        <h2 style={{ color: 'var(--text)' }}>無法連接 Kong Admin API</h2>
-        <p style={{ color: 'var(--muted)' }}>請確認 Kong 容器已在運行，端口 8001 可正常訪問</p>
+        <h2 style={{ color: 'var(--text)' }}>無法連接 Cont Admin API</h2>
+        <p style={{ color: 'var(--muted)' }}>請確認 Cont API 容器已在運行，端口 18081 可正常訪問</p>
       </div>
     )
   }
@@ -76,23 +76,23 @@ export default function Dashboard() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title={<span style={{ color: 'var(--muted)' }}>Kong 狀態</span>}
+              title={<span style={{ color: 'var(--muted)' }}>Cont 狀態</span>}
               valueRender={() => (
                 <div>
                   <Tag icon={<CheckCircleOutlined />} color={dbOk ? 'green' : 'red'}>
                     {dbOk ? 'Database OK' : 'Database Error'}
                   </Tag>
-                  <Tag icon={<CheckCircleOutlined />} color="blue" style={{ marginLeft: 8 }}>Nginx OK</Tag>
+                  <Tag icon={<CheckCircleOutlined />} color="blue" style={{ marginLeft: 8 }}>Workers OK</Tag>
                 </div>
               )}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card><Statistic title={<span style={{ color: 'var(--muted)' }}>Kong 版本</span>} value={version} /></Card>
+          <Card><Statistic title={<span style={{ color: 'var(--muted)' }}>Cont 版本</span>} value={version} /></Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card><Statistic title={<span style={{ color: 'var(--muted)' }}>Nginx Workers</span>} value={workerCount} /></Card>
+          <Card><Statistic title={<span style={{ color: 'var(--muted)' }}>Workers</span>} value={workerCount} /></Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>

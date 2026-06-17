@@ -46,7 +46,7 @@ export default function ConsumersPage() {
     setLoading(true)
     api.listConsumers()
       .then(r => setConsumers(r))
-      .catch(() => message.error('無法連接 Kong Admin API'))
+        .catch(() => message.error('無法連接 Cont Admin API'))
       .finally(() => setLoading(false))
   }
 
