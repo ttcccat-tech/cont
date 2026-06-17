@@ -945,6 +945,10 @@ func CreateTarget(store *storage.Store) gin.HandlerFunc {
 			badRequest(c, err)
 			return
 		}
+		if t.Target == "" {
+			badRequestMsg(c, "target is required and cannot be empty")
+			return
+		}
 		t.UpstreamID = c.Param("id")
 		// Inherit org_id from upstream for data consistency
 		orgID := getOrgID(c)
