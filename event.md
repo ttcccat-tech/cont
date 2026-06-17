@@ -98,7 +98,7 @@
 - **Services Update**: 上次 QA 標註 500，本次 QA 返回 200 ✅ 已修復（UUID validation 已生效）
 - **注意**: event.md 舊記錄「Services Update 500」已過時，實際已修復
 
-## 🔴 P0 Bug 彙整（需修復）- 更新於 2026-06-17 14:22
+## 🔴 P0 Bug 彙整（需修復）- 更新於 2026-06-17 15:42
 1. ~~Services Update 500~~ → ✅ 已修復（200）
-2. Routes Update 500（🔴 新發現 / 或舊 Bug 未真正修復）
-3. Proxy Routing 503 upstream targets nil（🔴 持續存在）
+2. ~~Routes Update 500~~ → ✅ 已修復（200，部分更新不影響 service_id）
+3. ~~Proxy Routing 503 upstream targets nil~~ → ✅ 已修復（targets map 是 [] 而非 null）
