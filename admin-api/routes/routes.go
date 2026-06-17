@@ -967,6 +967,10 @@ func UpdateTarget(store *storage.Store) gin.HandlerFunc {
 			badRequest(c, err)
 			return
 		}
+		if t.Target == "" {
+			badRequestMsg(c, "target is required and cannot be empty")
+			return
+		}
 		orgID := getOrgID(c)
 		result, err := store.UpdateTarget(c.Param("id"), c.Param("target_id"), orgID, &t)
 		if err != nil {
