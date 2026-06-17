@@ -16,8 +16,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// uuidV4Regex matches valid UUID v4 format
-var uuidV4Regex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
+// UUIDV4Regex matches valid UUID v4 format — exported for use by other packages
+var UUIDV4Regex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
 
 func NewStore(db *sql.DB, rdb *Redis) *Store {
 	return &Store{db: db, rdb: rdb}
@@ -118,7 +118,7 @@ func (s *Store) GetService(id, orgID string) (*Service, error) {
 // For partial updates use PatchService instead.
 func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) {
 	// Validate upstream_id format: empty is OK, otherwise must be valid UUID v4
-	if svc.UpstreamID != "" && !uuidV4Regex.MatchString(svc.UpstreamID) {
+	if svc.UpstreamID != "" && !UUIDV4Regex.MatchString(svc.UpstreamID) {
 		return nil, fmt.Errorf("invalid upstream_id format: must be a valid UUID v4")
 	}
 	err := s.db.QueryRow(`
@@ -204,7 +204,7 @@ func (s *Store) PatchService(id, orgID string, fields map[string]interface{}) (*
 			if !ok {
 				return nil, fmt.Errorf("invalid upstream_id format: must be a string")
 			}
-			if upstreamIDStr != "" && !uuidV4Regex.MatchString(upstreamIDStr) {
+			if upstreamIDStr != "" && !UUIDV4Regex.MatchString(upstreamIDStr) {
 				return nil, fmt.Errorf("invalid upstream_id format: must be a valid UUID v4")
 			}
 			addSet("upstream_id", upstreamIDStr)

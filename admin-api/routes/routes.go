@@ -350,6 +350,10 @@ func GetService(store *storage.Store) gin.HandlerFunc {
 
 func UpdateService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !storage.UUIDV4Regex.MatchString(c.Param("id")) {
+			badRequest(c, fmt.Errorf("invalid service id format: must be a valid UUID"))
+			return
+		}
 		var s storage.Service
 		if err := c.ShouldBindJSON(&s); err != nil {
 			badRequest(c, err)
@@ -620,6 +624,10 @@ func GetRoute(store *storage.Store) gin.HandlerFunc {
 
 func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !storage.UUIDV4Regex.MatchString(c.Param("id")) {
+			badRequest(c, fmt.Errorf("invalid route id format: must be a valid UUID"))
+			return
+		}
 		var r storage.Route
 		if err := c.ShouldBindJSON(&r); err != nil {
 			badRequest(c, err)

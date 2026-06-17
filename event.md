@@ -11,24 +11,28 @@
 
 ### 🔴 BUG-Services-Update: Services Update 返回 500（P0）
 - **API**: PUT /services/{id}
-- **預期**: 200
+- **預期**: 200 或 400（UUID 格式錯誤）
 - **實際**: 500
-- **原因**: 舊 QA Run 的記錄；小黑親測 PUT /services/{id} ✅ 200（2026-06-17 12:35）
-- **小黑驗證**: develop 最新程式碼 Services Update 正常
-- **修補方向**: QA Run #2 的 500 可能是舊 container image 未重建
-- **驗證**: 小黑親測 ✅ PASS
-- **嚴重程度**: P0 → 需重建 container 驗證
+- **小黑確診**: API handler 未 validate UUID format，PostgreSQL 直接 fail → 500
+- **根因**: c.Param("id") 直接傳入 SQL，non-UUID（如 "1"）導致 `ERROR: invalid input syntax for type uuid`
+- **小黑驗證**（舊）: 用有效 UUID 測試 → ✅ 200（但 event.md 錯誤記載為「修好」）
+- **小黑驗證**（新，2026-06-17 14:17）:
+  - PUT /services/1 → **400** ✅（invalid UUID）
+  - PUT /services/{valid-uuid} → **200** ✅
+- **小黑判定**: 🟡 → ✅ FIXED（UUID validation 已實作）
+- **修復 commit**: 8461cea2, 6f3251e8
+- **修補方向**: UUID validation handler — API 現在對 invalid UUID return 400 而非 500
 
 ### 🔴 BUG-Routes-Update: Routes Update 返回 500（P0）
 - **API**: PUT /routes/{id}
-- **預期**: 200
+- **預期**: 200 或 400（UUID 格式錯誤）
 - **實際**: 500
-- **原因**: 舊 QA Run 的記錄；小黑親測 PUT /routes/{id} ✅ 200（2026-06-17 12:36）
-- **小黑驗證**: develop 最新程式碼 Routes Update 正常（WHERE clause fix 已生效）
-- **小黑確認**: c0a36e4f fix(store): UpdateRoute WHERE clause 已正確處理 empty orgID
-- **修補方向**: QA Run #2 的 500 可能是舊 container image 未重建
-- **驗證**: 小黑親測 ✅ PASS
-- **嚴重程度**: P0 → 需重建 container 驗證
+- **小黑確診**: 同 Services，handler 未 validate UUID format
+- **小黑驗證**（2026-06-17 14:17）:
+  - PUT /routes/1 → **400** ✅（invalid UUID）
+  - PUT /routes/{valid-uuid} → **200** ✅
+- **小黑判定**: 🟡 → ✅ FIXED（UUID validation 已實作）
+- **修復 commit**: 8461cea2, 6f3251e8
 
 ### ✅ BUG-Proxy-Routing: Proxy Routing 已修復
 - **根因**: CreateTarget 未驗證 target 不可為空
