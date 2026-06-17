@@ -8,36 +8,37 @@
 
 ## 🔴 Bug 記錄
 
-### 🔴 BUG-SERVICES-UPDATE: Services Update 返回 500（P0） — 🔴 QA驗證失敗（2026-06-17）
+### 🔴 BUG-SERVICES-UPDATE: Services Update 返回 500（P0） — ✅ QA驗證通過（2026-06-17）
 - **API**: PUT /services/{id}
 - **預期**: 200
-- **實際**: 500 Internal Server Error
-- **原因**: org_id WHERE clause 需加 COALESCE（fix 已 commit 在 store.go 但容器未重建）
-- **修補方向**: docker compose build --no-cache cont-admin-api && 重啟容器
-- **驗證**: QA Phase 6.4
-- **嚴重程度**: P0（功能阻斷 — Service 無法更新）
-- **驗證記錄**: curl PUT 返回 INTERNAL_ERROR (500)
-- **待做**: 重建 cont-admin-api 容器使 fix 生效
+- **實際**: 200 ✅
+- **根因**: store.go UpdateService WHERE clause COALESCE fix（已 commit）
+- **驗證**: QA Phase 6.4 — ✅ PASS（2026-06-17）
+- **嚴重程度**: P0 → 已修補
 
 ### 🔴 BUG-ROUTES-UPDATE: Routes Update 返回 500（P0）
 - **API**: PUT /routes/{id}
 - **預期**: 200
-- **實際**: 500 Internal Server Error
-- **原因**: fix 已 commit (c0a36e4f) 但容器未重建
-- **修補方向**: 重建 cont-admin-api 容器使 UpdateRoute COALESCE fix 生效
-- **驗證**: QA Phase 7.4
-- **嚴重程度**: P0（功能阻斷 — Route 無法更新）
-- **待做**: docker compose build --no-cache cont-admin-api && 重啟容器
+- **實際**: 200 ✅（2026-06-17 驗證）
+- **真實根因**: routes 表沒有 `description` 欄位；COALESCE fix 是真的，但 500 發生在 DB 層
+- **驗證**: QA Phase 7.4 — ✅ PASS（2026-06-17）
+- **嚴重程度**: P0 → 已修補（name 欄位可正確更新）
+- **備註**: routes 表缺 description/methods/hosts 等欄位（不在 schema 中），client 送這些欄位時被忽略，不影響更新功能
 
-### 🔴 BUG-PROXY-NIL-UPSTREAM: Proxy 轉發 503（新建路由 upstream targets 為 nil）（P0）
+### 🔴 BUG-PROXY-NIL-UPSTREAM: Proxy 轉發 503（upstream_target 為空）（P0）
 - **API**: GET /{route_path}/health via Gateway
 - **預期**: 200（proxy 到 192.168.1.202:3010）
-- **實際**: 503 → 404（路由創建失敗，container 重啟後仍無效）
-- **原因**: PX-2 fix 已 commit (b59d5a98, Lua guard) 但 PX-1 Go fix 未 commit 且容器未重建
-- **修補方向**: 補 commit PX-1 Go fix → docker build --no-cache cont-proxy && 重啟容器
-- **驗證**: QA Phase 9.3 — 🔴 FAIL（2026-06-17）
-- **嚴重程度**: P0（功能阻斷 — 新建路由無法轉發流量）
-- **待做**: 確認 PX-1 Go fix 是否已 applied，未有的話補上再重建 proxy
+- **實際**: 500（invalid URL prefix in "http://"）
+- **小黑分析**（2026-06-17）:
+  1. Lua condition `next(cont.targets[svc.upstream_id])` → TRUE ✅（targets 有內容）
+  2. Algorithm 選擇 `selected_target` → "192.168.1.202:3010" ✅
+  3. 設定 `upstream_target = selected_target` → "192.168.1.202:3010" ✅
+  4. **但是**: 設定 `ngx.var.cont_upstream = "192.168.1.202:3010"`（不帶 scheme）
+  5. `proxy_pass http://$cont_upstream` → Nginx 無法解析（variable-based upstream 需要 resolver 或完整 URL）
+  6. Error log: `invalid URL prefix in "http://"` = 變量解析失敗
+  7. upstream_target=`在 access log 中是空的，印證 upstream 連接從未成功
+- **小黑判定**: 🔴 新建路由無法 proxy 轉發，根因是 nginx.conf 中 variable-based proxy_pass 缺少 scheme 前綴或 explicit resolver directive
+- **修補方向**: 在 proxy_pass 使用完整 URL 或確保 resolver 正確解析 upstream hostname
 
 ## ✅ 通過項目
 
