@@ -696,7 +696,7 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	}
 	args = append(args, orgID) // orgID at $13 or $14
 
-	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND ($" + strconv.Itoa(orgIDArgIndex) + " = '' OR ($" + strconv.Itoa(orgIDArgIndex) + " != '' AND org_id::text = $" + strconv.Itoa(orgIDArgIndex) + ")) RETURNING updated_at"
+	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($" + strconv.Itoa(orgIDArgIndex) + ", ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at"
 
 	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
 	if err != nil {
