@@ -653,60 +653,104 @@ func (s *Store) GetRoute(id, orgID string) (*Route, error) {
 }
 
 func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
-	protocols := orSlice(r.Protocols, []string{"http", "https"})
-	hosts := orSlice(r.Hosts, []string{})
-	paths := orSlice(r.Paths, []string{})
-	methods := orSlice(r.Methods, []string{})
-
 	svcID := r.GetServiceID()
 
-	// Build args FIRST, then setClauses with correct placeholder indices based on actual args positions.
-	// Without service_id: args = [id, name, protocols, hosts, paths, methods, strip_path, preserve_host,
-	//                           regex_priority, https_redirect_status_code, connection_timeout, enabled, orgID]
-	// With service_id:    args = [id, name, protocols, hosts, paths, methods, strip_path, preserve_host,
-	//                           regex_priority, https_redirect_status_code, connection_timeout, enabled, service_id, orgID]
+	// Build args only for fields that were explicitly provided (non-nil).
+	// Nil slice = user didn't provide this field → preserve DB value via COALESCE.
+	// Non-nil slice (even empty) = user explicitly provided it → update to new value.
+	args := []interface{}{id}
+	setClauses := []string{}
+	argIdx := 2 // next placeholder index
 
-	args := []interface{}{
-		id,                    // $1
-		r.Name,                // $2
-		"{" + strings.Join(protocols, ",") + "}", // $3
-		"{" + strings.Join(hosts, ",") + "}",    // $4
-		"{" + strings.Join(paths, ",") + "}",    // $5
-		"{" + strings.Join(methods, ",") + "}", // $6
-		r.StripPath,           // $7 — partial update: use COALESCE in SQL
-		r.PreserveHost,        // $8 — partial update: use COALESCE in SQL
-		r.RegexPriority,       // $9 — partial update: use COALESCE in SQL
-		r.HTTPSRedirectStatusCode, // $10 — partial update: use COALESCE in SQL
-		r.ConnectionTimeout,   // $11 — partial update: use COALESCE in SQL
-		r.Enabled,             // $12 — partial update: use COALESCE in SQL
-	}
-	setClauses := []string{
-		"name=COALESCE(NULLIF($2,''), name)",
-		"protocols=COALESCE(NULLIF($3,'{}'), protocols)",
-		"hosts=COALESCE(NULLIF($4,'{}'), hosts)",
-		"paths=COALESCE(NULLIF($5,'{}'), paths)",
-		"methods=COALESCE(NULLIF($6,'{}'), methods)",
-		"strip_path=$7",
-		"preserve_host=$8",
-		"regex_priority=CASE WHEN $9 = 0 THEN regex_priority ELSE $9 END",
-		"https_redirect_status_code=CASE WHEN $10 = 0 THEN https_redirect_status_code ELSE $10 END",
-		"connection_timeout=CASE WHEN $11 = 0 THEN connection_timeout ELSE $11 END",
-		"enabled=$12",
+	// name
+	if r.Name != "" {
+		args = append(args, r.Name)
+		setClauses = append(setClauses, "name=COALESCE(NULLIF($"+strconv.Itoa(argIdx)+",''), name)")
+		argIdx++
 	}
 
-	var orgIDArgIndex int
+	// protocols (non-nil means user provided it, even if empty)
+	if r.Protocols != nil {
+		arr, _ := json.Marshal(r.Protocols)
+		args = append(args, string(arr))
+		setClauses = append(setClauses, "protocols=$"+strconv.Itoa(argIdx))
+		argIdx++
+	}
+
+	// hosts
+	if r.Hosts != nil {
+		arr, _ := json.Marshal(r.Hosts)
+		args = append(args, string(arr))
+		setClauses = append(setClauses, "hosts=$"+strconv.Itoa(argIdx))
+		argIdx++
+	}
+
+	// paths
+	if r.Paths != nil {
+		arr, _ := json.Marshal(r.Paths)
+		args = append(args, string(arr))
+		setClauses = append(setClauses, "paths=$"+strconv.Itoa(argIdx))
+		argIdx++
+	}
+
+	// methods
+	if r.Methods != nil {
+		arr, _ := json.Marshal(r.Methods)
+		args = append(args, string(arr))
+		setClauses = append(setClauses, "methods=$"+strconv.Itoa(argIdx))
+		argIdx++
+	}
+
+	// bool fields — only update if pointer is non-nil
+	if r.StripPath != nil {
+		args = append(args, *r.StripPath)
+		setClauses = append(setClauses, fmt.Sprintf("strip_path=COALESCE(NULLIF($%d,''), strip_path)", argIdx))
+		argIdx++
+	}
+
+	if r.PreserveHost != nil {
+		args = append(args, *r.PreserveHost)
+		setClauses = append(setClauses, fmt.Sprintf("preserve_host=COALESCE(NULLIF($%d,''), preserve_host)", argIdx))
+		argIdx++
+	}
+
+	// int fields — use CASE to detect zero-value (preserve DB) vs explicit value
+	if r.RegexPriority != nil {
+		args = append(args, *r.RegexPriority)
+		setClauses = append(setClauses, fmt.Sprintf("regex_priority=CASE WHEN $%d=0 THEN regex_priority ELSE $%d END", argIdx, argIdx))
+		argIdx++
+	}
+
+	if r.HTTPSRedirectStatusCode != nil {
+		args = append(args, *r.HTTPSRedirectStatusCode)
+		setClauses = append(setClauses, fmt.Sprintf("https_redirect_status_code=CASE WHEN $%d=0 THEN https_redirect_status_code ELSE $%d END", argIdx, argIdx))
+		argIdx++
+	}
+
+	if r.ConnectionTimeout != nil {
+		args = append(args, *r.ConnectionTimeout)
+		setClauses = append(setClauses, fmt.Sprintf("connection_timeout=CASE WHEN $%d=0 THEN connection_timeout ELSE $%d END", argIdx, argIdx))
+		argIdx++
+	}
+
+	if r.Enabled != nil {
+		args = append(args, *r.Enabled)
+		setClauses = append(setClauses, fmt.Sprintf("enabled=COALESCE(NULLIF($%d,''), enabled)", argIdx))
+		argIdx++
+	}
+
+	// service_id
 	if svcID != "" {
-		// service_id goes after enabled (at $13), orgID at $14
-		args = append(args, svcID) // service_id at $13
-		setClauses = append(setClauses, "service_id=$13")
-		orgIDArgIndex = 14
-	} else {
-		// orgID at $13
-		orgIDArgIndex = 13
+		args = append(args, svcID)
+		setClauses = append(setClauses, "service_id=$"+strconv.Itoa(argIdx))
+		argIdx++
 	}
-	args = append(args, orgID) // orgID at $13 or $14
 
-	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($" + strconv.Itoa(orgIDArgIndex) + ", ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at"
+	// org_id (always last)
+	args = append(args, orgID)
+	orgIDArgIdx := argIdx
+
+	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($" + strconv.Itoa(orgIDArgIdx) + ", ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at"
 
 	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
 	if err != nil {
