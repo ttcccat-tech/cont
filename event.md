@@ -12,29 +12,32 @@
 - **API**: PUT /services/{id}
 - **預期**: 200
 - **實際**: 500 Internal Server Error
-- **原因**: 待 subagent 進一步診斷
-- **修補方向**: 檢查 service update handler，取出更新欄位後寫入 PostgreSQL 的邏輯
+- **原因**: org_id WHERE clause 需加 COALESCE（fix 已 commit 在 store.go 但容器未重建）
+- **修補方向**: docker compose build --no-cache cont-admin-api && 重啟容器
 - **驗證**: QA Phase 6.4
 - **嚴重程度**: P0（功能阻斷 — Service 無法更新）
 - **驗證記錄**: curl PUT 返回 INTERNAL_ERROR (500)
+- **待做**: 重建 cont-admin-api 容器使 fix 生效
 
 ### 🔴 BUG-ROUTES-UPDATE: Routes Update 返回 500（P0）
 - **API**: PUT /routes/{id}
 - **預期**: 200
 - **實際**: 500 Internal Server Error
-- **原因**: 待 subagent 進一步診斷（已知小黑已修復但 QA 仍失敗，container 未重建或修復無效）
-- **修補方向**: 檢查 route update handler
+- **原因**: fix 已 commit (c0a36e4f) 但容器未重建
+- **修補方向**: 重建 cont-admin-api 容器使 UpdateRoute COALESCE fix 生效
 - **驗證**: QA Phase 7.4
 - **嚴重程度**: P0（功能阻斷 — Route 無法更新）
+- **待做**: docker compose build --no-cache cont-admin-api && 重啟容器
 
 ### 🔴 BUG-PROXY-NIL-UPSTREAM: Proxy 轉發 503（新建路由 upstream targets 為 nil）（P0）
 - **API**: GET /{route_path}/health via Gateway
 - **預期**: 200（proxy 到 192.168.1.202:3010）
 - **實際**: 503 → 404（路由創建失敗，container 重啟後仍無效）
-- **原因**: GetProxyRuntimeConfig targetsMap：upstream 無 targets 時 map entry 為 null 而非 []，Lua next(nil) 失敗 → upstream_target=nil → 503。見 SPEC-BUG-PROXY-SERVICE-NIL-UPSTREAM.md
-- **修補方向**: upstream target 為空時處理 nil map entry
+- **原因**: PX-2 fix 已 commit (b59d5a98, Lua guard) 但 PX-1 Go fix 未 commit 且容器未重建
+- **修補方向**: 補 commit PX-1 Go fix → docker build --no-cache cont-proxy && 重啟容器
 - **驗證**: QA Phase 9.3 — 🔴 FAIL（2026-06-17）
 - **嚴重程度**: P0（功能阻斷 — 新建路由無法轉發流量）
+- **待做**: 確認 PX-1 Go fix 是否已 applied，未有的話補上再重建 proxy
 
 ## ✅ 通過項目
 
