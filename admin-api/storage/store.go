@@ -123,14 +123,16 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 	}
 	err := s.db.QueryRow(`
 		UPDATE services SET
-			name=$2, protocol=$3, host=$4, port=$5, path=$6, url=$7,
-			retries=$8, connect_timeout=$9, read_timeout=$10,
-			write_timeout=$11, upstream_id=NULLIF($12, '')::uuid, enabled=$13, updated_at=NOW()
+			name=COALESCE(NULLIF($2,''), name), protocol=COALESCE(NULLIF($3,''), protocol), host=COALESCE(NULLIF($4,''), host),
+			port=CASE WHEN $5 = 0 THEN port ELSE $5 END, path=COALESCE(NULLIF($6,''), path), url=COALESCE(NULLIF($7,''), url),
+			retries=CASE WHEN $8 = 0 THEN retries ELSE $8 END, connect_timeout=CASE WHEN $9 = 0 THEN connect_timeout ELSE $9 END,
+			read_timeout=CASE WHEN $10 = 0 THEN read_timeout ELSE $10 END, write_timeout=CASE WHEN $11 = 0 THEN write_timeout ELSE $11 END,
+			upstream_id=NULLIF($12, '')::uuid, enabled=$13, updated_at=NOW()
 		WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($14, ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at`,
-		id, svc.Name, orString(svc.Protocol, "http"), svc.Host,
-		orInt(svc.Port, 80), svc.Path, svc.URL, orInt(svc.Retries, 5),
-		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
-		orInt(svc.WriteTimeout, 60000), svc.UpstreamID,
+		id, svc.Name, svc.Protocol, svc.Host,
+		svc.Port, svc.Path, svc.URL, svc.Retries,
+		svc.ConnectTimeout, svc.ReadTimeout,
+		svc.WriteTimeout, svc.UpstreamID,
 		orBool(svc.Enabled, true),
 		orgID,
 	).Scan(&svc.UpdatedAt)
@@ -671,17 +673,25 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 		"{" + strings.Join(hosts, ",") + "}",    // $4
 		"{" + strings.Join(paths, ",") + "}",    // $5
 		"{" + strings.Join(methods, ",") + "}", // $6
-		orBool(r.StripPath, true),               // $7
-		orBool(r.PreserveHost, false),            // $8
-		orInt(r.RegexPriority, 0),               // $9
-		orInt(r.HTTPSRedirectStatusCode, 426),   // $10
-		orInt(r.ConnectionTimeout, 60000),       // $11
-		orBool(r.Enabled, true),                  // $12
+		r.StripPath,           // $7 — partial update: use COALESCE in SQL
+		r.PreserveHost,        // $8 — partial update: use COALESCE in SQL
+		r.RegexPriority,       // $9 — partial update: use COALESCE in SQL
+		r.HTTPSRedirectStatusCode, // $10 — partial update: use COALESCE in SQL
+		r.ConnectionTimeout,   // $11 — partial update: use COALESCE in SQL
+		r.Enabled,             // $12 — partial update: use COALESCE in SQL
 	}
 	setClauses := []string{
-		"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6",
-		"strip_path=$7", "preserve_host=$8", "regex_priority=$9",
-		"https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12",
+		"name=COALESCE(NULLIF($2,''), name)",
+		"protocols=COALESCE(NULLIF($3,'{}'), protocols)",
+		"hosts=COALESCE(NULLIF($4,'{}'), hosts)",
+		"paths=COALESCE(NULLIF($5,'{}'), paths)",
+		"methods=COALESCE(NULLIF($6,'{}'), methods)",
+		"strip_path=$7",
+		"preserve_host=$8",
+		"regex_priority=CASE WHEN $9 = 0 THEN regex_priority ELSE $9 END",
+		"https_redirect_status_code=CASE WHEN $10 = 0 THEN https_redirect_status_code ELSE $10 END",
+		"connection_timeout=CASE WHEN $11 = 0 THEN connection_timeout ELSE $11 END",
+		"enabled=$12",
 	}
 
 	var orgIDArgIndex int
