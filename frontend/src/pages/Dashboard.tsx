@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Row, Col, Card, Statistic, Spin, Tag, message } from 'antd'
-import { CheckCircleOutlined, ExclamationCircleOutlined, DownCircleOutlined } from '@ant-design/icons'
+import { Row, Col, Card, Statistic, Spin, Tag, message, Input, Button, Space } from 'antd'
+import { CheckCircleOutlined, ExclamationCircleOutlined, SaveOutlined } from '@ant-design/icons'
 import { getStatus, getInfo } from '../api/kong'
 
 interface KongStatus {
@@ -28,6 +28,8 @@ export default function Dashboard() {
   const [root, setRoot] = useState<KongRoot | null>(null)
   const [loading, setLoading] = useState(true)
   const [kongReachable, setKongReachable] = useState(false)
+  const [systemUrl, setSystemUrl] = useState('')
+  const [apiUrl, setApiUrl] = useState('')
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -43,8 +45,19 @@ export default function Dashboard() {
       })
       .catch(() => setKongReachable(false))
       .finally(() => { setLoading(false); clearTimeout(timer) })
+
+    // 載入系統 URL 設定
+    setSystemUrl(localStorage.getItem('cont_system_url') || '')
+    setApiUrl(localStorage.getItem('cont_api_url') || '')
+
     return () => clearTimeout(timer)
   }, [])
+
+  const saveUrlSettings = () => {
+    localStorage.setItem('cont_system_url', systemUrl)
+    localStorage.setItem('cont_api_url', apiUrl)
+    message.success('系統 URL 設定已儲存')
+  }
 
   if (loading) return <Spin size="large" style={{ display: 'flex', justifyContent: 'center', marginTop: 80 }} />
 
@@ -52,21 +65,18 @@ export default function Dashboard() {
     return (
       <div style={{ textAlign: 'center', marginTop: 80 }}>
         <ExclamationCircleOutlined style={{ fontSize: 48, color: '#faad14' }} />
-        <h2 style={{ color: 'var(--text)' }}>無法連接 Kong Admin API</h2>
-        <p style={{ color: 'var(--muted)' }}>請確認 Kong 容器已在運行，端口 8001 可正常訪問</p>
+        <h2 style={{ color: 'var(--text)' }}>無法連接 Cont Admin API</h2>
+        <p style={{ color: 'var(--muted)' }}>請確認 Cont 容器已在運行，端口 8001 可正常訪問</p>
       </div>
     )
   }
 
   const dbOk = status?.database?.reachable
   const version = root?.version || status?.version || '-'
-
   const activeConns = status?.server?.connections_active ?? '-'
   const totalReqs = status?.server?.total_requests ?? '-'
-
   const workerCount = status?.memory?.workers_lua_vms?.length ?? '-'
   const workerVMs = status?.memory?.workers_lua_vms ?? []
-
   const enabledPlugins = root?.plugins?.enabled_in_cluster ?? []
 
   return (
@@ -76,7 +86,7 @@ export default function Dashboard() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title={<span style={{ color: 'var(--muted)' }}>Kong 狀態</span>}
+              title={<span style={{ color: 'var(--muted)' }}>Cont 狀態</span>}
               valueRender={() => (
                 <div>
                   <Tag icon={<CheckCircleOutlined />} color={dbOk ? 'green' : 'red'}>
@@ -89,7 +99,7 @@ export default function Dashboard() {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card><Statistic title={<span style={{ color: 'var(--muted)' }}>Kong 版本</span>} value={version} /></Card>
+          <Card><Statistic title={<span style={{ color: 'var(--muted)' }}>Cont 版本</span>} value={version} /></Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card><Statistic title={<span style={{ color: 'var(--muted)' }}>Nginx Workers</span>} value={workerCount} /></Card>
@@ -125,6 +135,39 @@ export default function Dashboard() {
           ))}
         </Card>
       )}
+
+      <Card title="系統 URL 設定" style={{ marginTop: 16 }}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12}>
+            <label style={{ color: 'var(--muted)', display: 'block', marginBottom: 4 }}>系統網址</label>
+            <Input
+              value={systemUrl}
+              onChange={e => setSystemUrl(e.target.value)}
+              placeholder="例如: https://cont.tascn.com"
+            />
+          </Col>
+          <Col xs={24} sm={12}>
+            <label style={{ color: 'var(--muted)', display: 'block', marginBottom: 4 }}>系統 API 網址</label>
+            <Input
+              value={apiUrl}
+              onChange={e => setApiUrl(e.target.value)}
+              placeholder="例如: https://cont.tascn.com/api"
+            />
+          </Col>
+        </Row>
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          onClick={saveUrlSettings}
+          style={{ marginTop: 12 }}
+        >
+          儲存設定
+        </Button>
+        <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 13 }}>
+          <Tag color="blue">完整 API 網址格式</Tag>
+          {apiUrl ? `${apiUrl}/{workspace}/{route_name}` : '{apiUrl}/{workspace}/{route_name}'}
+        </div>
+      </Card>
     </div>
   )
 }
