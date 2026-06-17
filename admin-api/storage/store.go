@@ -706,6 +706,80 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	return r, nil
 }
 
+func (s *Store) PatchRoute(id, orgID string, fields map[string]interface{}) (*Route, error) {
+	current, err := s.GetRoute(id, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, sql.ErrNoRows
+	}
+
+	setParts := []string{}
+	args := []interface{}{}
+	argIdx := 3
+
+	addSet := func(field string, value interface{}) {
+		setParts = append(setParts, fmt.Sprintf("%s=$%d", field, argIdx))
+		args = append(args, value)
+		argIdx++
+	}
+
+	if v, present := fields["name"]; present {
+		addSet("name", coalesceString(v, current.Name))
+	}
+	if v, present := fields["strip_path"]; present {
+		addSet("strip_path", coalesceBool(v, current.StripPath))
+	}
+	if v, present := fields["preserve_host"]; present {
+		addSet("preserve_host", coalesceBool(v, current.PreserveHost))
+	}
+	if v, present := fields["enabled"]; present {
+		addSet("enabled", coalesceBool(v, current.Enabled))
+	}
+
+	if len(setParts) == 0 {
+		return current, nil
+	}
+
+	args = append([]interface{}{id, orgID}, args...)
+	query := "UPDATE routes SET " + strings.Join(setParts, ", ") +
+		" WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($2, ''), '00000000-0000-0000-0000-000000000000') RETURNING id, name, service_id, protocols, hosts, paths, methods, strip_path, preserve_host, regex_priority, https_redirect_status_code, connection_timeout, enabled, created_at, updated_at"
+
+	var r Route
+	var name, serviceID sql.NullString
+	var protocols, hosts, paths, methods []byte
+	var stripPath, preserveHost sql.NullBool
+	var regexPriority, httpsStatus, connTimeout sql.NullInt64
+	var enabled sql.NullBool
+	var created, updated sql.NullString
+	err = s.db.QueryRow(query, args...).Scan(
+		&r.ID, &name, &serviceID,
+		&protocols, &hosts, &paths, &methods,
+		&stripPath, &preserveHost, &regexPriority,
+		&httpsStatus, &connTimeout, &enabled,
+		&created, &updated,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if name.Valid { r.Name = name.String }
+	if serviceID.Valid { r.Service = &ServiceRef{ID: serviceID.String} }
+	jsonScanSlice(&r.Protocols, protocols)
+	jsonScanSlice(&r.Hosts, hosts)
+	jsonScanSlice(&r.Paths, paths)
+	jsonScanSlice(&r.Methods, methods)
+	if stripPath.Valid { r.StripPath = stripPath.Bool }
+	if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
+	if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
+	if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
+	if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
+	if enabled.Valid { r.Enabled = enabled.Bool }
+	if created.Valid { r.CreatedAt = created.String }
+	if updated.Valid { r.UpdatedAt = updated.String }
+	return &r, nil
+}
+
 func (s *Store) DeleteRoute(id, orgID string) error {
 	_, err := s.db.Exec("DELETE FROM routes WHERE id=$1 AND ((($2 = '' AND org_id IS NULL) OR ($2 = '' AND org_id = '00000000-0000-0000-0000-000000000000') OR COALESCE(org_id::text, '00000000-0000-0000-0000-000000000000') = $2))", id, orgID)
 	return err
