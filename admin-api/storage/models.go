@@ -172,12 +172,12 @@ type Route struct {
 	Hosts                   []string `json:"hosts,omitempty" binding:"omitempty,min=1,dive,fqdn"`
 	Paths                   []string `json:"paths,omitempty" binding:"omitempty,min=1,dive,starts_with=/"`
 	Methods                 []string `json:"methods,omitempty" binding:"omitempty,min=1,dive,oneof=GET POST PUT PATCH DELETE HEAD OPTIONS"`
-	StripPath               bool     `json:"strip_path"`
-	PreserveHost            bool     `json:"preserve_host"`
-	RegexPriority           int      `json:"regex_priority,omitempty" binding:"omitempty,min=0"`
-	HTTPSRedirectStatusCode int      `json:"https_redirect_status_code,omitempty" binding:"omitempty,oneof=301 302 307 308"`
-	ConnectionTimeout       int      `json:"connection_timeout,omitempty" binding:"omitempty,min=0,max=600000"`
-	Enabled                 bool     `json:"enabled"`
+	StripPath               *bool    `json:"strip_path,omitempty"`
+	PreserveHost            *bool    `json:"preserve_host,omitempty"`
+	RegexPriority           *int     `json:"regex_priority,omitempty" binding:"omitempty,min=0"`
+	HTTPSRedirectStatusCode *int     `json:"https_redirect_status_code,omitempty" binding:"omitempty,oneof=301 302 307 308"`
+	ConnectionTimeout       *int     `json:"connection_timeout,omitempty" binding:"omitempty,min=0,max=600000"`
+	Enabled                 *bool    `json:"enabled,omitempty"`
 	OrgID                   string   `json:"org_id,omitempty"`
 	CreatedAt               string   `json:"created_at,omitempty"`
 	UpdatedAt               string   `json:"updated_at,omitempty"`
