@@ -124,7 +124,7 @@ func buildTestRouter() *gin.Engine {
 	rt.POST("", routes.RequirePermission(testStore, "routes", true), routes.CreateRoute(testStore))
 	rt.GET("/:id", routes.RequirePermission(testStore, "routes", false), routes.GetRoute(testStore))
 	rt.PUT("/:id", routes.RequirePermission(testStore, "routes", true), routes.UpdateRoute(testStore))
-	rt.PATCH("/:id", routes.RequirePermission(testStore, "routes", true), routes.UpdateRoute(testStore))
+		rt.PATCH("/:id", routes.RequirePermission(testStore, "routes", true), routes.PatchRoute(testStore))
 	rt.DELETE("/:id", routes.RequirePermission(testStore, "routes", true), routes.DeleteRoute(testStore))
 
 	// Upstreams
