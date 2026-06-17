@@ -29,15 +29,14 @@ Analytics.tsx 目前只顯示 Kong Nginx metrics（nginx_requests_total 等）�
 3. `kong.ts` 的 `getAnalyticsUsage()` API call 正確
 4. 當 org 無用量時，回傳空陣列而非錯誤
 
-## 🔴 Bug
+## 🔴 Bug（已修復）
 
-`GetTopRoutesByUsage` 和 `GetTopConsumersByUsage` 的 key 解析邏輯錯誤：
-- `cont:usage:route:{route_id}:{YYYYMMDDHH}` → `parts[2]` = `"route"` (literal)，不是 route_id
-- `cont:usage:consumer:{consumer_id}:{YYYYMMDDHH}` → `parts[2]` = `"consumer"` (literal)，不是 consumer_id
-- 正確應該用 `parts[3]` 提取實際 ID
+`GetTopRoutesByUsage` 和 `GetTopConsumersByUsage` 的 key 解析曾錯誤使用 `parts[2]`：
+- `cont:usage:route:{route_id}:{YYYYMMDDHH}` → `parts[2]` = `"route"` (literal)
+- 已於 redis.go:304,362 確認使用 `parts[3]` ✅
 
 ## Tasks
 
-- [ ] TASK-ANALYTICS-1: Fix `GetTopRoutesByUsage` key parsing — change `parts[2]` to `parts[3]`
-- [ ] TASK-ANALYTICS-2: Fix `GetTopConsumersByUsage` key parsing — change `parts[2]` to `parts[3]`
-- [ ] TASK-ANALYTICS-3: Verify `/usage/analytics` endpoint returns correct top_routes/top_consumers data
+- [ ] TASK-ANALYTICS-1: Fix `GetTopRoutesByUsage` key parsing — change `parts[2]` to `parts[3]` ✅ **FIXED** (redis.go:304)
+- [ ] TASK-ANALYTICS-2: Fix `GetTopConsumersByUsage` key parsing — change `parts[2]` to `parts[3]` ✅ **FIXED** (redis.go:362)
+- [ ] TASK-ANALYTICS-3: Verify `/usage/analytics` endpoint returns correct top_routes/top_consumers data ⏳ pending QA verification
