@@ -39,7 +39,7 @@ if is_global or p.route_id == matched_route.id or p.service_id == service_id the
 5. [ ] cont-proxy container healthy
 
 ## Tasks
-- [ ] TASK-GLOBAL-JWT-1: Fix nginx.conf JWT enforcement logic (remove is_global condition)
-- [ ] TASK-GLOBAL-JWT-2: Docker build --no-cache cont-proxy
-- [ ] TASK-GLOBAL-JWT-3: Restart cont-proxy container
-- [ ] TASK-GLOBAL-JWT-4: Verify no-JWT route returns 200 (create test route + smoke test)
+- [ ] TASK-GLOBAL-JWT-1: Fix nginx.conf JWT enforcement logic (remove is_global condition) ✅ **FIXED** (nginx.conf:530)
+- [ ] TASK-GLOBAL-JWT-2: Docker build --no-cache cont-proxy ✅ **DONE**
+- [ ] TASK-GLOBAL-JWT-3: Restart cont-proxy container ✅ **DONE**
+- [ ] TASK-GLOBAL-JWT-4: Verify no-JWT route returns 200 (create test route + smoke test) ⏳ pending QA verification
