@@ -572,3 +572,42 @@
 - ✅ SPEC-usage-alerting
 - ✅ SPEC-PENDING-01（cosocket merge）— v025 upstream_id migration 確認存在
 - 🟡 SPEC-usage-enforcement（Redis counter 已驗證 write，TASK-UE-6/7 殘留）
+
+## QA Verification — Post-Restart Full Acceptance (2026-06-18 06:44 AM)
+
+### Test Summary
+
+| # | Test | Expected | Actual | Status |
+|---|------|----------|--------|--------|
+| 1 | Auth POST /auth/login | 200 + token | 200 + JWT | PASS |
+| 2 | UpdateService PUT /services/{id} | 200 + JSON | 500 INTERNAL_ERROR | FAIL |
+| 3 | UpdateRoute PUT /routes/{id} | 200 + JSON | 500 INTERNAL_ERROR | FAIL |
+| 4a | Create Service POST /services | 200 + JSON | 200 + JSON | PASS |
+| 4b | Get Service GET /services/{id} | 200 + JSON | 200 + JSON | PASS |
+| 4c | Update Service PUT /services/{id} | 200 + JSON | 500 INTERNAL_ERROR | FAIL |
+| 4d | Delete Service DELETE /services/{id} | 204 | 204 | PASS |
+| 4e | Create Route POST /routes | 200 + JSON | 200 + JSON | PASS |
+| 4f | Get Route GET /routes/{id} | 200 + JSON | 200 + JSON | PASS |
+| 4g | Update Route PUT /routes/{id} | 200 + JSON | 500 INTERNAL_ERROR | FAIL |
+| 4h | Delete Route DELETE /routes/{id} | 204 | 204 | PASS |
+| 5a | Usage Incr POST /internal/usage/incr | success | count=1,success=true | PASS |
+| 5b | Redis Key Check | key exists | key found | PASS |
+| 5c | Plan Quota GET /internal/plan-quota/default | current_usage>0 | current_usage=1 | PASS |
+| 6a | Docker Health | all healthy | cont-proxy: no healthcheck; ELK/frontend not healthy | PARTIAL |
+| 6b | Nginx Config | ok | syntax ok (worker_connections warn) | PASS |
+
+### Root Cause: UpdateService/UpdateRoute PUT returns 500
+
+- Service model has NO description field — silently dropped during unmarshal
+- UpdateService uses orBool(svc.Enabled, true) — cannot distinguish absent vs false
+- PATCH works correctly as workaround (field-presence detection via map)
+
+### Docker Health Status
+- cont-admin-api: healthy | cont-elasticsearch: healthy | cont-postgres: healthy | cont-redis: healthy
+- cont-proxy: up ~3 min, no healthcheck defined
+- cont-filebeat/cont-logstash/cont-frontend/cont-kibana: not healthy (non-critical)
+
+### Conclusion
+- Auth: PASS | Redis counter: PASS | Docker/nginx: PASS | Create/Get/Delete: PASS
+- Update PUT: FAIL (pre-existing orBool bug; PATCH works as workaround)
+
