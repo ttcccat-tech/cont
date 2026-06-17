@@ -126,7 +126,7 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 			name=$2, protocol=$3, host=$4, port=$5, path=$6, url=$7,
 			retries=$8, connect_timeout=$9, read_timeout=$10,
 			write_timeout=$11, upstream_id=NULLIF($12, '')::uuid, enabled=$13, updated_at=NOW()
-		WHERE id=$1 AND ($14 = '' OR ($14 != '' AND org_id::text = $14)) RETURNING updated_at`,
+		WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($14, ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at`,
 		id, svc.Name, orString(svc.Protocol, "http"), svc.Host,
 		orInt(svc.Port, 80), svc.Path, svc.URL, orInt(svc.Retries, 5),
 		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
