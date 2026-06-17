@@ -167,7 +167,7 @@ func main() {
 			rt.POST("", routes.RequirePermission(store, "routes", true), routes.CreateRoute(store))
 			rt.GET("/:id", routes.RequirePermission(store, "routes", false), routes.GetRoute(store))
 			rt.PUT("/:id", routes.RequirePermission(store, "routes", true), routes.UpdateRoute(store))
-			rt.PATCH("/:id", routes.RequirePermission(store, "routes", true), routes.UpdateRoute(store))
+			rt.PATCH("/:id", routes.RequirePermission(store, "routes", true), routes.PatchRoute(store))
 			rt.DELETE("/:id", routes.RequirePermission(store, "routes", true), routes.DeleteRoute(store))
 		}
 
