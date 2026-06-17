@@ -350,7 +350,7 @@ func GetService(store *storage.Store) gin.HandlerFunc {
 
 func UpdateService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !storage.uuidV4Regex.MatchString(c.Param("id")) {
+		if !storage.UUIDV4Regex.MatchString(c.Param("id")) {
 			badRequest(c, fmt.Errorf("invalid service id format: must be a valid UUID"))
 			return
 		}
@@ -624,7 +624,7 @@ func GetRoute(store *storage.Store) gin.HandlerFunc {
 
 func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !storage.uuidV4Regex.MatchString(c.Param("id")) {
+		if !storage.UUIDV4Regex.MatchString(c.Param("id")) {
 			badRequest(c, fmt.Errorf("invalid route id format: must be a valid UUID"))
 			return
 		}
