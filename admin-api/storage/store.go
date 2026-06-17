@@ -567,12 +567,12 @@ func (s *Store) ListRoutes(orgID string, limit, offset int) ([]Route, error) {
 		jsonScanSlice(&r.Methods, methods)
 		if name.Valid { r.Name = name.String }
 		if serviceID.Valid { r.Service = &ServiceRef{ID: serviceID.String} }
-		if stripPath.Valid { r.StripPath = stripPath.Bool }
-		if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
-		if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
-		if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
-		if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
-		if enabled.Valid { r.Enabled = enabled.Bool }
+		if stripPath.Valid { b := stripPath.Bool; r.StripPath = &b }
+		if preserveHost.Valid { b := preserveHost.Bool; r.PreserveHost = &b }
+		if regexPriority.Valid { v := int(regexPriority.Int64); r.RegexPriority = &v }
+		if httpsStatus.Valid { v := int(httpsStatus.Int64); r.HTTPSRedirectStatusCode = &v }
+		if connTimeout.Valid { v := int(connTimeout.Int64); r.ConnectionTimeout = &v }
+		if enabled.Valid { b := enabled.Bool; r.Enabled = &b }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
@@ -602,9 +602,9 @@ func (s *Store) CreateRoute(r *Route) (*Route, error) {
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING id, created_at, updated_at`,
 		r.Name, serviceIDArg, "{"+strings.Join(protocols,",")+"}", "{"+strings.Join(hosts,",")+"}", "{"+strings.Join(paths,",")+"}", "{"+strings.Join(methods,",")+"}",
-		orBool(r.StripPath, true), orBool(r.PreserveHost, false),
-		orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426),
-		orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true), orgID,
+		orBool(derefBool(r.StripPath), true), orBool(derefBool(r.PreserveHost), false),
+		orInt(derefInt(r.RegexPriority), 0), orInt(derefInt(r.HTTPSRedirectStatusCode), 426),
+		orInt(derefInt(r.ConnectionTimeout), 60000), orBool(derefBool(r.Enabled), true), orgID,
 	).Scan(&r.ID, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -1722,6 +1722,20 @@ func orBool(v bool, def bool) bool {
 		return def
 	}
 	return v
+}
+
+func derefBool(v *bool) bool {
+	if v == nil {
+		return false
+	}
+	return *v
+}
+
+func derefInt(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
 }
 
 func orSlice(v []string, def []string) []string {
