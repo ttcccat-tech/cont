@@ -235,7 +235,7 @@ export default function HealthPortal() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1>上游健康狀態監控</h1>
+        <h1>API 後端狀態監控</h1>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={handleRefresh} loading={loading}>刷新列表</Button>
           <Button type="primary" icon={<SafetyCertificateOutlined />} onClick={handleCheckAll} loading={checking}>
@@ -248,18 +248,18 @@ export default function HealthPortal() {
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={4}>
           <Card size="small">
-            <Statistic title="上游總數" value={totalUpstreams} valueStyle={{ color: '#1890ff' }} />
+            <Statistic title="API 後端總數" value={totalUpstreams} valueStyle={{ color: '#1890ff' }} />
           </Card>
         </Col>
         <Col span={4}>
           <Card size="small">
-            <Statistic title="健康上游" value={healthyUpstreams} valueStyle={{ color: '#52c41a' }}
+            <Statistic title="健康 API 後端" value={healthyUpstreams} valueStyle={{ color: '#52c41a' }}
               prefix={<span style={{ color: '#52c41a', marginRight: 4 }}>●</span>} />
           </Card>
         </Col>
         <Col span={4}>
           <Card size="small">
-            <Statistic title="異常上游" value={unhealthyUpstreams} valueStyle={{ color: '#ff4d4f' }}
+            <Statistic title="異常 API 後端" value={unhealthyUpstreams} valueStyle={{ color: '#ff4d4f' }}
               prefix={<span style={{ color: '#ff4d4f', marginRight: 4 }}>●</span>} />
           </Card>
         </Col>
@@ -271,7 +271,7 @@ export default function HealthPortal() {
         </Col>
         <Col span={4}>
           <Card size="small">
-            <Statistic title="Target 總數" value={totalTargets} valueStyle={{ color: '#8c8c8c' }} />
+            <Statistic title="所有 Target 總數" value={totalTargets} valueStyle={{ color: '#8c8c8c' }} />
           </Card>
         </Col>
         <Col span={4}>
@@ -327,7 +327,7 @@ export default function HealthPortal() {
           </Row>
 
           {/* Upstreams Table */}
-          <Card title="上游列表">
+          <Card title="API 後端列表">
             <Table
               columns={upstreamColumns}
               dataSource={upstreams as any[]}
@@ -342,7 +342,7 @@ export default function HealthPortal() {
 
       {/* Upstream Detail Modal */}
       <Modal
-        title={<Space><SafetyCertificateOutlined />上游健康狀態 — {selectedUpstream?.name}</Space>}
+        title={<Space><SafetyCertificateOutlined />API 後端健康狀態 — {selectedUpstream?.name}</Space>}
         open={detailModal}
         onCancel={() => { setDetailModal(false); setHealthData(null) }}
         footer={[

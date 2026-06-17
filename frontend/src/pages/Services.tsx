@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Table, Button, Space, Tag, message, Modal, Form, Input, InputNumber, Popconfirm, Switch } from 'antd'
+import { Table, Button, Space, Tag, message, Modal, Form, Input, InputNumber, Popconfirm, Select } from 'antd'
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import api, { KongService } from '../api/kong'
+import api, { KongService, KongUpstream } from '../api/kong'
 import { useAuth } from '../context/AuthContext'
-
-const API = import.meta.env.VITE_API_BASE || '/api'
 
 export default function Services() {
   const [services, setServices] = useState<KongService[]>([])
+  const [upstreams, setUpstreams] = useState<KongUpstream[]>([])
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<KongService | null>(null)
@@ -20,23 +19,34 @@ export default function Services() {
     setLoading(true)
     api.listServices()
       .then(data => setServices(data))
-        .catch(() => message.error('無法連接 Cont Admin API'))
+      .catch(() => message.error('無法連接 Cont Admin API'))
       .finally(() => setLoading(false))
+  }
+
+  const fetchUpstreams = () => {
+    api.listUpstreams()
+      .then(setUpstreams)
+      .catch(() => message.error('無法載入後端列表'))
   }
 
   useEffect(() => {
     fetchServices()
   }, [])
 
-  const openCreate = () => { setEditing(null); form.resetFields(); setModalOpen(true) }
+  const openCreate = () => {
+    setEditing(null)
+    form.resetFields()
+    fetchUpstreams()
+    setModalOpen(true)
+  }
+
   const openEdit = (record: KongService) => {
     setEditing(record)
+    fetchUpstreams()
     form.setFieldsValue({
       name: record.name,
       protocol: record.protocol || 'http',
-      host: record.host || '',
-      port: record.port || 80,
-      path: record.path || '',
+      upstream_id: record.upstream_id || undefined,
       retries: record.retries ?? 5,
       connect_timeout: record.connect_timeout ?? 60000,
       read_timeout: record.read_timeout ?? 60000,
@@ -61,11 +71,14 @@ export default function Services() {
       setSubmitting(true)
       const payload: any = {
         name: values.name,
-        url: `${values.protocol}://${values.host}:${values.port}${values.path || ''}`,
+        protocol: values.protocol || 'http',
         retries: values.retries ?? 5,
         connect_timeout: values.connect_timeout ?? 60000,
         read_timeout: values.read_timeout ?? 60000,
         write_timeout: values.write_timeout ?? 60000,
+      }
+      if (values.upstream_id) {
+        payload.upstream_id = values.upstream_id
       }
       if (values.health_url) payload.health_url = values.health_url
       if (values.doc_url) payload.doc_url = values.doc_url
@@ -86,19 +99,18 @@ export default function Services() {
     }
   }
 
-  const splitUrl = (url: string) => {
-    if (!url) return { host: '', port: 80, path: '', protocol: 'http' }
-    const m = url.match(/^(https?):\/\/([^:]+):?(\d*)(.*)$/)
-    return m ? { protocol: m[1], host: m[2], port: parseInt(m[3]) || 80, path: m[4] } : { protocol: 'http', host: url, port: 80, path: '', protocol2: 'http' }
+  const upstreamName = (id?: string) => {
+    if (!id) return '—'
+    const u = upstreams.find(u => u.id === id)
+    return u ? u.name : id
   }
 
   const columns: ColumnsType<KongService> = [
     { title: '名稱', dataIndex: 'name', key: 'name', render: v => <Tag color="blue">{v}</Tag> },
     {
-      title: '目標 URL',
-      key: 'url',
-      ellipsis: true,
-      render: (_, r) => <code style={{ fontSize: 12 }}>{r.protocol}://{r.host}:{r.port}</code>
+      title: 'API 目標(後端)',
+      key: 'upstream',
+      render: (_, r) => r.upstream_id ? <Tag color="green">{upstreamName(r.upstream_id)}</Tag> : <Tag color="default">—</Tag>
     },
     { title: '重試次數', dataIndex: 'retries', key: 'retries' },
     {
@@ -139,7 +151,7 @@ export default function Services() {
 
       <Table
         columns={columns}
-        dataSource={services  as any}
+        dataSource={services as any}
         rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
@@ -157,17 +169,17 @@ export default function Services() {
           <Form.Item name="name" label="服務名稱" rules={[{ required: true, message: '必填' }]}>
             <Input placeholder="my-api-service" />
           </Form.Item>
-          <Form.Item name="protocol" label="協議" rules={[{ required: true }]} initialValue="http">
-            <Input placeholder="http" />
+          <Form.Item name="upstream_id" label="API 目標(後端)">
+            <Select
+              placeholder="請選擇後端（可選）"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={upstreams.map(u => ({ value: u.id, label: u.name }))}
+            />
           </Form.Item>
-          <Form.Item name="host" label="目標主機" rules={[{ required: true, message: '必填' }]} tooltip="例: httpbin.org">
-            <Input placeholder="httpbin.org" />
-          </Form.Item>
-          <Form.Item name="port" label="端口" rules={[{ required: true }]} initialValue={80}>
-            <InputNumber min={1} max={65535} style={{ width: 120 }} />
-          </Form.Item>
-          <Form.Item name="path" label="路徑前綴" tooltip="可選，例: /api">
-            <Input placeholder="/api" />
+          <Form.Item name="protocol" label="協議" initialValue="http">
+            <Select options={[{ value: 'http', label: 'HTTP' }, { value: 'https', label: 'HTTPS' }]} />
           </Form.Item>
           <Form.Item name="retries" label="重試次數" initialValue={5}>
             <InputNumber min={0} max={100} style={{ width: 120 }} />

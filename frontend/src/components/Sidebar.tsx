@@ -32,17 +32,17 @@ export default function Sidebar() {
 
   const baseItems = [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'dashboard 儀表板' },
-    { key: '/services', icon: <ApiOutlined />, label: 'API名稱(前端)' },
     { key: '/routes', icon: <ThunderboltOutlined />, label: 'API路由URL' },
-    { key: '/plugins', icon: <KeyOutlined />, label: 'plugins 插件' },
-    { key: '/consumers', icon: <UserOutlined />, label: 'consumers 消費者' },
+    { key: '/services', icon: <ApiOutlined />, label: 'API名稱(前端)' },
     { key: '/upstreams', icon: <NodeIndexOutlined />, label: 'API 目標(後端)' },
+    { key: '/consumers', icon: <UserOutlined />, label: 'consumers 消費者' },
+    { key: '/plugins', icon: <KeyOutlined />, label: 'plugins 插件' },
     { key: '/grpc-services', icon: <CloudOutlined />, label: 'grpc gRPC 服務' },
     { key: '/analytics', icon: <BarChartOutlined />, label: 'analytics 統計報告' },
     { key: '/audit', icon: <AuditOutlined />, label: 'audit 審計日誌' },
-    { key: '/config-versioning', icon: <HistoryOutlined />, label: 'versions 設定版本' },
     { key: '/health-portal', icon: <HeartOutlined />, label: 'health 服務健康度' },
     { key: '/alerts/rules', icon: <BellOutlined />, label: 'alerts 告警規則' },
+    { key: '/config-versioning', icon: <HistoryOutlined />, label: 'versions 設定版本' },
     { key: '/api-key-requests', icon: <FileTextOutlined />, label: 'api keys API Key 申請' },
     { key: '/api-docs', icon: <BookOutlined />, label: 'api docs API 文件' },
     { key: '/settings', icon: <SettingOutlined />, label: 'settings 系統設置' },
@@ -54,7 +54,7 @@ export default function Sidebar() {
     { key: '/workspaces', icon: <SafetyOutlined />, label: 'workspaces 工作區' },
   ]
 
-  const menuItems = perms.users || perms.groups ? [...baseItems, ...adminItems] : baseItems
+  const menuItems = perms.users || perms.groups ? [...adminItems, ...baseItems] : baseItems
 
   return (
     <Sider
