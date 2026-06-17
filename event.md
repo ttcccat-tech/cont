@@ -529,3 +529,46 @@
 - **小黑修復**: `fetchUpstreams()` 改為 `Promise.all` 對每個 upstream 並發呼叫 `/upstreams/{id}/health`，從 targets 陣列計算真實的 healthyCount/unhealthyCount/overallStatus
 - **小黑驗證**: 健康上游=4 ✅、Target 總數=4 ✅、Target 健康=4/4 ✅
 - **小黑commit**: `c0c174fd` (frontend fix) → `26047e76` (merge develop → main)
+
+## Development Guardian Review（2026-06-17 18:45 PM）
+
+### ✅ TASK-CSMERGE 任務完成
+
+| Task | 說明 | 狀態 |
+|------|------|------|
+| TASK-CSMERGE-1 | Merge stash@{1} cosocket/PatchService changes | ✅ commit `dfc19a37` |
+| TASK-CSMERGE-2 | UpstreamID field 與 v025 migration 一致 | ✅ models.go:159 + migrations.go:691-696 |
+| TASK-CSMERGE-3 | `docker compose build --pull --no-cache cont-admin-api` | ✅ built |
+| TASK-CSMERGE-4 | `docker compose build --pull --no-cache cont-proxy` | ✅ built |
+| TASK-CSMERGE-5 | `docker exec cont-proxy nginx -t` | ✅ syntax ok（worker_connections warn — 🟡，非阻擋） |
+| TASK-CSMERGE-6 | Containers 重啟，all healthy | ✅ 5 containers healthy |
+
+### ✅ 驗證通過
+- Redis counter write: `POST /internal/usage/incr` → `cont:usage:smoke-test-org:2026061710` ✅
+- nginx -t: `configuration file test is successful` ✅
+- `jwt_validation.lua` + `config_sync.lua` 存在於 container ✅
+- `PatchService` handler (separate from UpdateService) 已 merge ✅
+- All 5 containers healthy ✅
+
+### 🔍小黑快速 code review（安全抽檢）
+- `jwt_validation.lua` 使用 cosocket，無 `ngx.location.capture` ✅
+- `config_sync.lua` 使用 cosocket，init_by_lua context 安全 ✅
+- `UpdateRoute` 使用 `svcID` variable 避免直接 `r.Service.ID` ✅
+- `uuidV4Regex` (lowercase, unexported) consistently used in store.go ✅
+- `PatchService` UUID validation uses `uuidV4Regex.MatchString` ✅
+
+### 🟡 非阻擋性問題
+- worker_connections (4096) 超過 open file limit (1024) — pre-existing, 不影響功能
+
+### 📋 SPEC 全部關帳（截至 2026-06-17 18:45）
+- ✅ SPEC-BLACKSCREEN-01
+- ✅ SPEC-2.5-A
+- ✅ SPEC-BUG-Services-Update-500
+- ✅ SPEC-BUG-Routes-Update-500
+- ✅ SPEC-BUG-Proxy-Routing-503
+- ✅ SPEC-ANALYTICS-01
+- ✅ SPEC-BUG-PROXY-GLOBAL-JWT
+- ✅ SPEC-plugin-access-param
+- ✅ SPEC-usage-alerting
+- ✅ SPEC-PENDING-01（cosocket merge）— v025 upstream_id migration 確認存在
+- 🟡 SPEC-usage-enforcement（Redis counter 已驗證 write，TASK-UE-6/7 殘留）
