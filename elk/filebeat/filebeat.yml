@@ -1,0 +1,19 @@
+filebeat.inputs:
+  - type: log
+    id: cont-access-log
+    enabled: true
+    paths:
+      - /var/log/cont/access.json.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.message_key: msg
+    fields:
+      log_type: cont_access
+    fields_under_root: true
+
+output.logstash:
+  hosts: ["logstash:5044"]
+  ssl.enabled: false
+
+logging.level: info
+logging.to_files: false
