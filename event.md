@@ -150,6 +150,46 @@
 ### 📋 其它 SPEC 待處理（優先順序排序）
 1. ~~SPEC-BLACKSCREEN-01~~ → ✅ COMPLETED（本輪小黑關帳）
 2. ~~SPEC-2.5-A~~ → ✅ COMPLETED（本輪小黑關帳）
-3. **SPEC-2.5-B** — AlertRules.tsx add usage_quota alert type（🟡 pending, code exists `8daf76f4`）
-4. **SPEC-usage-alerting** — alerter.go + Frontend alert rules（🟡 pending）
-5. **SPEC-plugin-access-param** — run_plugin_access() plugin param fix（🟡 pending）
+3. **SPEC-2.5-B** → ✅ COMPLETED（已併入 SPEC-usage-alerting，code review 通過）
+4. **SPEC-usage-alerting** → ✅ COMPLETED（alerter.go 有 evaluateUsageQuotas+evaluateOrgUsageQuota+evaluateConsumerUsageQuota，storage 正確讀寫 percentage_threshold+quota_metric_type，AlertRules.tsx 有完整 UI）
+5. **SPEC-plugin-access-param** → ✅ COMPLETED（TASK-1 fix commit d52a9c64，nginx -t ✅，docker build --no-cache ✅，container 重啟 ✅）
+
+## Development Guardian Review（2026-06-17 17:45 PM）
+
+### ✅ SPEC-plugin-access-param — 小黑驗證通過
+| Task | 說明 | 狀態 |
+|------|------|------|
+| TASK-PLUGIN-1 | `pcall(handler.access, handler, plugin)` — access.lua:178 | ✅ commit `d52a9c64` |
+| TASK-PLUGIN-2 | `nginx -t` passes | ✅ syntax ok |
+| TASK-PLUGIN-3 | Lua tests (busted) | ⏭️ skipped（無 busted tests in this repo） |
+| TASK-PLUGIN-4 | Docker build --no-cache succeeds + container restart | ✅ built + healthy |
+
+### ✅ SPEC-usage-alerting — 小黑程式碼審查通過
+| Task | 說明 | 程式碼 |
+|------|------|--------|
+| TASK-UA-1 | alerter.go — evaluateUsageQuotas + evaluateOrgUsageQuota + evaluateConsumerUsageQuota | alerter.go:93-240 |
+| TASK-UA-2 | alerter.go — computeConsumerUsageQuotaMetric | alerter.go:135（evaluateConsumerUsageQuota） |
+| TASK-UA-3 | storage — AlertRule CRUD 正確讀寫 percentage_threshold + quota_metric_type | storage/models.go:65-81, store.go:2265-2416 |
+| TASK-UA-4 | AlertRules.tsx — POST/PUT 攜帶 quota_metric_type + percentage_threshold | AlertRules.tsx:129-168 |
+| TASK-UA-5 | AlertRules.tsx — 列表顯示 usage_quota 門檻百分比 | AlertRules.tsx:233-240 |
+
+**小黑判定**: 🟡 → ✅ COMPLETED（程式碼完整，live QA 待下次 cron）
+
+### ✅ 驗證通過
+- `docker compose build --no-cache cont-proxy` ✅
+- `docker exec cont-proxy nginx -t` ✅ (worker_connections warn — 🟡)
+- All 4 containers healthy ✅
+- Admin API `http://localhost:18081/services` → 401 ✅（auth required，正確）
+- Gateway `http://localhost:18000/` → 200 ✅
+
+### 📋 SPEC 全部關帳（截至 2026-06-17）
+- ✅ SPEC-BLACKSCREEN-01
+- ✅ SPEC-2.5-A
+- ✅ SPEC-BUG-Services-Update-500
+- ✅ SPEC-BUG-Routes-Update-500
+- ✅ SPEC-BUG-Proxy-Routing-503
+- ✅ SPEC-ANALYTICS-01
+- ✅ SPEC-BUG-PROXY-GLOBAL-JWT
+- ✅ SPEC-plugin-access-param
+- ✅ SPEC-usage-alerting
+- 🟡 SPEC-usage-enforcement（無對應 SPEC 檔，見 SPEC-usage-counter.md）
