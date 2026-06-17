@@ -1,5 +1,14 @@
+version: '3.8'
+
+x-elastic-common: &elastic
+  ELASTICSEARCH_URL: http://elasticsearch:9200
+  LOGSTASH_HOST: logstash
+  KIBANA_HOST: kibana
+
 services:
-  # ── Databases ────────────────────────────────────────────────
+  # ══════════════════════════════════════════════════════════
+  #  Databases
+  # ══════════════════════════════════════════════════════════
   cont-postgres:
     image: postgres:16-alpine
     container_name: cont-postgres
@@ -34,7 +43,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── cont Admin API (Go Gin) ───────────────────────────────────
+  # ══════════════════════════════════════════════════════════
+  #  cont Admin API (Go Gin)
+  # ══════════════════════════════════════════════════════════
   cont-admin-api:
     build:
       context: ./admin-api
@@ -58,7 +69,6 @@ services:
       PROXY_METRICS_URL: "http://cont-proxy:8000/metrics"
       JWT_SECRET: ${JWT_SECRET:-cont-dev-jwt-secret-change-in-prod}
       CONT_URL: ${CONT_URL:-}
-      # Stripe Billing (required for paid plans)
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_PRO_MONTHLY: ${STRIPE_PRICE_PRO_MONTHLY:-}
@@ -73,7 +83,9 @@ services:
       cont-redis:
         condition: service_healthy
 
-  # ── cont Proxy Engine (OpenResty) ────────────────────────────
+  # ══════════════════════════════════════════════════════════
+  #  cont Proxy Engine (OpenResty)
+  # ══════════════════════════════════════════════════════════
   cont-proxy:
     build:
       context: ./proxy
@@ -84,13 +96,17 @@ services:
       - cont_default
     ports:
       - "18000:8000"
+    volumes:
+      - ./elk/proxy_logs:/var/log/cont
     environment:
       - LUA_PACKAGE_PATH=/usr/local/openresty/lualib/?.lua;/usr/local/openresty/lualib/?/init.lua;./?.lua;./?/init.lua
     depends_on:
       cont-admin-api:
         condition: service_healthy
 
-  # ── cont Frontend (React + Nginx) ─────────────────────────────
+  # ══════════════════════════════════════════════════════════
+  #  cont Frontend (React + Nginx)
+  # ══════════════════════════════════════════════════════════
   cont-frontend:
     build:
       context: ./frontend
@@ -107,10 +123,91 @@ services:
     depends_on:
       - cont-admin-api
 
+  # ══════════════════════════════════════════════════════════
+  #  ELK Stack — Access Log 儲存與查詢
+  # ══════════════════════════════════════════════════════════
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: cont-elasticsearch
+    restart: unless-stopped
+    networks:
+      - cont_default
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - cluster.name=cont-elk
+      - node.name=cont-es-01
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "19200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    container_name: cont-logstash
+    restart: unless-stopped
+    networks:
+      - cont_default
+    volumes:
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./elk/proxy_logs:/var/log/cont:ro
+    ports:
+      - "15040:5044"
+      - "19600:9600"
+    environment:
+      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+      - XPACK_MONITORING_ENABLED=false
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: cont-kibana
+    restart: unless-stopped
+    networks:
+      - cont_default
+    ports:
+      - "15601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_SECURITY_ENABLED=false
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"overall\":{\"level\":\"available\"}'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    container_name: cont-filebeat
+    restart: unless-stopped
+    networks:
+      - cont_default
+    user: root
+    volumes:
+      - ./elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./elk/proxy_logs:/var/log/cont:ro
+    command: filebeat -e -strict.perms=false
+    depends_on:
+      logstash:
+        condition: service_started
+
 networks:
   cont_default:
     external: true
 
 volumes:
   postgres_data:
-  proxy_logs:
+  elasticsearch_data:
