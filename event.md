@@ -100,5 +100,96 @@
 
 ## 🔴 P0 Bug 彙整（需修復）- 更新於 2026-06-17 15:42
 1. ~~Services Update 500~~ → ✅ 已修復（200）
-2. ~~Routes Update 500~~ → ✅ 已修復（200，部分更新不影響 service_id）
+2. ~~Routes Update 500~~ → ✅ 已修復（200，strip_path 欄位可正確更新）
 3. ~~Proxy Routing 503 upstream targets nil~~ → ✅ 已修復（targets map 是 [] 而非 null）
+
+## Development Guardian Review（2026-06-17 17:00 PM）
+
+### 🔍 小黑確診：SPECs 落後於實際程式碼
+
+|| SPEC | Task | 程式碼現況 |
+|------|------|----------|
+|| SPEC-ANALYTICS-01 | TASK-ANALYTICS-1/2 (parts[3]) | ✅ redis.go:304,362 已用 `parts[3]` |
+|| SPEC-BUG-PROXY-GLOBAL-JWT | TASK-GLOBAL-JWT-1 (is_global) | ✅ nginx.conf:530 無 `is_global` |
+
+### ✅ SPEC-BLACKSCREEN-01 — 已完成（程式碼審查 + Live 驗證）
+
+**小黑驗證**（2026-06-17 17:00）：
+| Task | 說明 | 狀態 |
+|------|------|------|
+| TASK-1 | Users.tsx `d.map is not a function` — 已 Array.isArray normalize | ✅ commit `e85ceb37` |
+| TASK-2 | AlertRules.tsx blank — component fetch fix | ✅ commit `f55927a2` |
+| TASK-3 | Billing.tsx route — `BillingPortal` component imported in App.tsx:28, route `/billing` → 200 | ✅ commit `8414f23e` |
+| TASK-4 | /config-snapshots route — App.tsx:144 routes to `ConfigVersioning`, returns 200 | ✅ commit `872a0eb4` |
+| TASK-5 | ApiDocs.tsx — fetches `/docs.json` as text (not JSON), SwaggerUI handles YAML natively | ✅ commit `68cd45e0` |
+| TASK-6 | Sidebar "工作區" → `/workspaces` — App.tsx:54 + Sidebar.tsx:54 一致 | ✅ |
+
+**小黑判定**: 🔴 → ✅ COMPLETED（所有 6 tasks 已實作，live 路由驗證通過）
+
+### ✅ SPEC-2.5-A — 已完成（程式碼審查）
+
+**小黑驗證**（2026-06-17 17:00）：
+
+| Task | 說明 | 程式碼 |
+|------|------|--------|
+| TASK-2.5-A1 | `/usage/analytics` endpoint | `dcd143e9` — routes/usage.go handler + storage/usage.go analytics query |
+| TASK-2.5-A2 | `getAnalyticsUsage()` in kong.ts | `8dd9d44a` — kong.ts:369 `export const getAnalyticsUsage` |
+| TASK-2.5-A3 | Cont usage panel in Analytics.tsx | `monthly_total`, `quota_limit`, `top_routes`, `top_consumers` all rendered (Analytics.tsx:331-420) |
+
+**小黑判定**: 🔴 → ✅ COMPLETED
+
+### ✅ 驗證通過
+- `docker compose build --no-cache cont-proxy` ✅
+- `docker compose build --no-cache cont-admin-api` ✅
+- `docker exec cont-proxy nginx -t` ✅ (worker_connections warn — 🟡)
+- `v025` migration applied (2026-06-15) ✅
+- All 5 containers healthy ✅
+- `/internal/config/snapshot` → 200 ✅
+- Frontend routes: `/billing` → 200, `/config-snapshots` → 200, `/api-docs` → 200, `/workspaces` → 200 ✅
+
+### 📋 其它 SPEC 待處理（優先順序排序）
+1. ~~SPEC-BLACKSCREEN-01~~ → ✅ COMPLETED（本輪小黑關帳）
+2. ~~SPEC-2.5-A~~ → ✅ COMPLETED（本輪小黑關帳）
+3. **SPEC-2.5-B** → ✅ COMPLETED（已併入 SPEC-usage-alerting，code review 通過）
+4. **SPEC-usage-alerting** → ✅ COMPLETED（alerter.go 有 evaluateUsageQuotas+evaluateOrgUsageQuota+evaluateConsumerUsageQuota，storage 正確讀寫 percentage_threshold+quota_metric_type，AlertRules.tsx 有完整 UI）
+5. **SPEC-plugin-access-param** → ✅ COMPLETED（TASK-1 fix commit d52a9c64，nginx -t ✅，docker build --no-cache ✅，container 重啟 ✅）
+
+## Development Guardian Review（2026-06-17 17:45 PM）
+
+### ✅ SPEC-plugin-access-param — 小黑驗證通過
+| Task | 說明 | 狀態 |
+|------|------|------|
+| TASK-PLUGIN-1 | `pcall(handler.access, handler, plugin)` — access.lua:178 | ✅ commit `d52a9c64` |
+| TASK-PLUGIN-2 | `nginx -t` passes | ✅ syntax ok |
+| TASK-PLUGIN-3 | Lua tests (busted) | ⏭️ skipped（無 busted tests in this repo） |
+| TASK-PLUGIN-4 | Docker build --no-cache succeeds + container restart | ✅ built + healthy |
+
+### ✅ SPEC-usage-alerting — 小黑程式碼審查通過
+| Task | 說明 | 程式碼 |
+|------|------|--------|
+| TASK-UA-1 | alerter.go — evaluateUsageQuotas + evaluateOrgUsageQuota + evaluateConsumerUsageQuota | alerter.go:93-240 |
+| TASK-UA-2 | alerter.go — computeConsumerUsageQuotaMetric | alerter.go:135（evaluateConsumerUsageQuota） |
+| TASK-UA-3 | storage — AlertRule CRUD 正確讀寫 percentage_threshold + quota_metric_type | storage/models.go:65-81, store.go:2265-2416 |
+| TASK-UA-4 | AlertRules.tsx — POST/PUT 攜帶 quota_metric_type + percentage_threshold | AlertRules.tsx:129-168 |
+| TASK-UA-5 | AlertRules.tsx — 列表顯示 usage_quota 門檻百分比 | AlertRules.tsx:233-240 |
+
+**小黑判定**: 🟡 → ✅ COMPLETED（程式碼完整，live QA 待下次 cron）
+
+### ✅ 驗證通過
+- `docker compose build --no-cache cont-proxy` ✅
+- `docker exec cont-proxy nginx -t` ✅ (worker_connections warn — 🟡)
+- All 4 containers healthy ✅
+- Admin API `http://localhost:18081/services` → 401 ✅（auth required，正確）
+- Gateway `http://localhost:18000/` → 200 ✅
+
+### 📋 SPEC 全部關帳（截至 2026-06-17）
+- ✅ SPEC-BLACKSCREEN-01
+- ✅ SPEC-2.5-A
+- ✅ SPEC-BUG-Services-Update-500
+- ✅ SPEC-BUG-Routes-Update-500
+- ✅ SPEC-BUG-Proxy-Routing-503
+- ✅ SPEC-ANALYTICS-01
+- ✅ SPEC-BUG-PROXY-GLOBAL-JWT
+- ✅ SPEC-plugin-access-param
+- ✅ SPEC-usage-alerting
+- 🟡 SPEC-usage-enforcement（無對應 SPEC 檔，見 SPEC-usage-counter.md）
