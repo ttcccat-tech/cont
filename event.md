@@ -1,9 +1,9 @@
 # Cont 2.0 Development Event Log
 
 ## Active Session
-- Date: 2026-06-16 (third session — 22:00)
+- Date: 2026-06-18 (fourth session — 02:00 UTC)
 - PM: 小黑
-- Scope: Default org usage tracking + Anonymous quota enforcement
+- Scope: 日常守護 — 驗證殘留 bug 狀態 + ELK merge
 
 ## 🔴 SPEC-default-org-usage — Default Org Usage Tracking（2026-06-16 小黑發現）
 - **發現時間**: 2026-06-16 09:00 UTC
@@ -71,6 +71,14 @@
 ## 🔴 ACTIVE REGRESSION — 2026-06-16 小黑發現
 
 （無）
+
+## ✅ 小黑驗證 — 2026-06-18 02:00 UTC
+- [✅] BUG-Services-Update-500 — PUT /services/{id} → 200 ✅（已修復，main 已併入）
+- [✅] BUG-Routes-Update-500 — PUT /routes/{id} → 200 ✅（已修復，main 已併入）
+- [✅] BUG-Proxy-NewRoute-503 — nginx.conf route 正常，Proxy container healthy ✅（已修復，main 已併入）
+- [✅] ELK stack merge — develop → main ✅（8 files, 337+ insertions, pushed）
+
+**小黑結論**: 所有 🔴 P0 bug 皆已修復驗證，event.md 記錄為歷史殘留。ELK stack 功能（Lua shared dict buffer → Filebeat → Logstash → Elasticsearch → Kibana）已合併至 main。
 
 ## ✅ 已完成（本輪 2026-06-16 小黑守護）
 
