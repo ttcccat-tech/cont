@@ -194,7 +194,7 @@ export default function UpstreamsPage() {
         <Space>
           <Button size="small" icon={<NodeIndexOutlined />} onClick={() => openDetail(r)}>目標</Button>
           {canDelete && (
-            <Popconfirm title="刪除此上游？" onConfirm={() => handleDelete(r.id!)}>
+            <Popconfirm title="刪除此負載平衡後端？" onConfirm={() => handleDelete(r.id!)}>
               <Button size="small" danger icon={<DeleteOutlined />}>刪除</Button>
             </Popconfirm>
           )}
@@ -228,22 +228,22 @@ export default function UpstreamsPage() {
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2>上游管理 (Upstreams)</h2>
+        <h2>API 負載平衡後端管理</h2>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchUpstreams}>刷新</Button>
-          {canWrite && <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModal(true)}>新增上游</Button>}
+          {canWrite && <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModal(true)}>新增後端</Button>}
         </Space>
       </div>
 
       {upstreams.length === 0 && !loading && (
-        <Alert message="尚無上游" description="建立服務時可指定 upstream 來做負載平衡" type="info" showIcon />
+        <Alert message="尚無負載平衡後端" description="建立 API 前端時可指定 upstream 來做負載平衡" type="info" showIcon />
       )}
 
       <Table columns={upstreamColumns} dataSource={upstreams} rowKey="id"
         loading={loading} pagination={{ pageSize: 10 }} />
 
       {/* Detail drawer */}
-      <Drawer title={`上游: ${selectedUpstream?.name || ''}`} open={detailDrawer}
+      <Drawer title={`負載平衡後端: ${selectedUpstream?.name || ''}`} open={detailDrawer}
         onClose={() => { setDetailDrawer(false); setTargets([]); setCbConfig(null) }} width={680}>
         <Descriptions column={2} size="small" style={{ marginBottom: 16 }}>
           <Descriptions.Item label="ID">{selectedUpstream?.id?.slice(0, 8)}</Descriptions.Item>
@@ -336,10 +336,10 @@ export default function UpstreamsPage() {
       </Drawer>
 
       {/* Create upstream modal (informational - backend may not have full CRUD) */}
-      <Modal title="新增上游" open={createModal}
+      <Modal title="新增後端" open={createModal}
         onOk={handleCreate} onCancel={() => { setCreateModal(false); form.resetFields() }}
         confirmLoading={submitting} okText="建立">
-        <Alert message="上游建立需透過服務編輯介面" type="info" showIcon style={{ marginBottom: 16 }} />
+        <Alert message="後端建立需透過 API 前端編輯介面" type="info" showIcon style={{ marginBottom: 16 }} />
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="名稱" rules={[{ required: true }]}>
             <Input placeholder="my-upstream" />
