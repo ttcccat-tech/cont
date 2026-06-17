@@ -97,7 +97,7 @@ services:
     ports:
       - "18000:8000"
     volumes:
-      - proxy_logs:/var/log/cont
+      - ./elk/proxy_logs:/var/log/cont
     environment:
       - LUA_PACKAGE_PATH=/usr/local/openresty/lualib/?.lua;/usr/local/openresty/lualib/?/init.lua;./?.lua;./?/init.lua
     depends_on:
@@ -158,8 +158,7 @@ services:
       - cont_default
     volumes:
       - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
-      - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
-      - proxy_logs:/var/log/cont:ro
+      - ./elk/proxy_logs:/var/log/cont:ro
     ports:
       - "15040:5044"
       - "19600:9600"
@@ -199,7 +198,7 @@ services:
     user: root
     volumes:
       - ./elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - proxy_logs:/var/log/cont:ro
+      - ./elk/proxy_logs:/var/log/cont:ro
     command: filebeat -e -strict.perms=false
     depends_on:
       logstash:
@@ -211,5 +210,4 @@ networks:
 
 volumes:
   postgres_data:
-  proxy_logs:
   elasticsearch_data:

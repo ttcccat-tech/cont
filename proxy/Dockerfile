@@ -4,6 +4,6 @@ COPY lua/cont/ /usr/local/openresty/lualib/cont/
 COPY lua/pdk/ /usr/local/openresty/lualib/pdk/
 COPY lua/plugins/ /usr/local/openresty/lualib/plugins/
 COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
-RUN mkdir -p /usr/local/openresty/nginx/logs
+RUN mkdir -p /usr/local/openresty/nginx/logs /var/log/cont
 EXPOSE 8000
 CMD ["nginx", "-g", "daemon off;"]
