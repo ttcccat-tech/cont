@@ -350,10 +350,6 @@ func GetService(store *storage.Store) gin.HandlerFunc {
 
 func UpdateService(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !storage.UUIDV4Regex.MatchString(c.Param("id")) {
-			badRequest(c, fmt.Errorf("invalid service id format: must be a valid UUID"))
-			return
-		}
 		var s storage.Service
 		if err := c.ShouldBindJSON(&s); err != nil {
 			badRequest(c, err)
@@ -624,10 +620,6 @@ func GetRoute(store *storage.Store) gin.HandlerFunc {
 
 func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !storage.UUIDV4Regex.MatchString(c.Param("id")) {
-			badRequest(c, fmt.Errorf("invalid route id format: must be a valid UUID"))
-			return
-		}
 		var r storage.Route
 		if err := c.ShouldBindJSON(&r); err != nil {
 			badRequest(c, err)
@@ -635,41 +627,6 @@ func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 		}
 		orgID := getOrgID(c)
 		result, err := store.UpdateRoute(c.Param("id"), orgID, &r)
-		if err == sql.ErrNoRows {
-			notFound(c, "route not found")
-			return
-		}
-		if err != nil {
-			internalError(c)
-			return
-		}
-		c.JSON(200, result)
-	}
-}
-
-func PatchRoute(store *storage.Store) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if !storage.UUIDV4Regex.MatchString(c.Param("id")) {
-			badRequest(c, fmt.Errorf("invalid route id format: must be a valid UUID"))
-			return
-		}
-		var fields map[string]interface{}
-		if err := c.ShouldBindJSON(&fields); err != nil {
-			badRequest(c, err)
-			return
-		}
-		// Reject unexpected fields
-		allowed := map[string]bool{
-			"name": true, "strip_path": true, "preserve_host": true, "enabled": true,
-		}
-		for k := range fields {
-			if !allowed[k] {
-				badRequestMsg(c, "unknown field: "+k)
-				return
-			}
-		}
-		orgID := getOrgID(c)
-		result, err := store.PatchRoute(c.Param("id"), orgID, fields)
 		if err == sql.ErrNoRows {
 			notFound(c, "route not found")
 			return
@@ -988,10 +945,6 @@ func CreateTarget(store *storage.Store) gin.HandlerFunc {
 			badRequest(c, err)
 			return
 		}
-		if t.Target == "" {
-			badRequestMsg(c, "target is required and cannot be empty")
-			return
-		}
 		t.UpstreamID = c.Param("id")
 		// Inherit org_id from upstream for data consistency
 		orgID := getOrgID(c)
@@ -1012,10 +965,6 @@ func UpdateTarget(store *storage.Store) gin.HandlerFunc {
 		var t storage.Target
 		if err := c.ShouldBindJSON(&t); err != nil {
 			badRequest(c, err)
-			return
-		}
-		if t.Target == "" {
-			badRequestMsg(c, "target is required and cannot be empty")
 			return
 		}
 		orgID := getOrgID(c)
@@ -1402,32 +1351,6 @@ func GetProxyRuntimeConfig(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
-		type ProxyRoute struct {
-			ID            string   `json:"id"`
-			Name          string   `json:"name,omitempty"`
-			ServiceID     string   `json:"service_id,omitempty"`
-			Protocols     []string `json:"protocols,omitempty"`
-			Hosts         []string `json:"hosts,omitempty"`
-			Paths         []string `json:"paths,omitempty"`
-			Methods       []string `json:"methods,omitempty"`
-			StripPath     bool     `json:"strip_path"`
-			PreserveHost  bool     `json:"preserve_host"`
-			Enabled       bool     `json:"enabled"`
-		}
-		proxyRoutes := make([]ProxyRoute, len(routes))
-		for i, r := range routes {
-			proxyRoutes[i] = ProxyRoute{
-				ID: r.ID, Name: r.Name,
-				ServiceID:    r.GetServiceID(),
-				Protocols:    r.Protocols,
-				Hosts:        r.Hosts,
-				Paths:        r.Paths,
-				Methods:      r.Methods,
-				StripPath:    r.StripPath,
-				PreserveHost: r.PreserveHost,
-				Enabled:      r.Enabled,
-			}
-		}
 		services, err := store.ListServices("", 1000, 0)
 		if err != nil {
 			internalError(c)
@@ -1487,9 +1410,9 @@ func GetProxyRuntimeConfig(store *storage.Store) gin.HandlerFunc {
 				Config: cfg, Enabled: p.Enabled,
 			})
 		}
-	c.JSON(200, gin.H{
-		"routes":    proxyRoutes,
-		"services":  services,
+		c.JSON(200, gin.H{
+			"routes":    routes,
+			"services":  services,
 			"upstreams": upstreams,
 			"targets":   targetsMap,
 			"plugins":   proxyPlugins,
