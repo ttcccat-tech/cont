@@ -126,7 +126,7 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 			name=$2, protocol=$3, host=$4, port=$5, path=$6, url=$7,
 			retries=$8, connect_timeout=$9, read_timeout=$10,
 			write_timeout=$11, upstream_id=NULLIF($12, '')::uuid, enabled=$13, updated_at=NOW()
-		WHERE id=$1 AND ($14 = '' OR ($14 != '' AND org_id::text = $14)) RETURNING updated_at`,
+		WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($14, ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at`,
 		id, svc.Name, orString(svc.Protocol, "http"), svc.Host,
 		orInt(svc.Port, 80), svc.Path, svc.URL, orInt(svc.Retries, 5),
 		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
@@ -704,6 +704,80 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 	}
 	r.ID = id
 	return r, nil
+}
+
+func (s *Store) PatchRoute(id, orgID string, fields map[string]interface{}) (*Route, error) {
+	current, err := s.GetRoute(id, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, sql.ErrNoRows
+	}
+
+	setParts := []string{}
+	args := []interface{}{}
+	argIdx := 3
+
+	addSet := func(field string, value interface{}) {
+		setParts = append(setParts, fmt.Sprintf("%s=$%d", field, argIdx))
+		args = append(args, value)
+		argIdx++
+	}
+
+	if v, present := fields["name"]; present {
+		addSet("name", coalesceString(v, current.Name))
+	}
+	if v, present := fields["strip_path"]; present {
+		addSet("strip_path", coalesceBool(v, current.StripPath))
+	}
+	if v, present := fields["preserve_host"]; present {
+		addSet("preserve_host", coalesceBool(v, current.PreserveHost))
+	}
+	if v, present := fields["enabled"]; present {
+		addSet("enabled", coalesceBool(v, current.Enabled))
+	}
+
+	if len(setParts) == 0 {
+		return current, nil
+	}
+
+	args = append([]interface{}{id, orgID}, args...)
+	query := "UPDATE routes SET " + strings.Join(setParts, ", ") +
+		" WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($2, ''), '00000000-0000-0000-0000-000000000000') RETURNING id, name, service_id, protocols, hosts, paths, methods, strip_path, preserve_host, regex_priority, https_redirect_status_code, connection_timeout, enabled, created_at, updated_at"
+
+	var r Route
+	var name, serviceID sql.NullString
+	var protocols, hosts, paths, methods []byte
+	var stripPath, preserveHost sql.NullBool
+	var regexPriority, httpsStatus, connTimeout sql.NullInt64
+	var enabled sql.NullBool
+	var created, updated sql.NullString
+	err = s.db.QueryRow(query, args...).Scan(
+		&r.ID, &name, &serviceID,
+		&protocols, &hosts, &paths, &methods,
+		&stripPath, &preserveHost, &regexPriority,
+		&httpsStatus, &connTimeout, &enabled,
+		&created, &updated,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if name.Valid { r.Name = name.String }
+	if serviceID.Valid { r.Service = &ServiceRef{ID: serviceID.String} }
+	jsonScanSlice(&r.Protocols, protocols)
+	jsonScanSlice(&r.Hosts, hosts)
+	jsonScanSlice(&r.Paths, paths)
+	jsonScanSlice(&r.Methods, methods)
+	if stripPath.Valid { r.StripPath = stripPath.Bool }
+	if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
+	if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
+	if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
+	if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
+	if enabled.Valid { r.Enabled = enabled.Bool }
+	if created.Valid { r.CreatedAt = created.String }
+	if updated.Valid { r.UpdatedAt = updated.String }
+	return &r, nil
 }
 
 func (s *Store) DeleteRoute(id, orgID string) error {

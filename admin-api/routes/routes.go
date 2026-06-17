@@ -639,6 +639,27 @@ func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 	}
 }
 
+func PatchRoute(store *storage.Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var fields map[string]interface{}
+		if err := c.ShouldBindJSON(&fields); err != nil {
+			badRequest(c, err)
+			return
+		}
+		orgID := getOrgID(c)
+		result, err := store.PatchRoute(c.Param("id"), orgID, fields)
+		if err == sql.ErrNoRows {
+			notFound(c, "route not found")
+			return
+		}
+		if err != nil {
+			internalError(c)
+			return
+		}
+		c.JSON(200, result)
+	}
+}
+
 func DeleteRoute(store *storage.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := getOrgID(c)
