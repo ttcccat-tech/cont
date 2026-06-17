@@ -534,14 +534,14 @@
 
 ### ✅ TASK-CSMERGE 任務完成
 
-| Task | 說明 | 狀態 |
+|| Task | 說明 | 狀態 |
 |------|------|------|
-| TASK-CSMERGE-1 | Merge stash@{1} cosocket/PatchService changes | ✅ commit `dfc19a37` |
-| TASK-CSMERGE-2 | UpstreamID field 與 v025 migration 一致 | ✅ models.go:159 + migrations.go:691-696 |
-| TASK-CSMERGE-3 | `docker compose build --pull --no-cache cont-admin-api` | ✅ built |
-| TASK-CSMERGE-4 | `docker compose build --pull --no-cache cont-proxy` | ✅ built |
-| TASK-CSMERGE-5 | `docker exec cont-proxy nginx -t` | ✅ syntax ok（worker_connections warn — 🟡，非阻擋） |
-| TASK-CSMERGE-6 | Containers 重啟，all healthy | ✅ 5 containers healthy |
+|| TASK-CSMERGE-1 | Merge stash@{1} cosocket/PatchService changes | ✅ commit `dfc19a37` |
+|| TASK-CSMERGE-2 | UpstreamID field 與 v025 migration 一致 | ✅ models.go:159 + migrations.go:691-696 |
+|| TASK-CSMERGE-3 | `docker compose build --pull --no-cache cont-admin-api` | ✅ built |
+|| TASK-CSMERGE-4 | `docker compose build --pull --no-cache cont-proxy` | ✅ built |
+|| TASK-CSMERGE-5 | `docker exec cont-proxy nginx -t` | ✅ syntax ok（worker_connections warn — 🟡，非阻擋） |
+|| TASK-CSMERGE-6 | Containers 重啟，all healthy | ✅ 5 containers healthy |
 
 ### ✅ 驗證通過
 - Redis counter write: `POST /internal/usage/incr` → `cont:usage:smoke-test-org:2026061710` ✅
@@ -572,3 +572,47 @@
 - ✅ SPEC-usage-alerting
 - ✅ SPEC-PENDING-01（cosocket merge）— v025 upstream_id migration 確認存在
 - 🟡 SPEC-usage-enforcement（Redis counter 已驗證 write，TASK-UE-6/7 殘留）
+
+---
+
+## 🔴 小黑紧急更正（2026-06-17 19:05 PM）
+
+### ⚠️ 小黑判定需要更正 — 2026-06-17 Review 錯誤
+
+小黑在 2026-06-17 18:45 的 REVIEW 聲稱 `BUG-Routes-Update-500` 已經 FIXED，但這是**錯誤的判定**。小黑親自做根因追蹤發現：
+
+**小黑根因追蹤**：
+1. 2026-06-17 04:12 commit `8dd1e1c2` 正確修復了 UpdateRoute WHERE clause：
+   ```sql
+   WHERE id=$1 AND COALESCE(NULLIF(org_id::text,''), '000...') = COALESCE(NULLIF($N,''), '000...')
+   ```
+2. 但 commit `2d93db08`（TASK-RU-FIX-1）又**把 COALESCE 改回舊的爛邏輯**：
+   ```sql
+   WHERE id=$1 AND ($N = '' OR ($N != '' AND org_id::text = $N))
+   ```
+3. `develop` 分支當時（commit `0007e394`）store.go line 699 仍然是**沒有 COALESCE 的舊爛 WHERE clause**
+
+**小黑親自 smoke test**：
+```
+PUT /routes/ad823972-6b44-48af-b647-9a085fcb0b09 → HTTP 500 INTERNAL_ERROR
+```
+
+**小黑判定**：
+| Bug | 狀態 | 說明 |
+|-----|------|------|
+| BUG-Services-Update-500 | ✅ 確認修復 | GET service = 200, update logic 已確認正確 |
+| BUG-Routes-Update-500 | 🔴 **仍然損壞** | COALESCE fix 被 revert 了，develop 分支仍是舊爛 WHERE clause |
+| BUG-Proxy-NewRoute-503 | ✅ 確認修復 | HTTP 400 upstream response，proxy routing 正常 |
+
+**小黑緊急任務**：
+- [✅] TASK-RU-COALESCE: 恢復 COALESCE WHERE clause fix 到 store.go line 699
+- [✅] TASK-RU-DOCKER: Docker build --no-cache cont-admin-api
+- [✅] TASK-RU-RESTART: Restart cont-admin-api container
+- [✅] TASK-RU-SMOKE: Smoke test — PUT /routes/{id} → 200
+
+**小黑緊急修復驗證（2026-06-17 19:30 PM）**：
+- store.go line 699 COALESCE fix 確認存在 ✅
+- Docker build --no-cache cont-admin-api ✅
+- Container healthy ✅
+- Smoke test: PUT /routes/{id} → 200 ✅
+- develop → main merge ✅ (commit `6eb7f1d5`)
