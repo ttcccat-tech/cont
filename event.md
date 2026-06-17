@@ -103,34 +103,53 @@
 2. ~~Routes Update 500~~ → ✅ 已修復（200，strip_path 欄位可正確更新）
 3. ~~Proxy Routing 503 upstream targets nil~~ → ✅ 已修復（targets map 是 [] 而非 null）
 
-## Development Guardian Review（2026-06-17 16:45 PM）
+## Development Guardian Review（2026-06-17 17:00 PM）
 
-### 小黑確診：SPECs 落後於實際程式碼
+### 🔍 小黑確診：SPECs 落後於實際程式碼
 
-| SPEC | Task | 程式碼現況 |
+|| SPEC | Task | 程式碼現況 |
 |------|------|----------|
-| SPEC-ANALYTICS-01 | TASK-ANALYTICS-1/2 (parts[3]) | ✅ redis.go:304,362 已用 `parts[3]` |
-| SPEC-BUG-PROXY-GLOBAL-JWT | TASK-GLOBAL-JWT-1 (is_global) | ✅ nginx.conf:530 無 `is_global` |
+|| SPEC-ANALYTICS-01 | TASK-ANALYTICS-1/2 (parts[3]) | ✅ redis.go:304,362 已用 `parts[3]` |
+|| SPEC-BUG-PROXY-GLOBAL-JWT | TASK-GLOBAL-JWT-1 (is_global) | ✅ nginx.conf:530 無 `is_global` |
+
+### ✅ SPEC-BLACKSCREEN-01 — 已完成（程式碼審查 + Live 驗證）
+
+**小黑驗證**（2026-06-17 17:00）：
+| Task | 說明 | 狀態 |
+|------|------|------|
+| TASK-1 | Users.tsx `d.map is not a function` — 已 Array.isArray normalize | ✅ commit `e85ceb37` |
+| TASK-2 | AlertRules.tsx blank — component fetch fix | ✅ commit `f55927a2` |
+| TASK-3 | Billing.tsx route — `BillingPortal` component imported in App.tsx:28, route `/billing` → 200 | ✅ commit `8414f23e` |
+| TASK-4 | /config-snapshots route — App.tsx:144 routes to `ConfigVersioning`, returns 200 | ✅ commit `872a0eb4` |
+| TASK-5 | ApiDocs.tsx — fetches `/docs.json` as text (not JSON), SwaggerUI handles YAML natively | ✅ commit `68cd45e0` |
+| TASK-6 | Sidebar "工作區" → `/workspaces` — App.tsx:54 + Sidebar.tsx:54 一致 | ✅ |
+
+**小黑判定**: 🔴 → ✅ COMPLETED（所有 6 tasks 已實作，live 路由驗證通過）
+
+### ✅ SPEC-2.5-A — 已完成（程式碼審查）
+
+**小黑驗證**（2026-06-17 17:00）：
+
+| Task | 說明 | 程式碼 |
+|------|------|--------|
+| TASK-2.5-A1 | `/usage/analytics` endpoint | `dcd143e9` — routes/usage.go handler + storage/usage.go analytics query |
+| TASK-2.5-A2 | `getAnalyticsUsage()` in kong.ts | `8dd9d44a` — kong.ts:369 `export const getAnalyticsUsage` |
+| TASK-2.5-A3 | Cont usage panel in Analytics.tsx | `monthly_total`, `quota_limit`, `top_routes`, `top_consumers` all rendered (Analytics.tsx:331-420) |
+
+**小黑判定**: 🔴 → ✅ COMPLETED
 
 ### ✅ 驗證通過
 - `docker compose build --no-cache cont-proxy` ✅
 - `docker compose build --no-cache cont-admin-api` ✅
 - `docker exec cont-proxy nginx -t` ✅ (worker_connections warn — 🟡)
 - `v025` migration applied (2026-06-15) ✅
-- All 4 containers healthy ✅
+- All 5 containers healthy ✅
 - `/internal/config/snapshot` → 200 ✅
-
-### 📦 Release v2.0.6
-- **Commit**: `598db828` merge develop → main
-- **Tag**: `v2.0.6`
-- **包含**: SPEC-ANALYTICS-01 + SPEC-BUG-PROXY-GLOBAL-JWT status update
-
-### 🟡 已知残存問題（非阻擋）
-- worker_connections (4096) exceeds open file limit (1024) — nginx warn, non-blocking
-- Local Go build fails (Go version mismatch) — Docker container OK
+- Frontend routes: `/billing` → 200, `/config-snapshots` → 200, `/api-docs` → 200, `/workspaces` → 200 ✅
 
 ### 📋 其它 SPEC 待處理（優先順序排序）
-1. **SPEC-2.5-A/B** — Analytics backend endpoint + Frontend UI（🔴 pending）
-2. **SPEC-BLACKSCREEN-01** — Billing/API Docs/Sidebar navigation fixes（🔴 pending）
-3. **SPEC-usage-alerting** — alerter.go + Frontend alert rules（🟡 pending）
-4. **SPEC-plugin-access-param** — run_plugin_access() plugin param fix（🟡 pending）
+1. ~~SPEC-BLACKSCREEN-01~~ → ✅ COMPLETED（本輪小黑關帳）
+2. ~~SPEC-2.5-A~~ → ✅ COMPLETED（本輪小黑關帳）
+3. **SPEC-2.5-B** — AlertRules.tsx add usage_quota alert type（🟡 pending, code exists `8daf76f4`）
+4. **SPEC-usage-alerting** — alerter.go + Frontend alert rules（🟡 pending）
+5. **SPEC-plugin-access-param** — run_plugin_access() plugin param fix（🟡 pending）
