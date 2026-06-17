@@ -100,5 +100,37 @@
 
 ## 🔴 P0 Bug 彙整（需修復）- 更新於 2026-06-17 15:42
 1. ~~Services Update 500~~ → ✅ 已修復（200）
-2. ~~Routes Update 500~~ → ✅ 已修復（200，部分更新不影響 service_id）
+2. ~~Routes Update 500~~ → ✅ 已修復（200，strip_path 欄位可正確更新）
 3. ~~Proxy Routing 503 upstream targets nil~~ → ✅ 已修復（targets map 是 [] 而非 null）
+
+## Development Guardian Review（2026-06-17 16:45 PM）
+
+### 小黑確診：SPECs 落後於實際程式碼
+
+| SPEC | Task | 程式碼現況 |
+|------|------|----------|
+| SPEC-ANALYTICS-01 | TASK-ANALYTICS-1/2 (parts[3]) | ✅ redis.go:304,362 已用 `parts[3]` |
+| SPEC-BUG-PROXY-GLOBAL-JWT | TASK-GLOBAL-JWT-1 (is_global) | ✅ nginx.conf:530 無 `is_global` |
+
+### ✅ 驗證通過
+- `docker compose build --no-cache cont-proxy` ✅
+- `docker compose build --no-cache cont-admin-api` ✅
+- `docker exec cont-proxy nginx -t` ✅ (worker_connections warn — 🟡)
+- `v025` migration applied (2026-06-15) ✅
+- All 4 containers healthy ✅
+- `/internal/config/snapshot` → 200 ✅
+
+### 📦 Release v2.0.6
+- **Commit**: `598db828` merge develop → main
+- **Tag**: `v2.0.6`
+- **包含**: SPEC-ANALYTICS-01 + SPEC-BUG-PROXY-GLOBAL-JWT status update
+
+### 🟡 已知残存問題（非阻擋）
+- worker_connections (4096) exceeds open file limit (1024) — nginx warn, non-blocking
+- Local Go build fails (Go version mismatch) — Docker container OK
+
+### 📋 其它 SPEC 待處理（優先順序排序）
+1. **SPEC-2.5-A/B** — Analytics backend endpoint + Frontend UI（🔴 pending）
+2. **SPEC-BLACKSCREEN-01** — Billing/API Docs/Sidebar navigation fixes（🔴 pending）
+3. **SPEC-usage-alerting** — alerter.go + Frontend alert rules（🟡 pending）
+4. **SPEC-plugin-access-param** — run_plugin_access() plugin param fix（🟡 pending）
