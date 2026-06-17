@@ -128,11 +128,11 @@ export default function Services() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h1>服務管理</h1>
+        <h1>API 前端管理</h1>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchServices}>刷新</Button>
           {canWrite('services') && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增服務</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增 API 前端</Button>
           )}
         </Space>
       </div>
@@ -143,11 +143,11 @@ export default function Services() {
         rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
-        locale={{ emptyText: '暫無服務，點擊「新增服務」建立第一個' }}
+        locale={{ emptyText: '暫無 API 前端，點擊「新增 API 前端」建立第一個' }}
       />
 
       <Modal
-        title={editing ? '編輯服務' : '新增服務'}
+        title={editing ? '編輯 API 前端' : '新增 API 前端'}
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         width={560}

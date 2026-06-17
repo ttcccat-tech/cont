@@ -945,6 +945,10 @@ func CreateTarget(store *storage.Store) gin.HandlerFunc {
 			badRequest(c, err)
 			return
 		}
+		if t.Target == "" {
+			badRequestMsg(c, "target is required and cannot be empty")
+			return
+		}
 		t.UpstreamID = c.Param("id")
 		// Inherit org_id from upstream for data consistency
 		orgID := getOrgID(c)
@@ -965,6 +969,10 @@ func UpdateTarget(store *storage.Store) gin.HandlerFunc {
 		var t storage.Target
 		if err := c.ShouldBindJSON(&t); err != nil {
 			badRequest(c, err)
+			return
+		}
+		if t.Target == "" {
+			badRequestMsg(c, "target is required and cannot be empty")
 			return
 		}
 		orgID := getOrgID(c)
@@ -1351,6 +1359,32 @@ func GetProxyRuntimeConfig(store *storage.Store) gin.HandlerFunc {
 			internalError(c)
 			return
 		}
+		type ProxyRoute struct {
+			ID            string   `json:"id"`
+			Name          string   `json:"name,omitempty"`
+			ServiceID     string   `json:"service_id,omitempty"`
+			Protocols     []string `json:"protocols,omitempty"`
+			Hosts         []string `json:"hosts,omitempty"`
+			Paths         []string `json:"paths,omitempty"`
+			Methods       []string `json:"methods,omitempty"`
+			StripPath     bool     `json:"strip_path"`
+			PreserveHost  bool     `json:"preserve_host"`
+			Enabled       bool     `json:"enabled"`
+		}
+		proxyRoutes := make([]ProxyRoute, len(routes))
+		for i, r := range routes {
+			proxyRoutes[i] = ProxyRoute{
+				ID: r.ID, Name: r.Name,
+				ServiceID:    r.GetServiceID(),
+				Protocols:    r.Protocols,
+				Hosts:        r.Hosts,
+				Paths:        r.Paths,
+				Methods:      r.Methods,
+				StripPath:    r.StripPath,
+				PreserveHost: r.PreserveHost,
+				Enabled:      r.Enabled,
+			}
+		}
 		services, err := store.ListServices("", 1000, 0)
 		if err != nil {
 			internalError(c)
@@ -1410,9 +1444,9 @@ func GetProxyRuntimeConfig(store *storage.Store) gin.HandlerFunc {
 				Config: cfg, Enabled: p.Enabled,
 			})
 		}
-		c.JSON(200, gin.H{
-			"routes":    routes,
-			"services":  services,
+	c.JSON(200, gin.H{
+		"routes":    proxyRoutes,
+		"services":  services,
 			"upstreams": upstreams,
 			"targets":   targetsMap,
 			"plugins":   proxyPlugins,

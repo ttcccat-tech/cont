@@ -5,48 +5,61 @@
 - **Admin API**: http://localhost:18081
 - **Gateway**: http://localhost:18000
 - **Tester**: Hermes Agent (cron)
+- **QA Run #2**: 2026-06-17 12:05 PM
 
-## 🔴 Bug 記錄
+## 🔴 Bug 記錄（2026-06-17 QA Run #2）
 
-### 🔴 BUG-SERVICES-UPDATE: Services Update 返回 500（P0） — ✅ QA驗證通過（2026-06-17）
+### 🔴 BUG-Services-Update: Services Update 返回 500（P0）
 - **API**: PUT /services/{id}
 - **預期**: 200
-- **實際**: 200 ✅
-- **根因**: store.go UpdateService WHERE clause COALESCE fix（已 commit）
-- **驗證**: QA Phase 6.4 — ✅ PASS（2026-06-17）
-- **嚴重程度**: P0 → 已修補
+- **實際**: 500
+- **原因**: 舊 QA Run 的記錄；小黑親測 PUT /services/{id} ✅ 200（2026-06-17 12:35）
+- **小黑驗證**: develop 最新程式碼 Services Update 正常
+- **修補方向**: QA Run #2 的 500 可能是舊 container image 未重建
+- **驗證**: 小黑親測 ✅ PASS
+- **嚴重程度**: P0 → 需重建 container 驗證
 
-### 🔴 BUG-ROUTES-UPDATE: Routes Update 返回 500（P0）
+### 🔴 BUG-Routes-Update: Routes Update 返回 500（P0）
 - **API**: PUT /routes/{id}
 - **預期**: 200
-- **實際**: 200 ✅（2026-06-17 驗證）
-- **真實根因**: routes 表沒有 `description` 欄位；COALESCE fix 是真的，但 500 發生在 DB 層
-- **驗證**: QA Phase 7.4 — ✅ PASS（2026-06-17）
-- **嚴重程度**: P0 → 已修補（name 欄位可正確更新）
-- **備註**: routes 表缺 description/methods/hosts 等欄位（不在 schema 中），client 送這些欄位時被忽略，不影響更新功能
+- **實際**: 500
+- **原因**: 舊 QA Run 的記錄；小黑親測 PUT /routes/{id} ✅ 200（2026-06-17 12:36）
+- **小黑驗證**: develop 最新程式碼 Routes Update 正常（WHERE clause fix 已生效）
+- **小黑確認**: c0a36e4f fix(store): UpdateRoute WHERE clause 已正確處理 empty orgID
+- **修補方向**: QA Run #2 的 500 可能是舊 container image 未重建
+- **驗證**: 小黑親測 ✅ PASS
+- **嚴重程度**: P0 → 需重建 container 驗證
 
-### 🔴 BUG-PROXY-NIL-UPSTREAM: Proxy 轉發 503（upstream_target 為空）（P0）— ✅ 已修補（2026-06-17）
-- **小黑分析**（2026-06-17）:
-  - 根因：`nginx.conf` 的 `proxy_pass http://$cont_upstream` 中的 `$cont_upstream` 無 scheme 前綴
-  - 真正問題：container image 早於 fix commit，container 跑的還是舊程式碼
-- **修補**:
-  - Commit `c79a7320`: `proxy_pass $cont_upstream`（移除硬編碼 `http://` 前綴，由 Lua 動態添加 `http://`）
-  - TASK-PX-FIX-1: rebuild cont-proxy image → ✅ 3fc7ca025b8b（新 image）
-  - TASK-PX-FIX-2: restart container → ✅
-  - TASK-PX-FIX-3: 驗證 `curl -H "Host: qa.example.com" http://localhost:18000/qa-test-route/headers` → **200 OK** ✅
-- **小黑判定**: ✅ FIXED — proxy forwarding 正常，`proxy_pass $cont_upstream` + Lua `ngx.var.cont_upstream = "http://" .. target` 模式已驗證可行
+### 🔴 BUG-Proxy-Routing: 新建路由 proxy 到 upstream 503（P0）
+- **API**: GET /{route_path}/health via Gateway
+- **預期**: status:200
+- **實際**: status:503
+- **原因**: 小黑親測發現 target 記錄存在但 target 欄位為空字串（length=0）
+- **根因**: CreateTarget 未驗證 target 不可為空，導致 empty string target 被寫入 DB
+- **secondary 根因**: container image 未重建（Jun17 01:38 vs git HEAD Jun17 11:52）
+- **修補方向**: 
+  1. CreateTarget + UpdateTarget handler 加 target 非空驗證
+  2. 重建 cont-admin-api + cont-proxy containers
+  3. 清理現有 empty target 記錄
+- **驗證**: 待重建後驗證
+- **嚴重程度**: P0（功能阻斷）
 
-## ✅ 通過項目
+## ✅ 通過項目（2026-06-17 QA Run #2）
 
 | Phase | 功能 | 狀態 |
 |-------|------|------|
 | 1 | Auth 登入 | ✅ 通過 |
-| 2 | Users CRUD | ✅ 通過 |
-| 3 | Groups CRUD | ✅ 通過 |
-| 4 | Consumers CRUD | ✅ 通過 |
-| 5 | Upstreams CRUD | ✅ 通過 |
-| 6 | Services Create/List/Get/Delete | ✅ 通過（Update 500 除外）|
-| 7 | Routes Create/List/Get/Delete | ✅ 通過（Update 500 除外）|
+| 2 | Users CRUD | ✅ 全部通過 |
+| 3 | Groups CRUD | ✅ 全部通過 |
+| 4 | Consumers CRUD | ✅ 全部通過 |
+| 5 | Upstreams CRUD | ✅ 全部通過 |
+| 6 | Services CRUD | ⚠️ Create/List/Get/Delete OK，Update 500 ❌ |
+| 7 | Routes CRUD | ⚠️ Create/List/Get/Delete OK，Update 500 ❌ |
 | 8 | Plugins CRUD | ✅ 全部通過 |
-| 9 | Proxy 轉發鏈路 | ✅ 200（via qa-test-route + qa.example.com Host header）（2026-06-17） |
-| 10 | JWT Credential Create | ✅ 通過 |
+| 9 | Proxy Routing | ❌ 503 on new route |
+| 10 | JWT Auth | ✅ credential API 正常 |
+
+## 🔴 P0 Bug 彙整（需修復）
+1. Services Update 500
+2. Routes Update 500
+3. Proxy Routing 503（upstream targets nil）
