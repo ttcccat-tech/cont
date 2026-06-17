@@ -641,12 +641,12 @@ func (s *Store) GetRoute(id, orgID string) (*Route, error) {
 	jsonScanSlice(&r.Hosts, hosts)
 	jsonScanSlice(&r.Paths, paths)
 	jsonScanSlice(&r.Methods, methods)
-	if stripPath.Valid { r.StripPath = stripPath.Bool }
-	if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
-	if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
-	if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
-	if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
-	if enabled.Valid { r.Enabled = enabled.Bool }
+	if stripPath.Valid { b := stripPath.Bool; r.StripPath = &b }
+	if preserveHost.Valid { b := preserveHost.Bool; r.PreserveHost = &b }
+	if regexPriority.Valid { v := int(regexPriority.Int64); r.RegexPriority = &v }
+	if httpsStatus.Valid { v := int(httpsStatus.Int64); r.HTTPSRedirectStatusCode = &v }
+	if connTimeout.Valid { v := int(connTimeout.Int64); r.ConnectionTimeout = &v }
+	if enabled.Valid { b := enabled.Bool; r.Enabled = &b }
 	if created.Valid { r.CreatedAt = created.String }
 	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
@@ -823,12 +823,12 @@ func (s *Store) PatchRoute(id, orgID string, fields map[string]interface{}) (*Ro
 	jsonScanSlice(&r.Hosts, hosts)
 	jsonScanSlice(&r.Paths, paths)
 	jsonScanSlice(&r.Methods, methods)
-	if stripPath.Valid { r.StripPath = stripPath.Bool }
-	if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
-	if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
-	if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
-	if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
-	if enabled.Valid { r.Enabled = enabled.Bool }
+	if stripPath.Valid { b := stripPath.Bool; r.StripPath = &b }
+	if preserveHost.Valid { b := preserveHost.Bool; r.PreserveHost = &b }
+	if regexPriority.Valid { v := int(regexPriority.Int64); r.RegexPriority = &v }
+	if httpsStatus.Valid { v := int(httpsStatus.Int64); r.HTTPSRedirectStatusCode = &v }
+	if connTimeout.Valid { v := int(connTimeout.Int64); r.ConnectionTimeout = &v }
+	if enabled.Valid { b := enabled.Bool; r.Enabled = &b }
 	if created.Valid { r.CreatedAt = created.String }
 	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
