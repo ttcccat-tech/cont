@@ -25,20 +25,16 @@
 - **嚴重程度**: P0 → 已修補（name 欄位可正確更新）
 - **備註**: routes 表缺 description/methods/hosts 等欄位（不在 schema 中），client 送這些欄位時被忽略，不影響更新功能
 
-### 🔴 BUG-PROXY-NIL-UPSTREAM: Proxy 轉發 503（upstream_target 為空）（P0）
-- **API**: GET /{route_path}/health via Gateway
-- **預期**: 200（proxy 到 192.168.1.202:3010）
-- **實際**: 500（invalid URL prefix in "http://"）
+### 🔴 BUG-PROXY-NIL-UPSTREAM: Proxy 轉發 503（upstream_target 為空）（P0）— ✅ 已修補（2026-06-17）
 - **小黑分析**（2026-06-17）:
-  1. Lua condition `next(cont.targets[svc.upstream_id])` → TRUE ✅（targets 有內容）
-  2. Algorithm 選擇 `selected_target` → "192.168.1.202:3010" ✅
-  3. 設定 `upstream_target = selected_target` → "192.168.1.202:3010" ✅
-  4. **但是**: 設定 `ngx.var.cont_upstream = "192.168.1.202:3010"`（不帶 scheme）
-  5. `proxy_pass http://$cont_upstream` → Nginx 無法解析（variable-based upstream 需要 resolver 或完整 URL）
-  6. Error log: `invalid URL prefix in "http://"` = 變量解析失敗
-  7. upstream_target=`在 access log 中是空的，印證 upstream 連接從未成功
-- **小黑判定**: 🔴 新建路由無法 proxy 轉發，根因是 nginx.conf 中 variable-based proxy_pass 缺少 scheme 前綴或 explicit resolver directive
-- **修補方向**: 在 proxy_pass 使用完整 URL 或確保 resolver 正確解析 upstream hostname
+  - 根因：`nginx.conf` 的 `proxy_pass http://$cont_upstream` 中的 `$cont_upstream` 無 scheme 前綴
+  - 真正問題：container image 早於 fix commit，container 跑的還是舊程式碼
+- **修補**:
+  - Commit `c79a7320`: `proxy_pass $cont_upstream`（移除硬編碼 `http://` 前綴，由 Lua 動態添加 `http://`）
+  - TASK-PX-FIX-1: rebuild cont-proxy image → ✅ 3fc7ca025b8b（新 image）
+  - TASK-PX-FIX-2: restart container → ✅
+  - TASK-PX-FIX-3: 驗證 `curl -H "Host: qa.example.com" http://localhost:18000/qa-test-route/headers` → **200 OK** ✅
+- **小黑判定**: ✅ FIXED — proxy forwarding 正常，`proxy_pass $cont_upstream` + Lua `ngx.var.cont_upstream = "http://" .. target` 模式已驗證可行
 
 ## ✅ 通過項目
 
@@ -52,5 +48,5 @@
 | 6 | Services Create/List/Get/Delete | ✅ 通過（Update 500 除外）|
 | 7 | Routes Create/List/Get/Delete | ✅ 通過（Update 500 除外）|
 | 8 | Plugins CRUD | ✅ 全部通過 |
-| 9 | Proxy 轉發鏈路 | 🔴 503（已知 nil upstream bug）|
+| 9 | Proxy 轉發鏈路 | ✅ 200（via qa-test-route + qa.example.com Host header）（2026-06-17） |
 | 10 | JWT Credential Create | ✅ 通過 |
