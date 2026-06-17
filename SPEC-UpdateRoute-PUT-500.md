@@ -1,35 +1,39 @@
-# SPEC-UpdateRoute-PUT-500 — UpdateRoute PUT Returns 500
+# SPEC-UpdateRoute-PUT-500 — UpdateRoute PUT Returns 500 (REVISED)
 
 ## 背景
 - **發現時間**: 2026-06-18 06:44 UTC（QA Verification）
-- **發現方式**: QA smoke test — `PUT /routes/{id}` 返回 500 INTERNAL_ERROR
-- **嚴重程度**: P0（功能阻斷 — Route 無法更新）
-- **根因假設**: 與 UpdateService 相同的 `orBool` 問題（需 Dev Agent 確認）
+- **QA 驗證時間**: 2026-06-18 07:30 UTC
+- **小黑判定**: UpdateService ✅ 已修，UpdateRoute 🔴 未完全修
+
+## 根因（小黑確認）
+1. `UpdateRoute`（store.go:704-728）對 bool/int 欄位無 COALESCE 保護
+2. 當 JSON 未攜帶某欄位時，Go struct 該欄位為 zero value（false/0），直接寫入 DB
+3. `UpdateService` 已用 `COALESCE/NULLIF` 修復（int/port/retries），但 bool (`enabled`) 仍用 `orBool`
+4. **根本問題**：JSON unmarshal 無法區分 absent field vs explicit false/0
+5. **真正修復方向**：指標類型（`*bool`/`*int`）才能區分 absent vs zero value
 
 ## 目標
-- 修復 `PUT /routes/{id}` 返回 500 的問題
+- 修復 `PUT /routes/{id}` 返回 500 的問題（UpdateService 已修，UpdateRoute 未修完）
 - 修補落實後，UpdateRoute 必須：
-  1. 正確區分 absent field vs explicit false
+  1. 正確區分 absent field vs explicit false/0
   2. 未傳入的欄位保留原值
   3. Partial update 必須保留其他欄位
 
 ## Scope
 
 ### In-scope
-- `store.go` UpdateRoute 的 args/setClauses 邏輯
-- JSON unmarshal 處理 absent/null 欄位
-- 與 CreateRoute 比對找出差異
+- `models.go` Route struct：將 bool/int 欄位改為指標類型（`*bool`/`*int`）
+- `store.go` UpdateRoute：使用 `COALESCE/NULLIF` 動態 SQL
+- `routes/routes.go` UpdateRoute handler：確保正確處理 nil 指標
+- 指標類型 ripple effect：所有使用 Route 欄位的地方
 
 ### Out-of-scope
 - CreateRoute / GetRoute / DeleteRoute（已正常）
-- Route matching logic（另一個已經修好的 bug）
+- PATCH 方法
 
 ## 驗收標準
-1. `PUT /routes/{id}` with `{"description":"updated"}` → 200，保留原 name/paths
-2. `PUT /routes/{id}` with `{"enabled":false}` → 200，明確設為 false
+1. `PUT /routes/{id}` with `{"strip_path":true}` → 200，`preserve_host`/`enabled` 保留原值
+2. `PUT /routes/{id}` with `{"enabled":false}` → 200，明確設為 false，其他欄位保留
 3. `PUT /routes/{id}` with `{"name":"new-route","paths":["/new"]}` → 200，兩者都更新
-4. `GET /routes/{id}` after update → 顯示更新後的值
-
-## 參考修復
-- `UpdateUpstream` 已成功使用 `COALESCE(NULLIF($2,''), name)` 模式（event.md line 399-413）
-- Dev Agent 應比對 UpdateUpstream vs UpdateRoute 的實作差異
+4. `GET /routes/{id}` after update → 顯示更新後的值，未更新欄位不變
+5. `PUT /routes/{id}` with `{"regex_priority":10}` → 200，其他欄位保留
