@@ -701,16 +701,16 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 		argIdx++
 	}
 
-	// bool fields — only update if pointer is non-nil
+	// bool fields — only update if pointer is non-nil; direct assignment since nil check handles absent
 	if r.StripPath != nil {
 		args = append(args, *r.StripPath)
-		setClauses = append(setClauses, fmt.Sprintf("strip_path=COALESCE(NULLIF($%d,''), strip_path)", argIdx))
+		setClauses = append(setClauses, fmt.Sprintf("strip_path=$%d", argIdx))
 		argIdx++
 	}
 
 	if r.PreserveHost != nil {
 		args = append(args, *r.PreserveHost)
-		setClauses = append(setClauses, fmt.Sprintf("preserve_host=COALESCE(NULLIF($%d,''), preserve_host)", argIdx))
+		setClauses = append(setClauses, fmt.Sprintf("preserve_host=$%d", argIdx))
 		argIdx++
 	}
 
@@ -735,7 +735,7 @@ func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
 
 	if r.Enabled != nil {
 		args = append(args, *r.Enabled)
-		setClauses = append(setClauses, fmt.Sprintf("enabled=COALESCE(NULLIF($%d,''), enabled)", argIdx))
+		setClauses = append(setClauses, fmt.Sprintf("enabled=$%d", argIdx))
 		argIdx++
 	}
 
@@ -783,13 +783,13 @@ func (s *Store) PatchRoute(id, orgID string, fields map[string]interface{}) (*Ro
 		addSet("name", coalesceString(v, current.Name))
 	}
 	if v, present := fields["strip_path"]; present {
-		addSet("strip_path", coalesceBool(v, current.StripPath))
+		addSet("strip_path", coalesceBool(v, derefBool(current.StripPath)))
 	}
 	if v, present := fields["preserve_host"]; present {
-		addSet("preserve_host", coalesceBool(v, current.PreserveHost))
+		addSet("preserve_host", coalesceBool(v, derefBool(current.PreserveHost)))
 	}
 	if v, present := fields["enabled"]; present {
-		addSet("enabled", coalesceBool(v, current.Enabled))
+		addSet("enabled", coalesceBool(v, derefBool(current.Enabled)))
 	}
 
 	if len(setParts) == 0 {
