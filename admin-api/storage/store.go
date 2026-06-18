@@ -60,7 +60,7 @@ func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error)
 		if read.Valid { r.ReadTimeout = int(read.Int64) }
 		if write.Valid { r.WriteTimeout = int(write.Int64) }
 		if upstreamID.Valid { r.UpstreamID = upstreamID.String }
-		if enabled.Valid { r.Enabled = enabled.Bool }
+		if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
@@ -83,7 +83,7 @@ func (s *Store) CreateService(svc *Service) (*Service, error) {
 		svc.Path, svc.URL, orInt(svc.Retries, 5),
 		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
 		orInt(svc.WriteTimeout, 60000), svc.UpstreamID,
-		orBool(svc.Enabled, true), orgID,
+		orBool(derefBool(svc.Enabled), true), orgID,
 	).Scan(&id, &svc.CreatedAt, &svc.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -213,7 +213,7 @@ func (s *Store) PatchService(id, orgID string, fields map[string]interface{}) (*
 		}
 	}
 	if _, present := fields["enabled"]; present {
-		addSet("enabled", coalesceBool(fields["enabled"], current.Enabled))
+		addSet("enabled", coalesceBool(fields["enabled"], derefBool(current.Enabled)))
 	}
 
 	if len(setParts) == 0 {
@@ -260,7 +260,7 @@ func (s *Store) PatchService(id, orgID string, fields map[string]interface{}) (*
 		current.WriteTimeout = int(write.Int64)
 	}
 	if enabled.Valid {
-		current.Enabled = enabled.Bool
+		current.Enabled = newBool(enabled.Bool)
 	}
 	current.OrgID = orgID
 	if created.Valid {
@@ -334,7 +334,7 @@ func (s *Store) getOneService(row *sql.Row) (*Service, error) {
 		r.WriteTimeout = int(write.Int64)
 	}
 	if enabled.Valid {
-		r.Enabled = enabled.Bool
+		r.Enabled = newBool(enabled.Bool)
 	}
 	if created.Valid {
 		r.CreatedAt = created.String
@@ -383,7 +383,7 @@ func (s *Store) ListGrpcServices(orgID string, limit, offset int) ([]GrpcService
 		r.Package = pkg.String
 		r.ProtoFile = proto.String
 		r.UpstreamID = upstreamID.String
-		if enabled.Valid { r.Enabled = enabled.Bool }
+		if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
@@ -430,7 +430,7 @@ func (s *Store) GetGrpcService(id, orgID string) (*GrpcService, error) {
 	r.Package = pkg.String
 	r.ProtoFile = proto.String
 	r.UpstreamID = upstreamID.String
-	if enabled.Valid { r.Enabled = enabled.Bool }
+	if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
 	if created.Valid { r.CreatedAt = created.String }
 	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
@@ -458,7 +458,7 @@ func (s *Store) UpdateGrpcService(id, orgID string, gs *GrpcService) (*GrpcServi
 	r.Package = pkg.String
 	r.ProtoFile = proto.String
 	r.UpstreamID = upstreamID.String
-	if enabled.Valid { r.Enabled = enabled.Bool }
+	if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
 	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
 }
@@ -495,7 +495,7 @@ func (s *Store) ListGrpcMethods(serviceID, orgID string) ([]GrpcMethod, error) {
 		r.MethodType = methodType.String
 		r.InputType = inputType.String
 		r.OutputType = outputType.String
-		if enabled.Valid { r.Enabled = enabled.Bool }
+		if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
@@ -1730,6 +1730,8 @@ func derefBool(v *bool) bool {
 	}
 	return *v
 }
+
+func newBool(v bool) *bool { return &v }
 
 func derefInt(v *int) int {
 	if v == nil {
