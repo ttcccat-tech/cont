@@ -383,7 +383,7 @@ func (s *Store) ListGrpcServices(orgID string, limit, offset int) ([]GrpcService
 		r.Package = pkg.String
 		r.ProtoFile = proto.String
 		r.UpstreamID = upstreamID.String
-		if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
+		if enabled.Valid { r.Enabled = enabled.Bool }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
@@ -430,7 +430,7 @@ func (s *Store) GetGrpcService(id, orgID string) (*GrpcService, error) {
 	r.Package = pkg.String
 	r.ProtoFile = proto.String
 	r.UpstreamID = upstreamID.String
-	if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
+	if enabled.Valid { r.Enabled = enabled.Bool }
 	if created.Valid { r.CreatedAt = created.String }
 	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
@@ -458,7 +458,7 @@ func (s *Store) UpdateGrpcService(id, orgID string, gs *GrpcService) (*GrpcServi
 	r.Package = pkg.String
 	r.ProtoFile = proto.String
 	r.UpstreamID = upstreamID.String
-	if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
+	if enabled.Valid { r.Enabled = enabled.Bool }
 	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
 }
@@ -495,7 +495,7 @@ func (s *Store) ListGrpcMethods(serviceID, orgID string) ([]GrpcMethod, error) {
 		r.MethodType = methodType.String
 		r.InputType = inputType.String
 		r.OutputType = outputType.String
-		if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
+		if enabled.Valid { r.Enabled = enabled.Bool }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)

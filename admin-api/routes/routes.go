@@ -632,6 +632,23 @@ func UpdateRoute(store *storage.Store) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
+			// Empty {} body causes all setClauses to be empty → invalid SQL
+			// Treat as "no-op" update: fetch current route and return it
+			if strings.Contains(err.Error(), "syntax at or near \"WHERE\"") ||
+				strings.Contains(err.Error(), "pq: syntax error") ||
+				strings.Contains(err.Error(), "SET WHERE") {
+				current, getErr := store.GetRoute(c.Param("id"), orgID)
+				if getErr == sql.ErrNoRows {
+					notFound(c, "route not found")
+					return
+				}
+				if getErr != nil {
+					internalError(c)
+					return
+				}
+				c.JSON(200, current)
+				return
+			}
 			internalError(c)
 			return
 		}
