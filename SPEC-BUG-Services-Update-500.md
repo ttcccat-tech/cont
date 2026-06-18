@@ -1,27 +1,48 @@
 # SPEC-BUG-Services-Update-500
 
 ## 背景
-- **發現時間**: 2026-06-16 15:13 UTC
-- **嚴重程度**: 🟡 P1（API 對 invalid UUID return 500，應 return 400）
+- **發現時間**: 2026-06-18 06:44 AM UTC（QA Verification）
 - **API**: PUT /services/{id}
-- **預期**: 200 或 400（UUID 格式錯誤）
-- **實際**: 500（UUID 格式錯誤時）
+- **預期**: 200 + 更新後的 Service JSON
+- **實際**: 500 INTERNAL_ERROR
 
-## 根因（小黑確診）
-- API handler 直接把 `c.Param("id")` 傳給 PostgreSQL，沒有 validate UUID format
-- PostgreSQL `id = '1'::uuid` → ERROR: invalid input syntax for type uuid → 500 INTERNAL_ERROR
-- 當使用正確 UUID format（如 `72f6c454-2342-420a-b72c-5952e659222e`）→ ✅ 200
-- QA Run #2 使用 `id=1`（非 UUID），因此看到 500
+## 小黑根因確認（2026-06-18 09:00）
+
+### 為何 UpdateService 500
+1. `UpdateService` (store.go:119) 使用 `COALESCE(NULLIF(...))` 模式處理 string/int 欄位
+2. **Bool 欄位 (`enabled`) 也用了 COALESCE/NULLIF，但 PostgreSQL bool 不接受 `''` 字串**，導致 SQL 錯誤
+3. 正確做法（UpdateRoute 已在 `84309f98` 修復）: bool 欄位用直接賦值 `$N`，不透過 COALESCE/NULLIF
+4. `orBool(svc.Enabled, true)` 邏輯問題: 當 JSON body 為 `{}` 時，`Enabled=false`（Go zero value），`orBool(false, true) → true`，覆蓋 DB 舊值
+
+### SQL 錯誤推導
+```sql
+-- store.go:130:
+enabled=$13  -- $13 = orBool(svc.Enabled, true)
+
+-- 當 svc.Enabled = false (zero value):
+-- orBool(false, true) → true → 意圖: "若未提供 enabled 欄位，保持 DB 值"
+-- 但 SQL: enabled=true (沒有 COALESCE，總是寫入)
+-- vs COALESCE(NULLIF($13,''), enabled) → NULLIF(true, '') = true → OK
+-- vs 直接 enabled=$13 = true → 但若要保留舊值做不到
+```
+
+真正 bug: **UpdateService 的 bool enabled 欄位沒有 COALESCE 保留舊值邏輯**，導致部分場景 SQL 錯誤或邏輯錯誤。
 
 ## Scope
+
 ### In-scope
-- 修復：API handler 收到 non-UUID id 時 return 400（Bad Request），不回 500
+- `storage/store.go` UpdateService: 修復 `enabled` 欄位的 SQL 處理（對齊 UpdateRoute `84309f98` 修復模式）
+- Docker build --no-cache cont-admin-api
+- 驗證 PUT /services/{id} → 200
 
 ### Out-of-scope
-- 不改 Store 層（Store 預期收到有效 UUID）
-- 不改 DB schema
+- PatchService（已有完整 field-presence detection，無需修改）
+- CreateService
+- 其他 model 的 Update
 
 ## 驗收標準
-- [ ] PUT /services/{id}，id 為 non-UUID（如 `1`）→ return 400 + error message
-- [ ] PUT /services/{id}，id 為 valid UUID → return 200
-- [ ] PUT /services/{id}，id 為 valid UUID 但記錄不存在 → return 404
+1. `PUT /services/{id}` with `{}` body → enabled 欄位保持 DB 舊值 → 200
+2. `PUT /services/{id}` with `{"enabled": false}` → enabled 設為 false → 200
+3. `PUT /services/{id}` with `{"enabled": true}` → enabled 設為 true → 200
+4. Docker build --no-cache 成功
+5. Container restart 後 healthy
