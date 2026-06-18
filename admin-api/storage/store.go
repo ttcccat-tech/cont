@@ -127,13 +127,13 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 			port=CASE WHEN $5 = 0 THEN port ELSE $5 END, path=COALESCE(NULLIF($6,''), path), url=COALESCE(NULLIF($7,''), url),
 			retries=CASE WHEN $8 = 0 THEN retries ELSE $8 END, connect_timeout=CASE WHEN $9 = 0 THEN connect_timeout ELSE $9 END,
 			read_timeout=CASE WHEN $10 = 0 THEN read_timeout ELSE $10 END, write_timeout=CASE WHEN $11 = 0 THEN write_timeout ELSE $11 END,
-			upstream_id=NULLIF($12, '')::uuid, enabled=$13, updated_at=NOW()
+			upstream_id=NULLIF($12, '')::uuid, enabled=COALESCE($13, enabled), updated_at=NOW()
 		WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($14, ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at`,
 		id, svc.Name, svc.Protocol, svc.Host,
 		svc.Port, svc.Path, svc.URL, svc.Retries,
 		svc.ConnectTimeout, svc.ReadTimeout,
 		svc.WriteTimeout, svc.UpstreamID,
-		orBool(svc.Enabled, true),
+		svc.Enabled,
 		orgID,
 	).Scan(&svc.UpdatedAt)
 	if err != nil {
