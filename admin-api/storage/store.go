@@ -60,7 +60,7 @@ func (s *Store) ListServices(orgID string, limit, offset int) ([]Service, error)
 		if read.Valid { r.ReadTimeout = int(read.Int64) }
 		if write.Valid { r.WriteTimeout = int(write.Int64) }
 		if upstreamID.Valid { r.UpstreamID = upstreamID.String }
-		if enabled.Valid { r.Enabled = enabled.Bool }
+		if enabled.Valid { r.Enabled = newBool(enabled.Bool) }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
@@ -83,7 +83,7 @@ func (s *Store) CreateService(svc *Service) (*Service, error) {
 		svc.Path, svc.URL, orInt(svc.Retries, 5),
 		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
 		orInt(svc.WriteTimeout, 60000), svc.UpstreamID,
-		orBool(svc.Enabled, true), orgID,
+		orBool(derefBool(svc.Enabled), true), orgID,
 	).Scan(&id, &svc.CreatedAt, &svc.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -123,15 +123,17 @@ func (s *Store) UpdateService(id, orgID string, svc *Service) (*Service, error) 
 	}
 	err := s.db.QueryRow(`
 		UPDATE services SET
-			name=$2, protocol=$3, host=$4, port=$5, path=$6, url=$7,
-			retries=$8, connect_timeout=$9, read_timeout=$10,
-			write_timeout=$11, upstream_id=NULLIF($12, '')::uuid, enabled=$13, updated_at=NOW()
+			name=COALESCE(NULLIF($2,''), name), protocol=COALESCE(NULLIF($3,''), protocol), host=COALESCE(NULLIF($4,''), host),
+			port=CASE WHEN $5 = 0 THEN port ELSE $5 END, path=COALESCE(NULLIF($6,''), path), url=COALESCE(NULLIF($7,''), url),
+			retries=CASE WHEN $8 = 0 THEN retries ELSE $8 END, connect_timeout=CASE WHEN $9 = 0 THEN connect_timeout ELSE $9 END,
+			read_timeout=CASE WHEN $10 = 0 THEN read_timeout ELSE $10 END, write_timeout=CASE WHEN $11 = 0 THEN write_timeout ELSE $11 END,
+			upstream_id=NULLIF($12, '')::uuid, enabled=COALESCE($13, enabled), updated_at=NOW()
 		WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($14, ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at`,
-		id, svc.Name, orString(svc.Protocol, "http"), svc.Host,
-		orInt(svc.Port, 80), svc.Path, svc.URL, orInt(svc.Retries, 5),
-		orInt(svc.ConnectTimeout, 60000), orInt(svc.ReadTimeout, 60000),
-		orInt(svc.WriteTimeout, 60000), svc.UpstreamID,
-		orBool(svc.Enabled, true),
+		id, svc.Name, svc.Protocol, svc.Host,
+		svc.Port, svc.Path, svc.URL, svc.Retries,
+		svc.ConnectTimeout, svc.ReadTimeout,
+		svc.WriteTimeout, svc.UpstreamID,
+		svc.Enabled,
 		orgID,
 	).Scan(&svc.UpdatedAt)
 	if err != nil {
@@ -211,7 +213,7 @@ func (s *Store) PatchService(id, orgID string, fields map[string]interface{}) (*
 		}
 	}
 	if _, present := fields["enabled"]; present {
-		addSet("enabled", coalesceBool(fields["enabled"], current.Enabled))
+		addSet("enabled", coalesceBool(fields["enabled"], derefBool(current.Enabled)))
 	}
 
 	if len(setParts) == 0 {
@@ -258,7 +260,7 @@ func (s *Store) PatchService(id, orgID string, fields map[string]interface{}) (*
 		current.WriteTimeout = int(write.Int64)
 	}
 	if enabled.Valid {
-		current.Enabled = enabled.Bool
+		current.Enabled = newBool(enabled.Bool)
 	}
 	current.OrgID = orgID
 	if created.Valid {
@@ -332,7 +334,7 @@ func (s *Store) getOneService(row *sql.Row) (*Service, error) {
 		r.WriteTimeout = int(write.Int64)
 	}
 	if enabled.Valid {
-		r.Enabled = enabled.Bool
+		r.Enabled = newBool(enabled.Bool)
 	}
 	if created.Valid {
 		r.CreatedAt = created.String
@@ -565,12 +567,12 @@ func (s *Store) ListRoutes(orgID string, limit, offset int) ([]Route, error) {
 		jsonScanSlice(&r.Methods, methods)
 		if name.Valid { r.Name = name.String }
 		if serviceID.Valid { r.Service = &ServiceRef{ID: serviceID.String} }
-		if stripPath.Valid { r.StripPath = stripPath.Bool }
-		if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
-		if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
-		if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
-		if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
-		if enabled.Valid { r.Enabled = enabled.Bool }
+		if stripPath.Valid { b := stripPath.Bool; r.StripPath = &b }
+		if preserveHost.Valid { b := preserveHost.Bool; r.PreserveHost = &b }
+		if regexPriority.Valid { v := int(regexPriority.Int64); r.RegexPriority = &v }
+		if httpsStatus.Valid { v := int(httpsStatus.Int64); r.HTTPSRedirectStatusCode = &v }
+		if connTimeout.Valid { v := int(connTimeout.Int64); r.ConnectionTimeout = &v }
+		if enabled.Valid { b := enabled.Bool; r.Enabled = &b }
 		if created.Valid { r.CreatedAt = created.String }
 		if updated.Valid { r.UpdatedAt = updated.String }
 		out = append(out, r)
@@ -600,9 +602,9 @@ func (s *Store) CreateRoute(r *Route) (*Route, error) {
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING id, created_at, updated_at`,
 		r.Name, serviceIDArg, "{"+strings.Join(protocols,",")+"}", "{"+strings.Join(hosts,",")+"}", "{"+strings.Join(paths,",")+"}", "{"+strings.Join(methods,",")+"}",
-		orBool(r.StripPath, true), orBool(r.PreserveHost, false),
-		orInt(r.RegexPriority, 0), orInt(r.HTTPSRedirectStatusCode, 426),
-		orInt(r.ConnectionTimeout, 60000), orBool(r.Enabled, true), orgID,
+		orBool(derefBool(r.StripPath), true), orBool(derefBool(r.PreserveHost), false),
+		orInt(derefInt(r.RegexPriority), 0), orInt(derefInt(r.HTTPSRedirectStatusCode), 426),
+		orInt(derefInt(r.ConnectionTimeout), 60000), orBool(derefBool(r.Enabled), true), orgID,
 	).Scan(&r.ID, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -639,64 +641,116 @@ func (s *Store) GetRoute(id, orgID string) (*Route, error) {
 	jsonScanSlice(&r.Hosts, hosts)
 	jsonScanSlice(&r.Paths, paths)
 	jsonScanSlice(&r.Methods, methods)
-	if stripPath.Valid { r.StripPath = stripPath.Bool }
-	if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
-	if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
-	if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
-	if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
-	if enabled.Valid { r.Enabled = enabled.Bool }
+	if stripPath.Valid { b := stripPath.Bool; r.StripPath = &b }
+	if preserveHost.Valid { b := preserveHost.Bool; r.PreserveHost = &b }
+	if regexPriority.Valid { v := int(regexPriority.Int64); r.RegexPriority = &v }
+	if httpsStatus.Valid { v := int(httpsStatus.Int64); r.HTTPSRedirectStatusCode = &v }
+	if connTimeout.Valid { v := int(connTimeout.Int64); r.ConnectionTimeout = &v }
+	if enabled.Valid { b := enabled.Bool; r.Enabled = &b }
 	if created.Valid { r.CreatedAt = created.String }
 	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
 }
 
 func (s *Store) UpdateRoute(id, orgID string, r *Route) (*Route, error) {
-	protocols := orSlice(r.Protocols, []string{"http", "https"})
-	hosts := orSlice(r.Hosts, []string{})
-	paths := orSlice(r.Paths, []string{})
-	methods := orSlice(r.Methods, []string{})
-
 	svcID := r.GetServiceID()
 
-	// Build args FIRST, then setClauses with correct placeholder indices based on actual args positions.
-	// Without service_id: args = [id, name, protocols, hosts, paths, methods, strip_path, preserve_host,
-	//                           regex_priority, https_redirect_status_code, connection_timeout, enabled, orgID]
-	// With service_id:    args = [id, name, protocols, hosts, paths, methods, strip_path, preserve_host,
-	//                           regex_priority, https_redirect_status_code, connection_timeout, enabled, service_id, orgID]
+	// Build args only for fields that were explicitly provided (non-nil).
+	// Nil slice = user didn't provide this field → preserve DB value via COALESCE.
+	// Non-nil slice (even empty) = user explicitly provided it → update to new value.
+	args := []interface{}{id}
+	setClauses := []string{}
+	argIdx := 2 // next placeholder index
 
-	args := []interface{}{
-		id,                    // $1
-		r.Name,                // $2
-		"{" + strings.Join(protocols, ",") + "}", // $3
-		"{" + strings.Join(hosts, ",") + "}",    // $4
-		"{" + strings.Join(paths, ",") + "}",    // $5
-		"{" + strings.Join(methods, ",") + "}", // $6
-		orBool(r.StripPath, true),               // $7
-		orBool(r.PreserveHost, false),            // $8
-		orInt(r.RegexPriority, 0),               // $9
-		orInt(r.HTTPSRedirectStatusCode, 426),   // $10
-		orInt(r.ConnectionTimeout, 60000),       // $11
-		orBool(r.Enabled, true),                  // $12
-	}
-	setClauses := []string{
-		"name=$2", "protocols=$3", "hosts=$4", "paths=$5", "methods=$6",
-		"strip_path=$7", "preserve_host=$8", "regex_priority=$9",
-		"https_redirect_status_code=$10", "connection_timeout=$11", "enabled=$12",
+	// name
+	if r.Name != "" {
+		args = append(args, r.Name)
+		setClauses = append(setClauses, "name=COALESCE(NULLIF($"+strconv.Itoa(argIdx)+",''), name)")
+		argIdx++
 	}
 
-	var orgIDArgIndex int
+	// protocols (non-nil means user provided it, even if empty)
+	if r.Protocols != nil {
+		arr, _ := json.Marshal(r.Protocols)
+		args = append(args, string(arr))
+		setClauses = append(setClauses, "protocols=$"+strconv.Itoa(argIdx))
+		argIdx++
+	}
+
+	// hosts
+	if r.Hosts != nil {
+		arr, _ := json.Marshal(r.Hosts)
+		args = append(args, string(arr))
+		setClauses = append(setClauses, "hosts=$"+strconv.Itoa(argIdx))
+		argIdx++
+	}
+
+	// paths
+	if r.Paths != nil {
+		arr, _ := json.Marshal(r.Paths)
+		args = append(args, string(arr))
+		setClauses = append(setClauses, "paths=$"+strconv.Itoa(argIdx))
+		argIdx++
+	}
+
+	// methods
+	if r.Methods != nil {
+		arr, _ := json.Marshal(r.Methods)
+		args = append(args, string(arr))
+		setClauses = append(setClauses, "methods=$"+strconv.Itoa(argIdx))
+		argIdx++
+	}
+
+	// bool fields — only update if pointer is non-nil; direct assignment since nil check handles absent
+	if r.StripPath != nil {
+		args = append(args, *r.StripPath)
+		setClauses = append(setClauses, fmt.Sprintf("strip_path=$%d", argIdx))
+		argIdx++
+	}
+
+	if r.PreserveHost != nil {
+		args = append(args, *r.PreserveHost)
+		setClauses = append(setClauses, fmt.Sprintf("preserve_host=$%d", argIdx))
+		argIdx++
+	}
+
+	// int fields — use CASE to detect zero-value (preserve DB) vs explicit value
+	if r.RegexPriority != nil {
+		args = append(args, *r.RegexPriority)
+		setClauses = append(setClauses, fmt.Sprintf("regex_priority=CASE WHEN $%d=0 THEN regex_priority ELSE $%d END", argIdx, argIdx))
+		argIdx++
+	}
+
+	if r.HTTPSRedirectStatusCode != nil {
+		args = append(args, *r.HTTPSRedirectStatusCode)
+		setClauses = append(setClauses, fmt.Sprintf("https_redirect_status_code=CASE WHEN $%d=0 THEN https_redirect_status_code ELSE $%d END", argIdx, argIdx))
+		argIdx++
+	}
+
+	if r.ConnectionTimeout != nil {
+		args = append(args, *r.ConnectionTimeout)
+		setClauses = append(setClauses, fmt.Sprintf("connection_timeout=CASE WHEN $%d=0 THEN connection_timeout ELSE $%d END", argIdx, argIdx))
+		argIdx++
+	}
+
+	if r.Enabled != nil {
+		args = append(args, *r.Enabled)
+		setClauses = append(setClauses, fmt.Sprintf("enabled=$%d", argIdx))
+		argIdx++
+	}
+
+	// service_id
 	if svcID != "" {
-		// service_id goes after enabled (at $13), orgID at $14
-		args = append(args, svcID) // service_id at $13
-		setClauses = append(setClauses, "service_id=$13")
-		orgIDArgIndex = 14
-	} else {
-		// orgID at $13
-		orgIDArgIndex = 13
+		args = append(args, svcID)
+		setClauses = append(setClauses, "service_id=$"+strconv.Itoa(argIdx))
+		argIdx++
 	}
-	args = append(args, orgID) // orgID at $13 or $14
 
-	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($" + strconv.Itoa(orgIDArgIndex) + ", ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at"
+	// org_id (always last)
+	args = append(args, orgID)
+	orgIDArgIdx := argIdx
+
+	query := "UPDATE routes SET " + strings.Join(setClauses, ", ") + " WHERE id=$1 AND COALESCE(NULLIF(org_id::text, ''), '00000000-0000-0000-0000-000000000000') = COALESCE(NULLIF($" + strconv.Itoa(orgIDArgIdx) + ", ''), '00000000-0000-0000-0000-000000000000') RETURNING updated_at"
 
 	err := s.db.QueryRow(query, args...).Scan(&r.UpdatedAt)
 	if err != nil {
@@ -729,13 +783,13 @@ func (s *Store) PatchRoute(id, orgID string, fields map[string]interface{}) (*Ro
 		addSet("name", coalesceString(v, current.Name))
 	}
 	if v, present := fields["strip_path"]; present {
-		addSet("strip_path", coalesceBool(v, current.StripPath))
+		addSet("strip_path", coalesceBool(v, derefBool(current.StripPath)))
 	}
 	if v, present := fields["preserve_host"]; present {
-		addSet("preserve_host", coalesceBool(v, current.PreserveHost))
+		addSet("preserve_host", coalesceBool(v, derefBool(current.PreserveHost)))
 	}
 	if v, present := fields["enabled"]; present {
-		addSet("enabled", coalesceBool(v, current.Enabled))
+		addSet("enabled", coalesceBool(v, derefBool(current.Enabled)))
 	}
 
 	if len(setParts) == 0 {
@@ -769,12 +823,12 @@ func (s *Store) PatchRoute(id, orgID string, fields map[string]interface{}) (*Ro
 	jsonScanSlice(&r.Hosts, hosts)
 	jsonScanSlice(&r.Paths, paths)
 	jsonScanSlice(&r.Methods, methods)
-	if stripPath.Valid { r.StripPath = stripPath.Bool }
-	if preserveHost.Valid { r.PreserveHost = preserveHost.Bool }
-	if regexPriority.Valid { r.RegexPriority = int(regexPriority.Int64) }
-	if httpsStatus.Valid { r.HTTPSRedirectStatusCode = int(httpsStatus.Int64) }
-	if connTimeout.Valid { r.ConnectionTimeout = int(connTimeout.Int64) }
-	if enabled.Valid { r.Enabled = enabled.Bool }
+	if stripPath.Valid { b := stripPath.Bool; r.StripPath = &b }
+	if preserveHost.Valid { b := preserveHost.Bool; r.PreserveHost = &b }
+	if regexPriority.Valid { v := int(regexPriority.Int64); r.RegexPriority = &v }
+	if httpsStatus.Valid { v := int(httpsStatus.Int64); r.HTTPSRedirectStatusCode = &v }
+	if connTimeout.Valid { v := int(connTimeout.Int64); r.ConnectionTimeout = &v }
+	if enabled.Valid { b := enabled.Bool; r.Enabled = &b }
 	if created.Valid { r.CreatedAt = created.String }
 	if updated.Valid { r.UpdatedAt = updated.String }
 	return &r, nil
@@ -1668,6 +1722,22 @@ func orBool(v bool, def bool) bool {
 		return def
 	}
 	return v
+}
+
+func derefBool(v *bool) bool {
+	if v == nil {
+		return false
+	}
+	return *v
+}
+
+func newBool(v bool) *bool { return &v }
+
+func derefInt(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
 }
 
 func orSlice(v []string, def []string) []string {
