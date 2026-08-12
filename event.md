@@ -611,3 +611,55 @@
 - Auth: PASS | Redis counter: PASS | Docker/nginx: PASS | Create/Get/Delete: PASS
 - Update PUT: FAIL (pre-existing orBool bug; PATCH works as workaround)
 
+---
+
+## Development Guardian — 2026-06-18 10:00 AM
+
+### 小黑判定：QA Bug Review
+
+小黑審視 QA Verification (2026-06-18 06:44) 的 bug report，確認：
+
+**🔴 BUG-UpdateService-PUT-500**: ✅ FIXED
+- Root cause: `Service.Enabled *bool` — DB scan 直接賦值 `bool` 而非 `*bool`，build 失敗
+- Fix (Dev Agent): `store.go` 全部 `enabled.Bool` → `newBool(enabled.Bool)` 保持一致
+- Additional fix: `models.go` Service struct — `Enabled *bool`，加上 `newBool()` wrapper
+- Docker build ✅, container healthy ✅, `PUT /services/{id}` → 200 ✅
+
+**🔴 BUG-UpdateRoute-PUT-500**: ✅ FIXED
+- Root cause (event.md 2026-06-18 06:44): `orBool()` 無法區分 absent vs false
+- Fix (develop commits): Route struct pointer types + `COALESCE/NULLIF` 動態 SQL
+- Build fix (Dev Agent 10:13): `store.go:337` `enabled.Bool` → `newBool(enabled.Bool)` 修復 build 錯誤
+- Empty body guard: `routes/routes.go` 新增 `strings.Contains` SQL error 檢測 + 空 body fallback
+- Docker build ✅, container healthy ✅, `PUT /routes/{id}` → 200 ✅
+
+###小黑任務（Dev Agent 執行）
+
+- [✅] TASK-FIX-1: store.go:337 `enabled.Bool` → `newBool(enabled.Bool)`
+- [✅] TASK-FIX-2: routes/routes.go — empty body SQL error guard
+- [✅] TASK-FIX-3: Docker build --no-cache cont-admin-api
+- [✅] TASK-FIX-4: Restart cont-admin-api container
+- [✅] TASK-FIX-5: Verification — `PUT /services/{id}` → 200 ✅
+- [✅] TASK-FIX-6: Verification — `PUT /routes/{id}` → 200 ✅
+
+###小黑驗證（小黑親自）
+
+| Test | Result |
+|------|--------|
+| UpdateService PUT (partial desc) | HTTP 200 ✅ |
+| UpdateRoute PUT (partial desc) | HTTP 200 ✅ |
+| Docker build --no-cache | Built ✅ |
+| Container healthy | cont-admin-api healthy ✅ |
+| git push develop | db9c457a → origin ✅ |
+
+###小黑安全抽檢
+- SQL injection: `store.go` uses parameterized queries (`$1, $2...`) ✅
+- Route update: `c.Param("id")` from URL, validated against DB lookup ✅
+- No `ngx.location.capture` in Lua (already confirmed prior) ✅
+- `config_sync.lua` uses cosocket in init_by_lua ✅
+
+###小黑最終判定
+
+✅ 全部穩定 → `develop → main` Fast-forward merge
+- main: `92cc0de3` (merge develop → main)
+- develop: `db9c457a` (FIX commit)
+
